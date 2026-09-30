@@ -100,6 +100,15 @@ export default async () => {
   });
 
   await describe('createSessionStore — the version and authority canaries', async () => {
+    await it('a truncated file throws a message naming the file', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'sessions.json');
+        writeFileSync(file, '{ "version": 1, "sessions": [ ');
+        const store = createSessionStore(file);
+        expect(() => store.all()).toThrow(/sessions\.json is not valid JSON/);
+      });
+    });
+
     await it('a file whose version is wrong throws a message naming the version', async () => {
       await withTempDir(async (dir) => {
         const file = join(dir, 'sessions.json');

@@ -58,7 +58,15 @@ export function createSessionStore(file: string): SessionStore {
       }
       throw error;
     }
-    const parsed = JSON.parse(raw) as StoreFile;
+    let parsed: StoreFile;
+    try {
+      parsed = JSON.parse(raw) as StoreFile;
+    } catch (error) {
+      // Named, because the bare parser message ("unexpected end of data at line 1 column 31") is
+      // what the GUI's error page showed, and it says what broke but not where. The file is the
+      // one thing a person needs to go and look at.
+      throw new Error(`${file} is not valid JSON: ${(error as Error).message}`);
+    }
     if (parsed?.version !== FILE_VERSION || !Array.isArray(parsed.sessions)) {
       throw new Error(
         `${file} is not a kurier session file (version ${String(parsed?.version)}, expected ${FILE_VERSION})`,
