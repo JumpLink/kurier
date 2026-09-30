@@ -31,8 +31,17 @@
  * The same bargain `narrow.ts` makes for `sessionUpdate`, one level up.
  */
 
-import { narrowConfigSelect, usableConfigValues, type UsableConfigValue } from '@kurier/acp/narrow';
-import type { KnownConfigCategory, SessionConfigOption, SetSessionConfigOptionRequest } from '@kurier/acp/types';
+import {
+  narrowConfigBoolean,
+  narrowConfigSelect,
+  usableConfigValues,
+  type UsableConfigValue,
+} from '@kurier/acp/narrow';
+import type {
+  KnownConfigCategory,
+  SessionConfigOption,
+  SetSessionConfigOptionRequest,
+} from '@kurier/acp/types';
 
 /**
  * One value in a `select`, as the surface shows it.
@@ -115,9 +124,15 @@ const SEARCH_THRESHOLD = 12;
  *   unreachable, and two controls for one value is one too many.
  */
 export function projectConfigOptions(options: SessionConfigOption[] | null | undefined): ConfigControl[] {
+  // The signature says `SessionConfigOption[] | null | undefined`, and that is the contract every
+  // caller holds. But this is the boundary where untrusted wire data arrives, and `for..of` on a
+  // number throws — a crash in the middle of rendering a session, caused by an agent. The runtime
+  // check is one line and was written because the adversarial test hit exactly this: the test typed
+  // `7 as never`, which is a lie the type system could not catch and the wire can still tell.
+  if (!Array.isArray(options)) return [];
   const controls: ConfigControl[] = [];
   const seen = new Set<string>();
-  for (const option of options ?? []) {
+  for (const option of options) {
     if (!option || typeof option.id !== 'string' || option.id === '' || seen.has(option.id)) continue;
     const control = projectOne(option);
     if (!control) continue;
@@ -135,7 +150,12 @@ function projectOne(option: SessionConfigOption): ConfigControl | null {
     category: typeof option.category === 'string' && option.category !== '' ? option.category : null,
   };
   if (option.type === 'boolean') {
-    return typeof option.currentValue === 'boolean' ? { kind: 'switch', ...common, currentValue: option.currentValue } : null;
+    // `narrowConfigBoolean` for symmetry with `narrowConfigSelect`, and because the boolean check
+    // is the *same* kind of statement about the protocol: a `boolean` whose `currentValue` is not a
+    // boolean is not a switch, it is a payload this version does not understand. Kept here rather
+    // than inlined so both arms of the `oneOf` are decided in the same file, by the same reasoning.
+    const toggle = narrowConfigBoolean(option);
+    return toggle ? { kind: 'switch', ...common, currentValue: toggle.currentValue } : null;
   }
   if (option.type !== 'select') return null;
   // The protocol-level half of the decision is `narrowConfigSelect` — including the check that the
@@ -180,7 +200,10 @@ export function currentLabel(control: ConfigControl): string {
  * schema's (`SetSessionConfigOptionRequest` is an `anyOf` on the request, not on the value), and it
  * is exactly the kind of detail that gets re-derived wrongly in a widget, so it lives here once.
  */
-export function configValue(control: ConfigControl, value: string | boolean): SetSessionConfigOptionRequest['value'] {
+export function configValue(
+  control: ConfigControl,
+  value: string | boolean,
+): SetSessionConfigOptionRequest['value'] {
   if (control.kind === 'switch') {
     return { type: 'boolean', value: typeof value === 'boolean' ? value : value === 'true' };
   }

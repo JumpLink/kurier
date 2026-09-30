@@ -113,8 +113,22 @@ export default async () => {
         notification({
           sessionUpdate: 'config_option_update',
           configOptions: [
-            { id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: 'a/b', options: [{ value: 'a/b', name: 'b' }] },
-            { id: 'effort', name: 'Effort', type: 'select', category: 'thought_level', currentValue: 'high', options: [{ value: 'high', name: 'High' }] },
+            {
+              id: 'model',
+              name: 'Model',
+              type: 'select',
+              category: 'model',
+              currentValue: 'a/b',
+              options: [{ value: 'a/b', name: 'b' }],
+            },
+            {
+              id: 'effort',
+              name: 'Effort',
+              type: 'select',
+              category: 'thought_level',
+              currentValue: 'high',
+              options: [{ value: 'high', name: 'High' }],
+            },
           ],
         }),
         AT,

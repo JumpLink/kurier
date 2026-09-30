@@ -70,7 +70,8 @@ export default async () => {
 
     await it('keeps the mode value’s description — it is the only per-value text ACP has', async () => {
       const control = findControl(projectConfigOptions(opencodeConfigOptions()), 'mode');
-      const plan = control?.kind === 'select' ? control.values.find((value) => value.value === 'plan') : undefined;
+      const plan =
+        control?.kind === 'select' ? control.values.find((value) => value.value === 'plan') : undefined;
       expect(plan?.description).toBe('Propose before changing');
     });
   });
@@ -95,8 +96,22 @@ export default async () => {
       // handle missing or unknown categories gracefully". Dropping it would make an agent's own
       // setting unreachable; guessing a widget for it would be inventing capability.
       const controls = projectConfigOptions([
-        { id: 'temperature', name: 'Temperature', type: 'select', category: 'sampling', currentValue: '0.7', options: [{ value: '0.7', name: '0.7' }] },
-        { id: 'mode', name: 'Session Mode', type: 'select', category: 'mode', currentValue: 'build', options: [{ value: 'build', name: 'Build' }] },
+        {
+          id: 'temperature',
+          name: 'Temperature',
+          type: 'select',
+          category: 'sampling',
+          currentValue: '0.7',
+          options: [{ value: '0.7', name: '0.7' }],
+        },
+        {
+          id: 'mode',
+          name: 'Session Mode',
+          type: 'select',
+          category: 'mode',
+          currentValue: 'build',
+          options: [{ value: 'build', name: 'Build' }],
+        },
       ]);
       expect(ids(controls)).toEqualArray(['mode', 'temperature']);
       expect(controls[1]?.name).toBe('Temperature');
@@ -104,7 +119,13 @@ export default async () => {
 
     await it('a missing category is treated as unknown, not as an error', async () => {
       const controls = projectConfigOptions([
-        { id: 'thing', name: 'Thing', type: 'select', currentValue: 'a', options: [{ value: 'a', name: 'A' }] },
+        {
+          id: 'thing',
+          name: 'Thing',
+          type: 'select',
+          currentValue: 'a',
+          options: [{ value: 'a', name: 'A' }],
+        },
       ]);
       expect(ids(controls)).toEqualArray(['thing']);
       expect(controls[0]?.category).toBe(null);
@@ -124,9 +145,9 @@ export default async () => {
     await it('a boolean with a non-boolean currentValue is skipped', async () => {
       // The schema requires a boolean here. An agent that sends a string has a different `type` in
       // mind, and a switch showing "on" for the text "yes" is a control that lies.
-      expect(projectConfigOptions([{ id: 'web', name: 'Web', type: 'boolean', currentValue: 'yes' }])).toStrictEqual(
-        [],
-      );
+      expect(
+        projectConfigOptions([{ id: 'web', name: 'Web', type: 'boolean', currentValue: 'yes' }]),
+      ).toStrictEqual([]);
     });
   });
 
@@ -140,6 +161,28 @@ export default async () => {
       ).toStrictEqual([]);
     });
 
+    await it('a slider that happens to carry a select-shaped payload is still refused', async () => {
+      // The dangerous version of the case above, and the one that proved the suite was not testing
+      // the guard: an unknown `type` whose payload looks *exactly* like a `select`, so nothing but
+      // the `type` distinguishes it. The `type` is checked in **two** places — `projectOne` and
+      // `narrowConfigSelect` — which is why removing either one alone leaves this green; removing
+      // both is the mutation that fails it, and all three were tried. Two guards for one property is
+      // deliberate: they are in different layers, and one of the two is about presentation and one
+      // about the protocol.
+      expect(
+        projectConfigOptions([
+          {
+            id: 'temp',
+            name: 'Temperature',
+            type: 'slider',
+            category: 'model_config',
+            currentValue: '0.7',
+            options: [{ value: '0.7', name: '0.7' }],
+          },
+        ]),
+      ).toStrictEqual([]);
+    });
+
     await it('a select with no options', async () => {
       expect(
         projectConfigOptions([{ id: 'model', name: 'Model', type: 'select', currentValue: 'a' }]),
@@ -149,7 +192,13 @@ export default async () => {
     await it('a select whose values are all unusable', async () => {
       expect(
         projectConfigOptions([
-          { id: 'model', name: 'Model', type: 'select', currentValue: 'a', options: [{ name: 'no value' } as never] },
+          {
+            id: 'model',
+            name: 'Model',
+            type: 'select',
+            currentValue: 'a',
+            options: [{ name: 'no value' } as never],
+          },
         ]),
       ).toStrictEqual([]);
     });
@@ -174,7 +223,9 @@ export default async () => {
 
     await it('a select with an empty options array', async () => {
       expect(
-        projectConfigOptions([{ id: 'model', name: 'Model', type: 'select', currentValue: 'a', options: [] }]),
+        projectConfigOptions([
+          { id: 'model', name: 'Model', type: 'select', currentValue: 'a', options: [] },
+        ]),
       ).toStrictEqual([]);
     });
 
@@ -195,8 +246,20 @@ export default async () => {
 
     await it('a second option with an id already seen — the duplicate is unreachable', async () => {
       const controls = projectConfigOptions([
-        { id: 'model', name: 'First', type: 'select', currentValue: 'a', options: [{ value: 'a', name: 'A' }] },
-        { id: 'model', name: 'Second', type: 'select', currentValue: 'b', options: [{ value: 'b', name: 'B' }] },
+        {
+          id: 'model',
+          name: 'First',
+          type: 'select',
+          currentValue: 'a',
+          options: [{ value: 'a', name: 'A' }],
+        },
+        {
+          id: 'model',
+          name: 'Second',
+          type: 'select',
+          currentValue: 'b',
+          options: [{ value: 'b', name: 'B' }],
+        },
       ]);
       expect(controls.length).toBe(1);
       expect(controls[0]?.name).toBe('First');
@@ -221,9 +284,121 @@ export default async () => {
       expect(control?.kind === 'select' ? control.values.length : 0).toBe(1);
     });
 
+    await it('a value of "" is not a value — it cannot be sent back', async () => {
+      // `session/set_config_option` sends `value` as the id, so an empty string is a request the
+      // agent cannot match to anything. The one non-obvious half of this: with the `""` filter
+      // removed, the *whole option* survives rather than being dropped, because the surviving value
+      // is the selected one. Verified as a mutation.
+      expect(
+        projectConfigOptions([
+          {
+            id: 'mode',
+            name: 'Mode',
+            type: 'select',
+            currentValue: '',
+            options: [
+              { value: '', name: 'Empty' },
+              { value: 'build', name: 'Build' },
+            ],
+          },
+        ]),
+      ).toStrictEqual([]);
+    });
+
+    await it('a non-object entry among the values is skipped, the rest survive', async () => {
+      const control = findControl(
+        projectConfigOptions([
+          {
+            id: 'mode',
+            name: 'Mode',
+            type: 'select',
+            currentValue: 'build',
+            options: [null, 'build', 7, { value: 'build', name: 'Build' }] as never,
+          },
+        ]),
+        'mode',
+      );
+      expect(control?.kind === 'select' ? control.values.length : 0).toBe(1);
+    });
+
     await it('an option with an empty id, and one that is not an object', async () => {
       expect(projectConfigOptions([{ id: '', name: 'Nameless', type: 'select' } as never])).toStrictEqual([]);
       expect(projectConfigOptions([null as never, undefined as never])).toStrictEqual([]);
+    });
+  });
+
+  await describe('adversarial input — nothing may throw, everything is refused or drawn', async () => {
+    const HOSTILE: unknown[] = [
+      undefined,
+      null,
+      0,
+      1,
+      '',
+      'select',
+      true,
+      false,
+      Symbol('x'),
+      10n,
+      () => 1,
+      [],
+      [null],
+      [[]],
+      [{}],
+      [{ value: {} }],
+      [{ value: [] }],
+      [{ name: 'x' }],
+      { options: 'not-an-array' },
+      { options: { length: 2 } },
+      { options: 7 },
+      { currentValue: {} },
+      { currentValue: [] },
+      { currentValue: null },
+      { type: 'select', currentValue: 'a', options: { 0: { value: 'a' } } },
+      { type: 'select', currentValue: 'a', options: [Object.create(null)] },
+      { type: 'select', currentValue: 'a', options: [{ value: 'a', name: { toString: null } }] },
+      { type: { toString: () => 'select' }, currentValue: 'a', options: [{ value: 'a' }] },
+      { id: 'a', type: 'select', currentValue: 'a', options: [{ value: 'a' }], category: {} },
+      { id: 'a', type: 'boolean', currentValue: 0 },
+      { id: 'a', type: 'boolean', currentValue: new Boolean(true) },
+      { id: 'a', type: 'select', currentValue: 'a', options: [{ value: 'a', name: '' }] },
+    ];
+
+    await it('never throws on any of them', async () => {
+      for (const input of HOSTILE) {
+        let thrown: string | null = null;
+        let result: unknown = null;
+        try {
+          result = projectConfigOptions([input as never]);
+        } catch (error) {
+          thrown = error instanceof Error ? error.message : String(error);
+        }
+        if (thrown !== null) throw new Error(`threw on ${String(input)}: ${thrown}`);
+        // Whatever came back must be drawable: a control whose name or id is not a string, or whose
+        // current value is not among its own values, is the failure this whole module exists to stop.
+        for (const control of (result ?? []) as ConfigControl[]) {
+          if (typeof control.id !== 'string' || control.id === '') throw new Error('id is not a string');
+          if (typeof control.name !== 'string' || control.name === '')
+            throw new Error('name is not a string');
+          if (control.kind === 'switch' && typeof control.currentValue !== 'boolean') {
+            throw new Error('switch without a boolean');
+          }
+          if (control.kind === 'select') {
+            for (const value of control.values) {
+              if (typeof value.value !== 'string' || value.value === '')
+                throw new Error('unusable value survived');
+            }
+            if (!control.values.some((value) => value.value === control.currentValue)) {
+              throw new Error('select whose currentValue is not among its values survived');
+            }
+          }
+        }
+      }
+    });
+
+    await it('treats a top-level non-array as no options at all', async () => {
+      for (const input of ['nope', 7, {}, null, undefined, true]) {
+        expect(projectConfigOptions(input as never)).toStrictEqual([]);
+      }
     });
   });
 
@@ -265,7 +440,14 @@ export default async () => {
     await it('falls back to the id when no value matches', async () => {
       const control = findControl(
         projectConfigOptions([
-          { id: 'x', name: 'X', type: 'select', category: 'other', currentValue: 'a', options: [{ value: 'a', name: 'A' }] },
+          {
+            id: 'x',
+            name: 'X',
+            type: 'select',
+            category: 'other',
+            currentValue: 'a',
+            options: [{ value: 'a', name: 'A' }],
+          },
         ]),
         'x',
       );

@@ -252,6 +252,19 @@ export interface SessionConfigSelect extends Extensible {
 }
 
 /**
+ * The payload of a `type: "boolean"` config option: on or off, and nothing else.
+ *
+ * The counterpart to `SessionConfigSelect`, and it exists for the same reason — the two arms of the
+ * `oneOf` disagree about `currentValue`, so they cannot be one type. It is also the whole reason
+ * `KURIER_CLIENT_CAPABILITIES` omits `session.configOptions.boolean`: `opencode acp` 2.0.19 refuses
+ * any value that is not a string, so this shape is defined by the schema and unimplemented by the
+ * one agent measured.
+ */
+export interface SessionConfigBoolean extends Extensible {
+  currentValue: boolean;
+}
+
+/**
  * A `SessionConfigOption` that passed validation, for the `select` case.
  *
  * What the flat wire type cannot say and this can: that `currentValue` is one of `options`' own
@@ -260,6 +273,9 @@ export interface SessionConfigSelect extends Extensible {
  * values narrows to `null` — it does not narrow to a control showing one model and writing another.
  */
 export type ValidSessionConfigSelect = SessionConfigSelect & SessionConfigOption;
+
+/** A `SessionConfigOption` that passed validation, for the `boolean` case. */
+export type ValidSessionConfigBoolean = SessionConfigBoolean & SessionConfigOption;
 
 /**
  * The categories the v1 schema names. It calls them a hint — "MUST NOT be required for

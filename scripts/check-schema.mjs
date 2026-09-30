@@ -147,6 +147,22 @@ const LOAD_BEARING = [
 ];
 
 /** `{ sessionId: SessionId; … }` — the `name?: type;` vs `name: type;` distinction, per interface. */
+/** The body of one interface, verbatim — for the checks a field *set* cannot answer. */
+function interfaceSource(interfaceName) {
+  const start = typesSource.indexOf(`export interface ${interfaceName} `);
+  if (start < 0) return '';
+  const open = typesSource.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < typesSource.length; i++) {
+    if (typesSource[i] === '{') depth++;
+    else if (typesSource[i] === '}') {
+      depth--;
+      if (depth === 0) return typesSource.slice(open + 1, i);
+    }
+  }
+  return '';
+}
+
 function interfaceFields(interfaceName) {
   const start = typesSource.indexOf(`export interface ${interfaceName} `);
   if (start < 0) return null;
@@ -351,6 +367,18 @@ for (const branch of authBranches) {
 }
 notes.push(`${authBranches.length} auth-method variants`);
 
+/**
+ * The primitive each config payload field must have in TypeScript, by the schema's own def.
+ *
+ * Presence is not enough, and a presence-only check has a hole: `options: unknown` is present, is
+ * optional-looking to nothing, and every consumer then iterates an `unknown` — which compiles. This
+ * table is the fix, and it was written *because* that mutation was tried and got through.
+ */
+const PAYLOAD_PRIMITIVES = {
+  SessionConfigSelect: { currentValue: 'string', options: 'SessionConfigSelectOption[]' },
+  SessionConfigBoolean: { currentValue: 'boolean' },
+};
+
 // ─── 4. session configuration: the `SessionConfigOption` `oneOf` ──────────────────────────────
 //
 // The config option is the one wire type in this file that is a **`oneOf` with a payload per arm**,
@@ -392,10 +420,22 @@ notes.push(`${schemaConfigTypes.length} config-option arms (${schemaConfigTypes.
 
 for (const type of schemaConfigTypes) {
   const arm = configArms.find((entry) => entry?.properties?.type?.const === type);
-  // The arm's own `required` covers `type`; the shared fields (`id`, `name`) and the arm's payload
-  // live on `SessionConfigOption` and the payload interfaces, so each is looked up where the schema
-  // puts it rather than read off the wrapper.
-  const payloadRequired = (arm?.required ?? []).filter((field) => field !== 'type');
+  // The arm wrapper carries only `type`; the **payload** is an `allOf` reference to a separate def
+  // (`SessionConfigSelect` / `SessionConfigBoolean`). Reading the wrapper for the payload finds
+  // nothing and the check then passes vacuously — so the ref is followed, and a missing def is a
+  // failure rather than an empty requirement list.
+  const payloadRef = (arm?.allOf ?? [])
+    .map((entry) => entry?.$ref)
+    .find(Boolean);
+  const payloadName = payloadRef ? String(payloadRef).split('/').pop() : undefined;
+  if (!payloadName) {
+    fail(`the "${type}" arm of SessionConfigOption has no allOf payload reference — this check cannot see it`);
+    continue;
+  }
+  if (!defs[payloadName]) {
+    fail(`the "${type}" arm of SessionConfigOption references ${payloadName}, which is not in $defs`);
+    continue;
+  }
   const carrier = interfaceFields('SessionConfigOption');
   if (!carrier) {
     fail(`${TYPES}: no interface named SessionConfigOption`);
@@ -409,31 +449,56 @@ for (const type of schemaConfigTypes) {
       );
     }
   }
-  if (type === 'boolean' && !carrier.required.has('type')) {
-    fail('SessionConfigOption.type must be required: the projection branches on it and skips what it cannot read');
+  // The projection branches on `type` and skips what it cannot read, so `type` cannot be optional.
+  if (!carrier.required.has('type')) {
+    fail(
+      'SessionConfigOption.type must be required: the projection branches on it and skips what it ' +
+        'cannot read',
+    );
   }
-  // The select payload has its own def (`SessionConfigSelect`); the boolean arm inlines
-  // `currentValue: boolean` on the arm itself, so there is nothing to resolve for it.
-  if (type === 'select') {
-    const selectFields = interfaceFields('SessionConfigSelect');
-    if (!selectFields) {
-      fail(`${TYPES}: no interface named SessionConfigSelect — the select payload would be unchecked`);
-    } else {
-      for (const field of schemaRequired(defs['SessionConfigSelect'])) {
-        if (!selectFields.required.has(field) && !selectFields.optional.has(field)) {
-          fail(
-            `SessionConfigSelect.${field} is required by the schema and absent from the TypeScript — a ` +
-              'select option would reach the projection without the values it is supposed to offer',
-          );
-        }
-      }
+  // The payload's own required fields, against the interface that mirrors the def. Named by the
+  // schema's own def name, so a renamed def fails here instead of silently checking nothing.
+  const payloadFields = interfaceFields(payloadName);
+  if (!payloadFields) {
+    fail(
+      `${TYPES}: no interface named ${payloadName} — the "${type}" payload would reach the projection ` +
+        'with no check that the schema requires one',
+    );
+    continue;
+  }
+  for (const field of schemaRequired(defs[payloadName])) {
+    if (!payloadFields.required.has(field) && !payloadFields.optional.has(field)) {
+      fail(
+        `${payloadName}.${field} is required by the schema and absent from the TypeScript — a ` +
+          `"${type}" option would reach the projection without the value it is meant to carry`,
+      );
     }
   }
-  for (const field of payloadRequired) {
-    if (!carrier.required.has(field) && !carrier.optional.has(field)) {
+  // The primitive matters as much as the presence. A `currentValue` that is `unknown` in
+  // `SessionConfigBoolean` would compile, and every consumer of a switch would then compare a
+  // boolean against `unknown` — which TypeScript allows, so the bug reaches the widget.
+  // Verified by negative test: `currentValue: unknown` and a missing field both now fail, and
+  // `options: unknown` — which is how N12 got through the presence-only check — is caught here.
+  for (const [field, expected] of Object.entries(PAYLOAD_PRIMITIVES[payloadName] ?? {})) {
+    const declared = new RegExp(`^\\s{2}${field}(\\?)?\\s*:\\s*([^;]+);`, 'm').exec(interfaceSource(payloadName));
+    if (!declared) continue; // absence is the presence check's failure, reported there
+    const type = declared[2].trim();
+    if (declared[1] === '?' || type !== expected) {
       fail(
-        `the "${type}" arm of SessionConfigOption requires ${field}, and the TypeScript has no such ` +
-          'field — the projection cannot see the payload it is meant to validate',
+        `${payloadName}.${field} must be a required \`${expected}\` — the schema requires it with that ` +
+          `type, and the TypeScript says \`${declared[1] ?? ''}${type}\`, so a consumer would compare ` +
+          'against a value the schema never allows',
+      );
+    }
+  }
+  // And the deliberate looseness, reported: the flat carrier cannot mark the payload fields
+  // required per arm, so the check cannot tell "optional on purpose" from "forgotten". A note keeps
+  // the trade visible in the report instead of leaving it to whoever reads the type's comment.
+  for (const field of schemaRequired(defs[payloadName])) {
+    if (carrier.optional.has(field)) {
+      notes.push(
+        `SessionConfigOption.${field} is required on the "${type}" arm and optional on the flat ` +
+          'carrier — validated by narrowConfigSelect/projectOne instead',
       );
     }
   }

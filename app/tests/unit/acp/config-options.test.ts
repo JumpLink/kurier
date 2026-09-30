@@ -194,7 +194,11 @@ export default async () => {
 
       let failed = false;
       await client
-        .setConfigOption({ sessionId: session.sessionId, configId: 'web', value: { type: 'boolean', value: true } })
+        .setConfigOption({
+          sessionId: session.sessionId,
+          configId: 'web',
+          value: { type: 'boolean', value: true },
+        })
         .catch(() => {
           failed = true;
         });
@@ -211,7 +215,11 @@ export default async () => {
       await client.initialize();
       const session = await client.newSession({ cwd: '/tmp', mcpServers: [] });
 
-      const answer = await client.setConfigOption({ sessionId: session.sessionId, configId: 'mode', value: 'plan' });
+      const answer = await client.setConfigOption({
+        sessionId: session.sessionId,
+        configId: 'mode',
+        value: 'plan',
+      });
       expect(currentValueOf(answer.configOptions, 'mode')).toBe('plan');
 
       await client.setMode({ sessionId: session.sessionId, modeId: 'build' });

@@ -18,6 +18,7 @@ import {
   type AnySessionUpdate,
   type KnownSessionUpdate,
   type SessionConfigOption,
+  type ValidSessionConfigBoolean,
   type ValidSessionConfigSelect,
 } from './types.ts';
 
@@ -123,4 +124,17 @@ export function narrowConfigSelect(option: SessionConfigOption | null | undefine
   // a separate emptiness guard here was verified to be dead code.
   if (!values.some((entry) => entry.value === currentValue)) return null;
   return option as ValidSessionConfigSelect;
+}
+
+/**
+ * Narrow a wire config option to a `boolean` that can be drawn, or `null`.
+ *
+ * One check, and it is the same shape as the `select` case: the payload must be the type the schema
+ * says. A `boolean` with a string `currentValue` is not a switch with an odd label — it is an agent
+ * that means something this version does not, and rendering it as on/off would be a guess.
+ */
+export function narrowConfigBoolean(option: SessionConfigOption | null | undefined): ValidSessionConfigBoolean | null {
+  if (!option || !isKnownConfigOptionType(option.type) || option.type !== 'boolean') return null;
+  if (typeof option.currentValue !== 'boolean') return null;
+  return option as ValidSessionConfigBoolean;
 }

@@ -116,7 +116,16 @@ export function buildManyModelOptions(count = 400): SessionConfigOption[] {
     value: `openrouter/vendor/model-${String(index).padStart(3, '0')}`,
     name: `model-${String(index).padStart(3, '0')}`,
   }));
-  return [{ id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: options[0]?.value, options }];
+  return [
+    {
+      id: 'model',
+      name: 'Model',
+      type: 'select',
+      category: 'model',
+      currentValue: options[0]?.value,
+      options,
+    },
+  ];
 }
 
 export interface FixtureAgentOptions {
@@ -604,7 +613,11 @@ export class FixtureAgent {
     return this.#replyWithOptions(id, params, configId === 'model');
   }
 
-  #replyWithOptions(id: RequestId | undefined, params: Record<string, unknown> | undefined, push: boolean): void {
+  #replyWithOptions(
+    id: RequestId | undefined,
+    params: Record<string, unknown> | undefined,
+    push: boolean,
+  ): void {
     this.#reply(id, { configOptions: this.#configOptions, ...this.#meta() });
     if (push && this.#options.pushConfigOptionUpdate !== false) {
       this.#update({
