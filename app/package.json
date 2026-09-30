@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "Kurier app: the `kurier` binary — a CLI over @kurier/acp and @kurier/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
+  "description": "Kurier app: the `kurier` binary \u2014 a CLI over @kurier/acp and @kurier/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -17,8 +17,11 @@
     "lint:fix": "gjsify lint --fix .",
     "build": "gjsify run build:gjs",
     "build:gjs": "gjsify build src/index.ts --app gjs --outfile dist/kurier.gjs.mjs",
+    "build:app": "gjsify build src/frontends/gui/main.ts --app gjs --outfile dist/kurier-app.gjs.mjs",
     "start": "gjsify run dist/kurier.gjs.mjs",
+    "start:app": "gjsify run dist/kurier-app.gjs.mjs",
     "dev": "gjsify run build:gjs && gjsify run start",
+    "dev:app": "gjsify run build:app && gjsify run start:app",
     "test": "gjsify test",
     "test:real-agent": "gjsify build tests/integration/acp-real-agent.ts --app gjs --outfile dist/acp-real-agent.gjs.mjs && gjsify run dist/acp-real-agent.gjs.mjs",
     "test:schema": "node ../scripts/check-schema.mjs"
@@ -50,6 +53,7 @@
     "@types/yargs": "^17.0.35",
     "oxfmt": "^0.56.0",
     "oxlint": "^1.71.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@gjsify/adwaita-app": "0.49.0"
   }
 }
