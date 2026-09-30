@@ -1,0 +1,23 @@
+{
+  "name": "@kurier/acp",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "Agent Client Protocol, layer 1: the protocol types against refs/acp/schema.v1.json, the JSON-RPC 2.0 codec, and the client session lifecycle. NO spawn, NO gi://, NO dependencies — the transport is an injected interface, so every byte of protocol lives here and is unit-testable on both runtimes.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./gate": "./src/gate.ts",
+    "./jsonrpc": "./src/jsonrpc.ts",
+    "./methods": "./src/methods.ts",
+    "./transport": "./src/transport.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "check": "gjsify tsc --noEmit --project tsconfig.json"
+  },
+  "files": [
+    "src"
+  ]
+}

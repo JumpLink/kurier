@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Refresh the vendored ACP v1 schema from upstream, then check the code against it.
+#
+#   ./scripts/update-acp-schema            # pin to the current upstream main
+#   ./scripts/update-acp-schema <commit>   # pin to a specific upstream commit
+#
+# Read the diff before committing. A schema change usually means the types in
+# packages/acp/src/types.ts and the method table in packages/acp/src/methods.ts have to move
+# with it — see refs/acp/SOURCE.md.
+set -euo pipefail
+
+REPO="agentclientprotocol/agent-client-protocol"
+REF="${1:-main}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET="$HERE/../refs/acp/schema.v1.json"
+
+sha=$(gh api "repos/$REPO/commits/$REF" --jq '.sha')
+echo "upstream $REF = $sha"
+curl -sSL -o "$TARGET" "https://raw.githubusercontent.com/$REPO/$sha/schema/v1/schema.json"
+
+# Re-serialise with sorted keys and no $schema, so a refresh shows a real diff and nothing else.
+node -e '
+  const fs = require("node:fs");
+  const file = process.argv[1];
+  const doc = JSON.parse(fs.readFileSync(file, "utf8"));
+  delete doc.$schema;
+  fs.writeFileSync(file, JSON.stringify(doc, { indent: 2, sortKeys: true }) + "\n");
+' "$TARGET"
+
+node "$HERE/check-schema.mjs"
+echo
+echo "pinned $sha — copy it into the table in refs/acp/SOURCE.md by hand"

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The gjsify toolchain, as in postbote/troedler/beifahrer: `gjsify install --immutable`, the bundled
+# `gjsify tsc` type-check, `gjsify build` for the app, and the unit tests under BOTH gjs and node.
+#
+# The GJS half is the point, not a bonus. A pure Node suite would be green and would not answer the
+# question this project exists for: does a real ACP handshake survive a full gjsify bundle with no
+# Node process in the chain? (See AGENTS.md — the `node:child_process` specifier rule exists
+# because that chain was measured twice and failed twice.)
+#
+# `opencode` is deliberately NOT installed here. The real-agent integration test needs a model
+# account, and a test that costs a model call is not a test. It runs locally:
+#   gjsify workspace kurier-cli test:real-agent
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    steps:
+      # gjs only: the test bundle spawns a child process over stdio and nothing else. No GTK, no
+      # GI typelib — an ACP client has no widgets in Scheibe 1.
+      - name: Install system prerequisites
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git tar xz findutils gjs
+
+      - uses: actions/checkout@v4
+
+      # Node 24: gjsify's native install-backend prebuilds target node 24; Fedora's default node
+      # 22 loads a mismatched ABI and segfaults `gjsify install`.
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Cache gjsify tarball store
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/gjsify/tarballs
+          key: gjsify-tarballs-${{ hashFiles('gjsify-lock.json') }}
+          restore-keys: gjsify-tarballs-
+
+      # Bootstrap the SAME gjsify version the app pins — read from app/package.json, never
+      # repeated here, so the two cannot drift apart.
+      - name: Bootstrap the gjsify CLI
+        run: |
+          VERSION=$(node -p "require('./app/package.json').devDependencies['@gjsify/cli']")
+          echo "Bootstrapping @gjsify/cli@$VERSION (from app/package.json)"
+          npm install -g "@gjsify/cli@$VERSION"
+
+      - name: Install dependencies (gjsify install --immutable)
+        run: gjsify install --immutable
+
+      # The vendored ACP schema against the code. A hand-written copy of a protocol schema drifts,
+      # and the drift is silent at runtime: a renamed method is a `-32601` against a live agent, and
+      # a field that became required is an agent that ignores what kurier sent.
+      - name: Check the code against refs/acp/schema.v1.json
+        run: node scripts/check-schema.mjs
+
+      # -A includes the `private: true` workspaces — without it the packages are skipped and the
+      # check silently covers only part of the tree.
+      - name: Type check (every workspace)
+        run: gjsify foreach -A check
+
+      - name: Lint
+        run: gjsify foreach -A lint
+
+      # oxfmt directly, not `gjsify format`: the gjsify formatter under GJS cannot format every
+      # file type and SKIPS those silently — a check that is green locally and red here.
+      - name: Format check
+        run: node_modules/.bin/oxfmt --check .
+
+      - name: Build the app bundle
+        run: gjsify workspace kurier-cli build
+
+      # The dual run. If a change makes the Node leg impossible, the change is in the wrong file.
+      - name: Unit tests (gjs + node)
+        run: gjsify workspace kurier-cli test
+
+      # The bundle a person would install has to at least start and print its command table.
+      - name: Smoke: the built bundle starts
+        run: |
+          gjsify run app/dist/kurier.gjs.mjs agents
+          gjsify run app/dist/kurier.gjs.mjs sessions

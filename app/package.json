@@ -1,0 +1,55 @@
+{
+  "name": "kurier-cli",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "Kurier app: the `kurier` binary — a CLI over @kurier/acp and @kurier/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "gjsify tsc --noEmit",
+    "format": "gjsify format --write .",
+    "format:check": "gjsify format --check .",
+    "lint": "gjsify lint .",
+    "lint:fix": "gjsify lint --fix .",
+    "build": "gjsify run build:gjs",
+    "build:gjs": "gjsify build src/index.ts --app gjs --outfile dist/kurier.gjs.mjs",
+    "start": "gjsify run dist/kurier.gjs.mjs",
+    "dev": "gjsify run build:gjs && gjsify run start",
+    "test": "gjsify test",
+    "test:real-agent": "gjsify build tests/integration/acp-real-agent.ts --app gjs --outfile dist/acp-real-agent.gjs.mjs && gjsify run dist/acp-real-agent.gjs.mjs",
+    "test:schema": "node ../scripts/check-schema.mjs"
+  },
+  "gjsify": {
+    "test": {
+      "entry": "tests/test.mts",
+      "outdir": "dist",
+      "runtimes": [
+        "gjs",
+        "node"
+      ]
+    }
+  },
+  "dependencies": {
+    "@kurier/acp": "*",
+    "@kurier/session": "*",
+    "yargs": "^18.1.0"
+  },
+  "devDependencies": {
+    "@gjsify/cli": "0.49.0",
+    "@gjsify/napi": "0.49.0",
+    "@gjsify/node-globals": "0.49.0",
+    "@gjsify/rolldown-native": "0.49.0",
+    "@gjsify/runtime": "0.49.0",
+    "@gjsify/unit": "0.49.0",
+    "@gjsify/ws": "0.49.0",
+    "@types/node": "^26.1.2",
+    "@types/yargs": "^17.0.35",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "kurier",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "Kurier — an ACP client. Starts coding agents as subprocesses over the Agent Client Protocol, manages their sessions, and binds them to a surface. Runs on GJS via gjsify.",
+  "workspaces": [
+    "packages/*",
+    "app"
+  ],
+  "scripts": {
+    "check": "gjsify foreach -A check",
+    "check:schema": "node scripts/check-schema.mjs",
+    "lint": "gjsify foreach -A lint",
+    "format": "gjsify foreach -A format",
+    "format:check": "oxfmt --check .",
+    "build": "gjsify workspace kurier-cli build",
+    "start": "gjsify workspace kurier-cli start",
+    "test": "gjsify workspace kurier-cli test"
+  }
+}
