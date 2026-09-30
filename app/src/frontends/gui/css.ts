@@ -76,6 +76,77 @@ export const APP_CSS = `
   font-size: 0.9em;
   padding: 2px 0;
 }
+
+/* The open session's row in the sidebar. One line, not a theme rule, because a \`Gtk.ListBox\` in
+   \`SelectionMode.NONE\` never puts \`:selected\` on a row — so the theme's own selected-row rule can
+   never fire here and the mark has to be one this file applies. The alpha is the theme's:
+   \`libadwaita.css\` gives \`.navigation-sidebar row:selected\` \`currentColor\` at 10%, and the same
+   value keeps the mark from reading as a second kind of emphasis. */
+.navigation-sidebar > row.kurier-open-row {
+  background-color: alpha(currentColor, 0.10);
+}
+
+/* A message bubble. Adwaita has no name for one: \`Adw.StatusPage\`'s icons and \`.card\` are the
+   toolkit's idea of an inset surface, and a card per message is a wall of borders in a long
+   conversation. So the three things a bubble needs are written out. \`border-radius\` and \`padding\`
+   were verified against the GTK 4.22 parser along with the properties above. */
+.kurier-bubble {
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+/* The person's own messages, in the accent colour. \`@accent_bg_color\` is a libadwaita named colour,
+   so this follows the system light/dark setting for free — the reason this file is not a palette.
+   Alpha, not solid: a solid accent block is a header, and a transcript of ten of them is a wall. */
+.kurier-bubble-user {
+  background-color: alpha(@accent_bg_color, 0.20);
+}
+
+/* The agent's, one step off the window background. Alpha over \`@window_fg_color\` and NOT a second
+   named background colour, because a solid \`@window_bg_color\` is by definition invisible against
+   the window — it would be a bubble-shaped hole in a dark theme and a border-shaped nothing in a
+   light one. \`alpha()\` over the foreground darkens a light surface and lightens a dark one, which
+   is the one expression that is a step away from the background in both. Asymmetric on purpose: the
+   accent belongs to what the person said. */
+.kurier-bubble-agent {
+  background-color: alpha(@window_fg_color, 0.07);
+}
+
+/* A centred system note — a plan, a mode change, an update this client does not know. Quieter than
+   a bubble because it is neither speaker: the conversation's own bookkeeping should not be the most
+   prominent thing on screen. \`opacity\` rather than a lighter colour, so it composites over whatever
+   the surface behind it is. */
+.kurier-note {
+  font-size: 0.9em;
+  opacity: 0.66;
+  margin-bottom: 8px;
+}
+
+/* The body under a disclosure's summary line, and nothing about its type. \`margin-left\` is
+   \`Gtk.Expander\`'s own title indent, measured rather than guessed — the expander spans the full
+   696 px measure and GTK4 does NOT indent its child, so the 38 px here is what puts the body under
+   the summary text instead of 38 px to its left (the arrow plus its spacing). That is the one
+   number in this file coupled to a theme's arrow width: a theme that draws a different arrow moves
+   the summary and leaves this behind.
+   NO \`font-size\` here, and that is a measurement: \`font-size\` is not inherited as a computed value,
+   it multiplies down the tree, so a second \`0.9em\` on a descendant of \`.kurier-disclosure\` rendered
+   it at 0.81em — measured, 20 'i's came out 197 px wide at the intended size and 181 px inside the
+   expander. It inherits the expander's \`0.9em\`, which is the size that was wanted.
+   No \`font-family\` either, so the two bodies below can differ: a command is monospace and a
+   thought is prose. */
+.kurier-disclosure-body {
+  margin-left: 38px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+/* A thought's body. Proportional and dimmed, where a tool's output is monospace at full weight: a
+   model's reasoning is commentary on the answer, and at the answer's own weight it competes with it.
+   \`opacity\` rather than a lighter colour, so it composites over whatever surface is behind it. */
+.kurier-thought {
+  opacity: 0.72;
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
@@ -87,6 +158,13 @@ export const CSS = {
   sessionTitle: 'kurier-session-title',
   dateHeader: 'kurier-date-header',
   disclosure: 'kurier-disclosure',
+  bubble: 'kurier-bubble',
+  bubbleUser: 'kurier-bubble-user',
+  bubbleAgent: 'kurier-bubble-agent',
+  note: 'kurier-note',
+  disclosureBody: 'kurier-disclosure-body',
+  thought: 'kurier-thought',
+  openRow: 'kurier-open-row',
   dim: DIM,
   title: TITLE,
   mono: MONO,

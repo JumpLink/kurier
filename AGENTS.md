@@ -23,7 +23,7 @@ layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `se
 |---|---|---|
 | `@kurier/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
 | `@kurier/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@kurier/acp`, `node:fs` — no `gi://`, no agent adapter |
-| `kurier-cli` (`app/`) | yargs CLI, the stdio child-process adapters, the agent launcher table, the terminal permission gate, XDG paths | all of the above |
+| `kurier-cli` (`app/`) | yargs CLI, the stdio child-process adapters, the agent launcher table, the terminal permission gate, XDG paths, and the Adwaita surface in `src/frontends/gui/` (its own bundle) | all of the above; `gi://` only under `frontends/gui/` |
 
 **`packages/acp` does not know that subprocesses exist.** No `spawn`, no `node:child_process`, no
 `gi://`, no dependencies at all — the transport is an injected interface (`Transport` in
@@ -150,7 +150,15 @@ gjsify workspace kurier-cli build                # → app/dist/kurier.gjs.mjs
 gjsify workspace kurier-cli test                 # @gjsify/unit, on gjs AND node
 gjsify workspace kurier-cli test:real-agent      # the real stdio chain against a real agent
 gjsify run app/dist/kurier.gjs.mjs <command>
+gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
+
+The GUI is looked at, not believed: start it **detached** (a foreground GJS process is killed by
+the agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on
+`/eu/jumplink/Kurier/devtools` (`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>`
+so no real conversation ends up in a screenshot, and `KU_APP_SESSION=<id>` to open a session without
+a pointer. GTK behaviour a comment relies on gets a probe in `scripts/probes/` that prints the
+numbers the comment quotes.
 
 **GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
 question. Both runtimes, as in postbote and beifahrer:
@@ -231,9 +239,9 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 
 ## What is deliberately not here yet
 
-Surface (comes later on `@gjsify/adwaita-app`, real GTK4/libadwaita — **not** adwaita-web, which is
-the browser path per beifahrer ADR 0008) · Telegram bot · MCP wiring against the real apps ·
-principal policy · troedler integration · a Claude adapter (parked on a non-technical question:
-per `docs/concepts/ai-document-workflow.md` the Claude Agent SDK has drawn its own monthly quota
-since 2026-06-15, separate from the interactive subscription — verify before building against it,
-never assume).
+A web surface (the Adwaita one is in `app/src/frontends/gui/`, being built slice by slice; **not**
+adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot · MCP wiring against
+the real apps · principal policy · troedler integration · a Claude adapter (parked on a
+non-technical question: per `docs/concepts/ai-document-workflow.md` the Claude Agent SDK has drawn
+its own monthly quota since 2026-06-15, separate from the interactive subscription — verify before
+building against it, never assume).

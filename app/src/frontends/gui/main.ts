@@ -22,8 +22,11 @@
  */
 
 import Gtk from '@girs/gtk-4.0';
-import { readAppDevHooks, runAdwaitaApp } from '@gjsify/adwaita-app';
+import { runAdwaitaApp } from '@gjsify/adwaita-app';
 
+import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
+
+import { sessionsFile } from '../../core/paths.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
 import { MainWindow } from './window.ts';
@@ -55,7 +58,13 @@ const status = await runAdwaitaApp({
       'the questions it asks. The agent brings its own model, its own tools and its own login — ' +
       'kurier shows what it offers and asks before it acts. The same kernel as the command line.',
   },
-  createWindow: (app) => new MainWindow(app, { hooks }),
+  // The same read `kurier sessions` does, principal filter included: two surfaces listing different
+  // sessions from one file would make one of them wrong, and nobody could say which.
+  createWindow: (app) =>
+    new MainWindow(app, {
+      hooks,
+      loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
+    }),
 });
 
 process.exit(status);

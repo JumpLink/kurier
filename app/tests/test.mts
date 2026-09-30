@@ -19,6 +19,8 @@ import interrupt from './unit/core/interrupt.test.ts';
 import transcript from './unit/core/transcript.test.ts';
 import agents from './unit/core/agents.test.ts';
 import paths from './unit/core/paths.test.ts';
+import sessionGroups from './unit/core/session-groups.test.ts';
+import transcriptItems from './unit/core/transcript-items.test.ts';
 
 import smoke from './unit/smoke.test.ts';
 
@@ -37,5 +39,7 @@ run({
   transcript,
   agents,
   paths,
+  sessionGroups,
+  transcriptItems,
   smoke,
 });

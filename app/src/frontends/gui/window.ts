@@ -15,48 +15,71 @@
  *
  * **The shell is built here rather than taken from `createNavShell`.** That is a real decision with
  * a measured reason, not a preference: the packaged shell takes a `readonly NavItem[]` and hands
- * back a `LoadingStack`, so the list cannot grow when a session arrives, has no handle for
- * `Gtk.ListBox`'s `set_header_func` (which is how "Today" / "Yesterday" groups work), and has no
- * bottom bar — and the composer *has* to be in a bottom bar, because it is the one control that
- * belongs under the conversation rather than in it. The breakpoint is copied from it verbatim.
+ * back a plain `Gtk.Stack` with no `Gtk.ListBox` in it, so the list cannot grow when a session
+ * arrives, has no handle for `Gtk.ListBox`'s `set_header_func` (which is how "Today" / "Yesterday"
+ * groups work), and has no bottom bar — and the composer *has* to be in a bottom bar, because it is
+ * the one control that belongs under the conversation rather than in it. The breakpoint is copied
+ * from it verbatim.
  *
  * The gap is upstream, and the honest move is both: build the shell kurier needs, and file the
- * feature request. A slice is not hostage to somebody else's release train, and a workaround that
- * ossifies is worse than a small local one that is honestly labelled.
+ * feature request — https://github.com/gjsify/gjsify/issues/1911. A slice is not hostage to somebody
+ * else's release train, and a workaround that ossifies is worse than a small local one that is
+ * honestly labelled.
  *
  * **The vertical line between the two panes is wanted. Do not "fix" it.** It is
  * `AdwNavigationSplitView`'s own separator — `strings libadwaita-1.so.0` names
  * `adw-navigation-split-view.c` and `adw_flap_set_separator` — and it runs the full window height,
  * header row included. That looked wrong until the pixels said why: the header bars are transparent
- * by design (libadwaita ≥ 1.4), so at y=25 in the header and at y=300 in the body the sidebar is the
- * same (40,40,44) and the content the same (34,34,38). The two panes really are two surfaces, and
- * the hairline is what says so. A 6-unit tonal step alone reads as a rendering seam; the line reads
- * as structure — the better of the two.
+ * by design (libadwaita ≥ 1.4), so one pane is one surface from top to bottom. The two panes really
+ * are two surfaces, and the hairline is what says so. A tonal step alone reads as a rendering seam;
+ * the line reads as structure — the better of the two.
  *
- * Asked, measured, answered: a bare `Adw.HeaderBar` in a `Gtk.Box` and an `Adw.ToolbarView` top bar
- * render **pixel-identical** here, and `top_bar_style` RAISED/FLAT changes nothing, so none of those
- * is the lever. There is no public property on `AdwNavigationSplitView` to hide the separator at
- * all — only `collapsed`, `content`, `min_/max_sidebar_width`.
+ * The pane shape decides how that line looks, and this file once claimed the opposite — that a bare
+ * `Adw.HeaderBar` in a `Gtk.Box` and an `Adw.ToolbarView` top bar render pixel-identical. They do
+ * not, and `scripts/probes/headerbar-ab.mjs` is where the numbers come from; it renders both shapes
+ * and prints columns 255–263 at four heights, dark style, GTK 4.22.5 / libadwaita 1.9.3:
+ *
+ * - At y=20 and again below the header row, both shapes give the sidebar pane (46,46,50) and the
+ *   content pane (34,34,38) — two surfaces, and that is the whole reason the separator is wanted.
+ * - Shape A, the bare header bar: the header row is a surface of its own and a (77,77,81) column
+ *   sits at x=260, and at y=46 a (29,29,34) border runs across it with (63,63,67) at x=260.
+ * - Below that, at y ≥ 47, both shapes show one unbroken (29,29,34) column at x=259.
+ *
+ * So `ToolbarView` is the shape, see `buildSidebar`. There is no public property on
+ * `AdwNavigationSplitView` to hide the separator at all — only `collapsed`, `content`,
+ * `min_/max_sidebar_width`.
  */
 
 import Adw from '@girs/adw-1';
 import GObject from '@girs/gobject-2.0';
+import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
+
+import { labelOf, type SessionRecord } from '@kurier/session';
 
 import { APP_NAME, COLLAPSE_WIDTH_PX, WINDOW_HEIGHT, WINDOW_WIDTH } from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
+import { SessionList } from './session-list.ts';
 
 export interface MainWindowOptions {
   /** Read once at startup. See `hooks.ts` — a state only a click can reach is a state untested. */
   readonly hooks: KurierHooks;
+  /**
+   * The records to list, already filtered to the principal this window is for. A function rather
+   * than an array so a failure to read is the window's to *show* — thrown here, it lands on the
+   * error page instead of killing the app before there is a window to say why.
+   */
+  readonly loadSessions: () => readonly SessionRecord[];
 }
 
 export class MainWindow extends Adw.ApplicationWindow {
   static readonly GTypeName = 'KurierMainWindow';
 
   readonly #split: Adw.NavigationSplitView;
-  readonly #sessionList: Gtk.ListBox;
+  readonly #sessions: SessionList;
   readonly #placeholder: Adw.StatusPage;
+  readonly #contentPage: Adw.NavigationPage;
+  readonly #contentHeader: Adw.HeaderBar;
 
   constructor(app: Adw.Application, options: MainWindowOptions) {
     super({
@@ -71,9 +94,12 @@ export class MainWindow extends Adw.ApplicationWindow {
       heightRequest: 400,
     });
 
-    this.#sessionList = buildSessionList();
+    this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#placeholder = buildPlaceholder();
-    this.#split = buildSplitView(this.#sessionList, this.#placeholder);
+    const panes = buildSplitView(this.#sessions.widget, this.#placeholder);
+    this.#split = panes.split;
+    this.#contentPage = panes.contentPage;
+    this.#contentHeader = panes.contentHeader;
 
     // `content`, not `set_child`: `Adw.ApplicationWindow` refuses the GtkWindow setter with
     // "gtk_window_set_child() is not supported for AdwApplicationWindow", and the property is the
@@ -87,12 +113,56 @@ export class MainWindow extends Adw.ApplicationWindow {
     // collapse then silently never happens. With the content in place first, the same breakpoint
     // sets `collapsed` on the first frame at 500 px — checked by running it, not by reading it.
     this.#applyBreakpoint();
+    this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
   }
 
-  /** The session list, for the next slice to fill. Exposed rather than private from the start. */
-  get sessionList(): Gtk.ListBox {
-    return this.#sessionList;
+  #load(loadSessions: () => readonly SessionRecord[]): void {
+    try {
+      this.#sessions.setSessions(loadSessions());
+    } catch (error) {
+      this.#sessions.showError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * Show a session in the content pane.
+   *
+   * `show_content = true` is what makes the collapsed window work at all. Its default is **false**
+   * (`Adw-1.gir`: `default-value="FALSE"`, and read back at runtime), so on a narrow window the
+   * sidebar is what shows, and until a row set it nothing ever brought the content pane forward.
+   * Peer review caught that. Setting it is also what makes libadwaita's own back button appear —
+   * see `buildContent`.
+   *
+   * **Only `description` is escaped, and that is not an oversight.** `Adw.StatusPage.title` and
+   * `Adw.NavigationPage.title` are plain text on both: `adw-status-page.ui` sets `use-markup` on
+   * the description label only and the title label is filled with `gtk_label_set_text`. A label
+   * whose own words go through `gtk_label_set_text` would drop the agent's `<` and `&`, so escaping
+   * them would be the bug. `description` is the one field here that *is* Pango markup, so a working
+   * directory with an `&` in it has to be escaped — into nothing, and then the page reads right.
+   *
+   * What it shows is what the record holds, and no more: the transcript is the next step, and a
+   * page that pretended to have one would be the "control that points at nothing" in prose.
+   */
+  #open(record: SessionRecord): void {
+    const label = labelOf(record);
+    // Not `chat-symbolic`: the Adwaita icon theme has no such icon and the page showed a broken-image
+    // placeholder. Checked with `Gtk.IconTheme.has_icon`, like every icon name in this file.
+    this.#placeholder.iconName = 'utilities-terminal-symbolic';
+    // Plain text, not markup — see the note on escaping below.
+    this.#placeholder.title = label;
+    const entries = record.turns.length === 1 ? '1 entry' : `${record.turns.length} entries`;
+    // The description IS markup (`adw-status-page.ui` sets `use-markup` on that label), and a working
+    // directory is the person's own and may hold an `&`.
+    this.#placeholder.description = GLib.markup_escape_text(
+      `${record.agent} in ${record.cwd} · ${entries}`,
+      -1,
+    );
+    this.#contentPage.title = label;
+    // The title can be shown now: it names the session, not the app, so it is no longer the
+    // double title `buildContent` hides it against.
+    this.#contentHeader.showTitle = true;
+    this.#split.showContent = true;
   }
 
   /**
@@ -120,11 +190,18 @@ export class MainWindow extends Adw.ApplicationWindow {
    * **Logged, not silently ignored.** A hook that does nothing is indistinguishable from a typo in
    * its name, and the whole point of a hook is to be relied on; the first version of a surface whose
    * states cannot be screenshotted is one where nobody knows which ones were ever looked at. Every
-   * line says "not yet", because at this stage that is the truth rather than an excuse.
+   * line that says "not yet" says it because at this stage that is the truth rather than an excuse.
+   *
+   * `KU_APP_SESSION` is the first one acted on: it opens the session exactly as a click would, so
+   * the collapsed content pane and its back button are reachable without a pointer.
    */
   #applyDevHooks(hooks: KurierHooks): void {
+    if (hooks.session !== undefined) {
+      const record = this.#sessions.select(hooks.session);
+      if (record) this.#open(record);
+      else console.log(`kurier: KU_APP_SESSION=${hooks.session} — no such session in the list`);
+    }
     for (const [name, value] of [
-      ['SESSION', hooks.session],
       ['CONFIG', hooks.config],
       ['PERMISSION', hooks.permission],
       ['THINKING', hooks.thinking],
@@ -134,24 +211,6 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
   }
-}
-
-/**
- * The sidebar's session list, empty.
- *
- * A `Gtk.ListBox` rather than the packaged shell's `Adw.NavigationView`, for one measured reason:
- * `set_header_func` is how the "Today" / "Yesterday" groups get drawn, and a list that cannot carry
- * group headers cannot be sorted the way a person reads a list of sessions. It is also the only
- * handle that survives a row being added later, which is the next thing that happens to it.
- *
- * `NONE` selection mode: clicking a row will *open* a session, and a row that also shows a focus
- * ring suggests a mode this list does not have.
- */
-function buildSessionList(): Gtk.ListBox {
-  return new Gtk.ListBox({
-    selectionMode: Gtk.SelectionMode.NONE,
-    cssClasses: ['navigation-sidebar'],
-  });
 }
 
 /**
@@ -169,24 +228,27 @@ function buildPlaceholder(): Adw.StatusPage {
   return new Adw.StatusPage({
     iconName: 'mail-send-receive-symbolic',
     title: 'No session open',
-    description: 'Pick a session on the left, or start one to begin a conversation with an agent.',
+    // Neither "on the left" (on a narrow window the list is a page of its own) nor "start one"
+    // (there is no control for that yet, and copy that points at one is a control that isn't there).
+    description: 'Pick a session from the list to see it here.',
     vexpand: true,
   });
 }
 
 /** The sidebar pane: a title bar with the app's name, and the list under it. */
-function buildSidebar(list: Gtk.ListBox): Adw.NavigationPage {
+function buildSidebar(list: Gtk.Widget): Adw.NavigationPage {
   const box = new Adw.ToolbarView({ vexpand: true });
   // An `Adw.HeaderBar` is a **top bar of an `Adw.ToolbarView`**, never a child of a plain `Gtk.Box`.
   // That is the documented shape since libadwaita 1.4 and it is what `@gjsify/adwaita-app`'s own
   // `createNavShell` builds. It also decides how the pane's edge looks: a bare header bar does not
   // merge with the pane beside it, and `Adw.NavigationSplitView` then draws its separator straight
   // through the header row — a vertical rule across the top of the window that no GNOME app has.
-  // Measured in both shapes by screenshot, not believed.
+  // The pixels are in `scripts/probes/headerbar-ab.mjs` and in the file header.
   box.add_top_bar(
     new Adw.HeaderBar({
-      showEndTitleButtons: false,
-      showStartTitleButtons: false,
+      // No `show*TitleButtons: false` here. It hid the close button on the collapsed window, where
+      // this bar is the only one on screen; left alone, libadwaita puts the window buttons on
+      // whichever bar sits at the window's edge, in both shapes.
       // `Adw.WindowTitle`, not a `Gtk.Label` with `title-1`: that name class is for a *window*
       // title, and at that size a sidebar label reads as shouting.
       titleWidget: new Adw.WindowTitle({ title: APP_NAME, subtitle: '' }),
@@ -206,17 +268,16 @@ function buildSidebar(list: Gtk.ListBox): Adw.NavigationPage {
  * instead of by a button. libadwaita says the same in as many words: "AdwNavigationPage … is
  * missing a title. To hide a header bar title, consider using AdwHeaderBar:show-title instead."
  *
- * The bar carries the **back button**, and it has to: `Adw.NavigationSplitView` does not supply one.
+ * **The back button is libadwaita's, not ours.** An `Adw.HeaderBar` in the content page of a
+ * collapsed `Adw.NavigationSplitView` grows one by itself as soon as `show_content` is true. This
+ * file once claimed the opposite and shipped its own button, from a measurement that rested on an
+ * API that does not exist: there is no `get_start_widget()` in libadwaita 1.9.3 (0 hits in
+ * `Adw-1.gir`), and `show_content` was `false` — its default — in every state measured, so nothing
+ * could have been seen to go back to. The screenshot after the session list first set it to `true`
+ * then showed two back buttons side by side. What the collapsed window was missing was never a
+ * button; it was `MainWindow.#open`.
  *
- * This file used to claim the opposite — that an `Adw.HeaderBar` inside an `Adw.NavigationPage`
- * grows a back button for you, and that this is what the collapsed view shows. A screenshot of a
- * window narrowed below the breakpoint disproved it: the pane collapsed, no button appeared, and the
- * person was stuck. Measured across all four states (wide, narrow, wide again, narrow again),
- * `AdwHeaderBar.get_start_widget()` is `null` in every one, with and without `show_content` set —
- * libadwaita 1.9.3 adds nothing. The button is ours, in `#buildBackButton`, and it is shown only
- * when there is somewhere to go back to.
- *
- * The title is the other thing the bar will grow later, once there is a session to name.
+ * The title comes back once there is a session to name — `MainWindow.#open` turns it on.
  */
 function buildContent(header: Adw.HeaderBar, placeholder: Adw.StatusPage): Adw.NavigationPage {
   const box = new Adw.ToolbarView({ vexpand: true });
@@ -225,64 +286,36 @@ function buildContent(header: Adw.HeaderBar, placeholder: Adw.StatusPage): Adw.N
   return new Adw.NavigationPage({ title: APP_NAME, child: box });
 }
 
-/** The content pane's header bar. Split out because the back button is packed into it after the
- *  split view exists, and the split view needs the content page to already exist. */
+/** The content pane's header bar. `MainWindow.#open` turns `showTitle` on and names the page. */
 function buildContentHeader(): Adw.HeaderBar {
   return new Adw.HeaderBar({ showTitle: false });
 }
 
-/**
- * The button that gets a person back to the session list on a narrow window.
- *
- * **Visible only when there is somewhere to go back to**, which is the whole condition. On a wide
- * window the sidebar is already there and a back button would be a second way of saying it; on a
- * collapsed window showing content it is the *only* way back. `notify::collapsed` is the signal,
- * because the breakpoint changes `collapsed` and nothing else announces it.
- *
- * It sets `show_content = false` and never touches `collapsed`. That is measured, not stylistic:
- * assigning `collapsed` by hand fights the breakpoint permanently, because a breakpoint applies on a
- * **condition change** — one manual `collapsed = false` while the window is already narrow means it
- * never collapses again, at any width, in that process. `show_content` is the property libadwaita
- * wants a client to set; it manages `collapsed` itself.
- */
-function buildBackButton(split: Adw.NavigationSplitView): Gtk.Button {
-  const button = new Gtk.Button({
-    iconName: 'go-previous-symbolic',
-    tooltipText: 'Back to the sessions',
-    // Hidden until the window is actually narrow. A button the window hides by clipping is worse
-    // than one that is simply not there.
-    visible: false,
-  });
-  button.update_property([Gtk.AccessibleProperty.LABEL], ['Back to the sessions']);
-  button.connect('clicked', () => split.set_show_content(false));
-  const sync = () => {
-    button.set_visible(split.get_collapsed() && split.get_show_content());
-  };
-  split.connect('notify::collapsed', sync);
-  split.connect('notify::show-content', sync);
-  sync();
-  return button;
+interface Panes {
+  readonly split: Adw.NavigationSplitView;
+  /** Retitled when a session opens. */
+  readonly contentPage: Adw.NavigationPage;
+  readonly contentHeader: Adw.HeaderBar;
 }
 
 /** The split view, with a page per side — see the file header on why there are two header bars. */
-function buildSplitView(sidebar: Gtk.ListBox, content: Adw.StatusPage): Adw.NavigationSplitView {
+function buildSplitView(sidebar: Gtk.Widget, content: Adw.StatusPage): Panes {
   const contentHeader = buildContentHeader();
+  const contentPage = buildContent(contentHeader, content);
   const split = new Adw.NavigationSplitView({
     sidebar: buildSidebar(sidebar),
-    content: buildContent(contentHeader, content),
+    content: contentPage,
     minSidebarWidth: 260,
     maxSidebarWidth: 340,
     // Not collapsed on a wide monitor: a sidebar that starts hidden hides the list for no reason,
     // which is the "control that points at nothing" in its other direction. The breakpoint collapses
-    // it when the window genuinely has no room — and only the breakpoint may do that, see
-    // `buildBackButton`.
+    // it when the window genuinely has no room — and **only** the breakpoint may do that. Measured:
+    // a breakpoint applies on a condition *change*, so one manual `collapsed = false` while the
+    // window is already narrow means it never collapses again, at any width, in that process. A
+    // client moves between the panes with `show_content`; libadwaita owns `collapsed`.
     collapsed: false,
   });
-  // Packed in here and not in `buildContent`, because the button binds to `split` and `split` needs
-  // the content page: the first version threaded a throwaway `Adw.NavigationSplitView` through to
-  // break the cycle, which bound the button to an object nothing ever displayed.
-  contentHeader.pack_start(buildBackButton(split));
-  return split;
+  return { split, contentPage, contentHeader };
 }
 
 GObject.registerClass(MainWindow);
