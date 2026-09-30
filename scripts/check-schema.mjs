@@ -46,6 +46,31 @@ function fail(message) {
 const schema = JSON.parse(readFileSync(SCHEMA, 'utf8'));
 const defs = schema.$defs ?? {};
 
+/**
+ * The config-option `type`s and categories the TypeScript names, read out of `types.ts` rather than
+ * imported.
+ *
+ * `check-schema.mjs` is a plain Node script with no workspace wiring, so it cannot import the
+ * package it is checking — and duplicating the two lists here would be a second source of truth
+ * that the check could not see drift in. These two are the exceptions to that rule, and the
+ * negative tests below are what keep them honest.
+ */
+function constArrayInTypes(source, name) {
+  const match = new RegExp(`export const ${name} = \\[([^\\]]*)\\]`).exec(source);
+  if (!match) return null;
+  return [...match[1].matchAll(/'([^']+)'/g)].map((entry) => entry[1]);
+}
+
+const tsTypesSource = readFileSync(TYPES, 'utf8');
+const KNOWN_CONFIG_OPTION_TYPES = constArrayInTypes(tsTypesSource, 'KNOWN_CONFIG_OPTION_TYPES') ?? [];
+const KNOWN_CONFIG_CATEGORIES = constArrayInTypes(tsTypesSource, 'KNOWN_CONFIG_CATEGORIES') ?? [];
+if (KNOWN_CONFIG_OPTION_TYPES.length === 0) {
+  fail(`${TYPES}: no KNOWN_CONFIG_OPTION_TYPES const — the config-arm check would pass vacuously`);
+}
+if (KNOWN_CONFIG_CATEGORIES.length === 0) {
+  fail(`${TYPES}: no KNOWN_CONFIG_CATEGORIES const — the category check would pass vacuously`);
+}
+
 // ─── 1. method names ────────────────────────────────────────────────────────────────────────
 
 /** Every `x-method` in the schema, with the side the schema records. */
@@ -100,6 +125,11 @@ const LOAD_BEARING = [
   'PromptResponse',
   'CloseSessionRequest',
   'DeleteSessionRequest',
+  'SetSessionModeRequest',
+  'SetSessionConfigOptionRequest',
+  'SetSessionConfigOptionResponse',
+  'SessionConfigSelectOption',
+  'ConfigOptionUpdate',
   'SessionNotification',
   'RequestPermissionRequest',
   'RequestPermissionResponse',
@@ -320,6 +350,117 @@ for (const branch of authBranches) {
   }
 }
 notes.push(`${authBranches.length} auth-method variants`);
+
+// ─── 4. session configuration: the `SessionConfigOption` `oneOf` ──────────────────────────────
+//
+// The config option is the one wire type in this file that is a **`oneOf` with a payload per arm**,
+// and it is the one whose two arms disagree about what `currentValue` is: a value id for `select`,
+// a boolean for `boolean`. A TypeScript mirror of that union cannot be narrowed without casts (see
+// the note on `SessionConfigOption` in `types.ts`), so the wire type is flat and the validation
+// lives in `app/src/core/config.ts`. That trade is only safe while this check is true, so it is
+// asserted here rather than trusted:
+//
+// - both arms must exist in the schema and both must be named in `KNOWN_CONFIG_OPTION_TYPES`, so a
+//   new arm cannot appear without kurier deciding what to do with it;
+// - the fields the schema marks required **on each arm** must be checked, because that is the
+//   information the flat type throws away.
+//
+// The category list is checked the same way. The schema says a category "MUST NOT be required for
+// correctness", which is exactly why an unknown one must survive — so the check asserts that
+// `KNOWN_CONFIG_CATEGORIES` names no category the schema does not define, in both directions.
+const configArms = defs['SessionConfigOption']?.oneOf ?? [];
+const schemaConfigTypes = configArms
+  .map((arm) => arm?.properties?.type?.const)
+  .filter((value) => typeof value === 'string');
+if (schemaConfigTypes.length === 0) {
+  fail('the schema’s SessionConfigOption has no oneOf arms with a type const — this check cannot see it');
+}
+for (const type of schemaConfigTypes) {
+  if (!KNOWN_CONFIG_OPTION_TYPES.includes(type)) {
+    fail(
+      `SessionConfigOption has a "${type}" arm in the schema that KNOWN_CONFIG_OPTION_TYPES does not ` +
+        'name — the projection would silently drop every option of that kind',
+    );
+  }
+}
+for (const type of KNOWN_CONFIG_OPTION_TYPES) {
+  if (!schemaConfigTypes.includes(type)) {
+    fail(`KNOWN_CONFIG_OPTION_TYPES names "${type}", which the schema’s SessionConfigOption does not define`);
+  }
+}
+notes.push(`${schemaConfigTypes.length} config-option arms (${schemaConfigTypes.join(', ')})`);
+
+for (const type of schemaConfigTypes) {
+  const arm = configArms.find((entry) => entry?.properties?.type?.const === type);
+  // The arm's own `required` covers `type`; the shared fields (`id`, `name`) and the arm's payload
+  // live on `SessionConfigOption` and the payload interfaces, so each is looked up where the schema
+  // puts it rather than read off the wrapper.
+  const payloadRequired = (arm?.required ?? []).filter((field) => field !== 'type');
+  const carrier = interfaceFields('SessionConfigOption');
+  if (!carrier) {
+    fail(`${TYPES}: no interface named SessionConfigOption`);
+    break;
+  }
+  for (const field of schemaRequired(defs['SessionConfigOption'])) {
+    if (!carrier.required.has(field) && !carrier.optional.has(field)) {
+      fail(
+        `SessionConfigOption.${field} is required by the schema and absent from the TypeScript — the ` +
+          'projection would receive an option with no id to set',
+      );
+    }
+  }
+  if (type === 'boolean' && !carrier.required.has('type')) {
+    fail('SessionConfigOption.type must be required: the projection branches on it and skips what it cannot read');
+  }
+  // The select payload has its own def (`SessionConfigSelect`); the boolean arm inlines
+  // `currentValue: boolean` on the arm itself, so there is nothing to resolve for it.
+  if (type === 'select') {
+    const selectFields = interfaceFields('SessionConfigSelect');
+    if (!selectFields) {
+      fail(`${TYPES}: no interface named SessionConfigSelect — the select payload would be unchecked`);
+    } else {
+      for (const field of schemaRequired(defs['SessionConfigSelect'])) {
+        if (!selectFields.required.has(field) && !selectFields.optional.has(field)) {
+          fail(
+            `SessionConfigSelect.${field} is required by the schema and absent from the TypeScript — a ` +
+              'select option would reach the projection without the values it is supposed to offer',
+          );
+        }
+      }
+    }
+  }
+  for (const field of payloadRequired) {
+    if (!carrier.required.has(field) && !carrier.optional.has(field)) {
+      fail(
+        `the "${type}" arm of SessionConfigOption requires ${field}, and the TypeScript has no such ` +
+          'field — the projection cannot see the payload it is meant to validate',
+      );
+    }
+  }
+}
+
+// Categories: both directions, because a name kurier invents and a name the schema drops are both
+// drift, and only the second is visible by reading the schema.
+const schemaCategories = (defs['SessionConfigOptionCategory']?.anyOf ?? [])
+  .map((entry) => entry?.const)
+  .filter((value) => typeof value === 'string');
+for (const category of KNOWN_CONFIG_CATEGORIES) {
+  if (!schemaCategories.includes(category)) {
+    fail(
+      `KNOWN_CONFIG_CATEGORIES names "${category}", which the schema does not define — the surface ` +
+        'would order by a category no agent ever sends',
+    );
+  }
+}
+for (const category of schemaCategories) {
+  if (!KNOWN_CONFIG_CATEGORIES.includes(category)) {
+    fail(
+      `the schema defines the config category "${category}" and KNOWN_CONFIG_CATEGORIES omits it — it ` +
+        'would be treated as unknown and sorted to the end',
+    );
+  }
+}
+notes.push(`${KNOWN_CONFIG_CATEGORIES.length} config categories, ${schemaCategories.length} in the schema`);
 
 // ─── report ─────────────────────────────────────────────────────────────────────────────────
 

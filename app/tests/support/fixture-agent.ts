@@ -41,10 +41,83 @@ import {
   type McpServer,
   type PermissionOption,
   type RequestId,
+  type SessionConfigOption,
+  type SessionMode,
   type SessionNotification,
   type SessionUpdate,
   type StopReason,
 } from '@kurier/acp/types';
+
+/**
+ * The three options `opencode acp` 2.0.19 reports, with the shape it reports them in.
+ *
+ * **Values are cut down, structure is not.** The real answer carries ~400 models, and a fixture
+ * that carried 400 would make every assertion about "the options" a test of a list nobody reads.
+ * What matters is the *shape*: an id that is a `provider/model` string, a thought level whose
+ * values are single words, and a mode with a `description` per value — because the description is
+ * the only per-value text ACP has, and a surface that ignores it renders "plan" and "build" with
+ * nothing to say what they do.
+ *
+ * `buildManyModelOptions` produces the real size on demand for the one case that needs it.
+ */
+export function opencodeConfigOptions(): SessionConfigOption[] {
+  return [
+    {
+      id: 'model',
+      name: 'Model',
+      type: 'select',
+      category: 'model',
+      currentValue: 'openrouter/openai/gpt-6.1-sol',
+      options: [
+        { value: 'openrouter/openai/gpt-6.1-sol', name: 'gpt-6.1-sol' },
+        { value: 'openrouter/anthropic/claude-sonnet-5.5', name: 'claude-sonnet-5.5' },
+        { value: 'github-copilot/gpt-5.5-codex', name: 'gpt-5.5-codex' },
+      ],
+    },
+    {
+      id: 'effort',
+      name: 'Effort',
+      description: 'Available effort levels for this model',
+      type: 'select',
+      category: 'thought_level',
+      currentValue: 'default',
+      options: [
+        { value: 'low', name: 'Low' },
+        { value: 'medium', name: 'Medium' },
+        { value: 'high', name: 'High' },
+        { value: 'xhigh', name: 'Extra high' },
+        { value: 'max', name: 'Maximum' },
+        { value: 'default', name: 'Default' },
+      ],
+    },
+    {
+      id: 'mode',
+      name: 'Session Mode',
+      type: 'select',
+      category: 'mode',
+      currentValue: 'build',
+      options: [
+        { value: 'build', name: 'Build', description: 'Make the change' },
+        { value: 'plan', name: 'Plan', description: 'Propose before changing' },
+      ],
+    },
+  ];
+}
+
+/** The modes behind the `mode` config option. opencode keeps the two in step; so does this. */
+export const OPENCODE_MODES: SessionMode[] = [
+  { id: 'build', name: 'Build', description: 'Make the change' },
+  { id: 'plan', name: 'Plan', description: 'Propose before changing' },
+];
+
+/** A model list the size a real account actually produces, for the "is it searchable" question. */
+export function buildManyModelOptions(count = 400): SessionConfigOption[] {
+  const options = Array.from({ length: count }, (_, index) => ({
+    value: `openrouter/vendor/model-${String(index).padStart(3, '0')}`,
+    name: `model-${String(index).padStart(3, '0')}`,
+  }));
+  return [{ id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: options[0]?.value, options }];
+}
 
 export interface FixtureAgentOptions {
   /** What `initialize` reports. The defaults are opencode 2.0.19's, warts included. */
@@ -77,6 +150,21 @@ export interface FixtureAgentOptions {
   chattyMeta?: boolean;
   /** How many pages `session/list` answers before the cursor runs out. Defaults to 1. */
   listPages?: number;
+  /**
+   * The options reported on `session/new`, `session/load`, `session/resume` and every
+   * `session/set_config_option` answer. Defaults to opencode 2.0.19's three.
+   *
+   * Pass `[]` for an agent that has no configuration at all, which is a different client behaviour
+   * from "an empty dropdown" and therefore a different test.
+   */
+  configOptions?: SessionConfigOption[];
+  /** Reject a config option the fixture does not know, and a value outside the option's list. */
+  strictConfigOptions?: boolean;
+  /**
+   * Push a `config_option_update` after a successful set, the way opencode does when the **model**
+   * changes (it does not for `effort` or `mode`). Defaults to true.
+   */
+  pushConfigOptionUpdate?: boolean;
   /** Never answer `initialize` — for the initialize timeout. */
   hangOnInitialize?: boolean;
   /** Ask for a file the client refused to answer, mid-turn. */
@@ -86,6 +174,9 @@ export interface FixtureAgentOptions {
 }
 
 type PermissionOutcome = { outcome: { outcome: 'cancelled' } | { outcome: 'selected'; optionId: string } };
+
+/** What the agent said when it refused to set something. The `about` keys vary per refusal. */
+export type ConfigRefusal = { message: string } & Record<string, unknown>;
 
 const SESSION_ID = 'ses_fixture_0001';
 
@@ -98,6 +189,10 @@ export class FixtureAgent {
   readonly permissionOutcomes: (PermissionOutcome | undefined)[] = [];
   /** Every error response the fixture sent back, for the "agent keeps talking" assertions. */
   readonly refused: { path: string }[] = [];
+  /** Every value the client set, in order — the assertion surface for a config option. */
+  readonly configSets: { configId: string; value: unknown }[] = [];
+  /** Every mode the client set, in order. `session/set_mode` and the `mode` option are two doors. */
+  readonly modesSet: string[] = [];
 
   #options: FixtureAgentOptions;
   #reader = new MessageReader();
@@ -110,10 +205,25 @@ export class FixtureAgent {
   #nextRequestId = 10_000;
   #pendingPermissions = new Map<RequestId, (outcome: PermissionOutcome) => void>();
   #sessions = new Map<string, { cwd: string; mcpServers: McpServer[] }>();
+  #configOptions: SessionConfigOption[];
+  #currentModeId = 'build';
+  /** Every config-option refusal, so a test can assert *which* mistake the client made. */
+  readonly #configErrors: ConfigRefusal[] = [];
 
   constructor(options: FixtureAgentOptions = {}) {
     this.#options = options;
     this.#authenticated = options.requireAuth !== true;
+    this.#configOptions = options.configOptions ?? opencodeConfigOptions();
+  }
+
+  /** Every config-option refusal the fixture sent, in order. */
+  get configErrors(): ConfigRefusal[] {
+    return this.#configErrors;
+  }
+
+  /** The options as the fixture currently stands — what a surface would have to re-read. */
+  get configOptions(): SessionConfigOption[] {
+    return this.#configOptions;
   }
 
   /** The client under test. */
@@ -187,7 +297,7 @@ export class FixtureAgent {
         const cwd = String(params?.['cwd'] ?? '');
         const mcpServers = (params?.['mcpServers'] ?? []) as McpServer[];
         this.#sessions.set(SESSION_ID, { cwd, mcpServers });
-        this.#reply(id, { sessionId: SESSION_ID, ...this.#meta() });
+        this.#reply(id, { sessionId: SESSION_ID, ...this.#sessionState(), ...this.#meta() });
         // A real agent announces its slash commands unprompted, before the first prompt turn.
         this.#update({
           sessionId: SESSION_ID,
@@ -203,7 +313,7 @@ export class FixtureAgent {
         if (!this.#authenticated) return this.#authRequired(id);
         if (this.#options.omitLoadSession) return this.#methodNotFound(id, message.method);
         const sessionId = String(params?.['sessionId'] ?? SESSION_ID);
-        this.#reply(id, this.#meta());
+        this.#reply(id, { ...this.#sessionState(), ...this.#meta() });
         // A load replays the history as notifications. That is its whole purpose.
         for (const chunk of this.#options.chunks ?? ['replayed']) {
           this.#update({ sessionId, update: this.#agentChunk(chunk) });
@@ -213,7 +323,32 @@ export class FixtureAgent {
 
       case CLIENT_METHODS.resumeSession: {
         if (!this.#authenticated) return this.#authRequired(id);
+        this.#reply(id, { ...this.#sessionState(), ...this.#meta() });
+        return;
+      }
+
+      case CLIENT_METHODS.setSessionMode: {
+        if (!this.#authenticated) return this.#authRequired(id);
+        const modeId = String(params?.['modeId'] ?? '');
+        if (!OPENCODE_MODES.some((mode) => mode.id === modeId)) {
+          return this.#configInvalid(id, 'no such mode', { modeId });
+        }
+        this.modesSet.push(modeId);
+        this.#currentModeId = modeId;
+        this.#syncModeOption();
+        // The v1 response carries nothing. The new mode comes back as an update, so a client that
+        // treats the acknowledgement as the state is guessing.
         this.#reply(id, this.#meta());
+        this.#update({
+          sessionId: String(params?.['sessionId'] ?? SESSION_ID),
+          update: { sessionUpdate: 'current_mode_update', currentModeId: modeId },
+        });
+        return;
+      }
+
+      case CLIENT_METHODS.setSessionConfigOption: {
+        if (!this.#authenticated) return this.#authRequired(id);
+        this.#setConfigOption(id, params);
         return;
       }
 
@@ -401,6 +536,105 @@ export class FixtureAgent {
 
   #agentChunk(text: string): SessionUpdate {
     return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } };
+  }
+
+  /**
+   * The `modes` and `configOptions` every session-creating and session-reopening answer carries.
+   *
+   * `opencode acp` 2.0.19 sends both from `session/new`, `session/load` and `session/resume`, which
+   * is what makes them re-readable: a surface that shows the current model after a restart is
+   * reading the agent's answer, not remembering its own choice.
+   */
+  #sessionState(): Record<string, unknown> {
+    return {
+      modes: { currentModeId: this.#currentModeId, availableModes: OPENCODE_MODES },
+      configOptions: this.#configOptions,
+    };
+  }
+
+  /**
+   * `session/set_config_option`, with the two behaviours of the real agent that a test has to be
+   * able to reproduce:
+   *
+   * - **A non-string value is refused outright.** opencode 2.0.19 answers
+   *   `InvalidConfigOptionError` for `typeof value !== "string"`, so it implements no boolean
+   *   options at all. That is the measurement behind `KURIER_CLIENT_CAPABILITIES` omitting
+   *   `session.configOptions.boolean`: announcing a shape the agent refuses is a promise the agent
+   *   is entitled to break.
+   * - **The answer is the full list, and it is the truth.** An unknown `configId` or a value outside
+   *   the option is an error; anything else rewrites the option and returns every option again, so a
+   *   client that kept its own guess instead of reading the answer can be caught.
+   */
+  #setConfigOption(id: RequestId | undefined, params: Record<string, unknown> | undefined): void {
+    const configId = String(params?.['configId'] ?? '');
+    const value = params?.['value'];
+    if (typeof value !== 'string') {
+      return this.#configInvalid(id, 'this agent takes a value id, not a tagged value', { configId });
+    }
+    this.configSets.push({ configId, value });
+
+    if (configId === 'mode') {
+      if (!OPENCODE_MODES.some((mode) => mode.id === value)) {
+        return this.#configInvalid(id, 'no such mode', { configId, value });
+      }
+      this.#currentModeId = value;
+      this.modesSet.push(value);
+      this.#syncModeOption();
+      return this.#replyWithOptions(id, params, false);
+    }
+
+    const index = this.#configOptions.findIndex((option) => option.id === configId);
+    if (index === -1) {
+      return this.#configInvalid(id, 'no such config option', { configId });
+    }
+    const option = this.#configOptions[index] as SessionConfigOption;
+    if (option.type === 'select') {
+      const values = (option.options ?? []).map((entry) => entry.value);
+      if (!values.includes(value)) {
+        return this.#configInvalid(id, 'that value is not one of the offered ones', { configId, value });
+      }
+    }
+    this.#configOptions = [
+      ...this.#configOptions.slice(0, index),
+      { ...option, currentValue: value },
+      ...this.#configOptions.slice(index + 1),
+    ];
+    // opencode pushes an update for a **model** change and returns the list for the others. Both,
+    // here: a client has to cope with either and must not depend on the notification arriving.
+    return this.#replyWithOptions(id, params, configId === 'model');
+  }
+
+  #replyWithOptions(id: RequestId | undefined, params: Record<string, unknown> | undefined, push: boolean): void {
+    this.#reply(id, { configOptions: this.#configOptions, ...this.#meta() });
+    if (push && this.#options.pushConfigOptionUpdate !== false) {
+      this.#update({
+        sessionId: String(params?.['sessionId'] ?? SESSION_ID),
+        update: { sessionUpdate: 'config_option_update', configOptions: this.#configOptions },
+      });
+    }
+  }
+
+  /** Keep the `mode` option's `currentValue` in step with `session/set_mode`. */
+  #syncModeOption(): void {
+    this.#configOptions = this.#configOptions.map((option) =>
+      option.id === 'mode' ? { ...option, currentValue: this.#currentModeId } : option,
+    );
+  }
+
+  /**
+   * The refusal `opencode acp` gives for a config option it cannot set, as a real error response.
+   *
+   * A response and not a silent drop: a client that gets no answer to `session/set_config_option`
+   * waits forever, and a fixture that hangs is a fixture that cannot test a failure.
+   */
+  #configInvalid(id: RequestId | undefined, message: string, about: Record<string, unknown>): void {
+    this.#configErrors.push({ message, ...about });
+    this.#send(
+      encodeFailure(id as RequestId, {
+        code: ERROR_CODES.INVALID_PARAMS,
+        message: `${message}: ${JSON.stringify(about)}`,
+      }),
+    );
   }
 
   #update(notification: SessionNotification): void {

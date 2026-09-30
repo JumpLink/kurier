@@ -66,6 +66,10 @@ import {
   type SessionCapabilities,
   type SessionId,
   type SessionNotification,
+  type SetSessionConfigOptionRequest,
+  type SetSessionConfigOptionResponse,
+  type SetSessionModeRequest,
+  type SetSessionModeResponse,
   type WriteTextFileRequest,
 } from './types.ts';
 
@@ -314,6 +318,36 @@ export class AcpClient {
       });
     }
     return (await this.#request(CLIENT_METHODS.deleteSession, params)) as DeleteSessionResponse;
+  }
+
+  // ─── session configuration ─────────────────────────────────────────────────────────────────
+  //
+  // Both of these write a value **inside the agent**, for the lifetime of that session. kurier
+  // keeps no copy: the agent's `currentValue` is the truth, and it is re-read on every
+  // `session/new`, `session/load` and `config_option_update`. A surface that remembered a preferred
+  // model in a kurier file would be holding configuration authority over the agent — the same
+  // mistake as "always allow" in different clothes.
+
+  /**
+   * `session/set_mode` — switch the session between the modes the agent offered.
+   *
+   * The v1 response carries no fields: the new mode comes back as a `current_mode_update`
+   * notification, which is why the return value is the empty `SetSessionModeResponse` and not a
+   * lie about which mode is now active.
+   */
+  async setMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
+    return (await this.#request(CLIENT_METHODS.setSessionMode, params)) as SetSessionModeResponse;
+  }
+
+  /**
+   * `session/set_config_option` — pick a model, a thought level, or anything else the agent offers.
+   *
+   * The answer is the **full** option set, and the caller is expected to use it rather than assume
+   * its own value took: an agent that clamps a value it does not have answers with the corrected
+   * list, and a surface that kept the guess would show a model that is not in use.
+   */
+  async setConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
+    return (await this.#request(CLIENT_METHODS.setSessionConfigOption, params)) as SetSessionConfigOptionResponse;
   }
 
   // ─── prompt turn ───────────────────────────────────────────────────────────────────────────

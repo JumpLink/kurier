@@ -34,11 +34,26 @@ export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: 
  * The capabilities kurier announces. Both file-system flags are `false` and `terminal` is
  * `false`: the agent gets no channel to kurier's file system and no channel to a shell. A later
  * slice may add one, but it has to be added *here*, visibly, next to the reasoning.
+ *
+ * `session.configOptions` announces that kurier can **act on** a session's configuration — the
+ * model, the thought level, the mode. Two things about it are deliberate:
+ *
+ * - **It is a client capability.** It sits under `ClientCapabilities.session`, so it is kurier
+ *   saying what it can do, not a record of what the agent offered. Measured against
+ *   `opencode acp` 2.0.19: the agent answers `session/new` with 400+ models, 6 thought levels and
+ *   2 modes whether kurier announces this or not — which is a reason to announce, not a reason to
+ *   believe the announcement made the options appear.
+ * - **`boolean` is omitted, so it will not be sent.** `{}` there means "I can render a switch";
+ *   leaving it out means the agent must not include `type: "boolean"` options. The surface does not
+ *   exist yet, and a capability announced before it is implemented is a promise the agent is
+ *   entitled to act on. It goes in when the switch goes in — next to this line, not in a later
+ *   commit that leaves no trace of why.
  */
 export const KURIER_CLIENT_CAPABILITIES: ClientCapabilities = {
   fs: { readTextFile: false, writeTextFile: false },
   terminal: false,
   auth: { terminal: false },
+  session: { configOptions: {} },
 };
 
 /**

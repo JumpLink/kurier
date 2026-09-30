@@ -69,8 +69,28 @@ export interface AgentAuthCapabilities extends Extensible {
   logout?: LogoutCapabilities | null;
 }
 
+/**
+ * "I can render a boolean config option." An empty object is the whole signal — the schema says
+ * supplying `{}` means the agent may include `type: "boolean"` options, and omitting it means the
+ * client does not advertise support. See `KURIER_CLIENT_CAPABILITIES`.
+ */
+export interface BooleanConfigOptionCapabilities extends Extensible {}
+
+/**
+ * Which config-option shapes kurier can act on, announced in
+ * `clientCapabilities.session.configOptions`.
+ *
+ * **This is a client capability, not an agent one**, and mistaking it for the other way round is
+ * easy: an agent answering without it says nothing about whether it *has* options. kurier omits the
+ * whole `session` key until the surface exists, and the fact that `opencode acp` 2.0.19 sends 400+
+ * model options anyway is a reason to announce, not a reason to skip announcing.
+ */
+export interface SessionConfigOptionsCapabilities extends Extensible {
+  boolean?: BooleanConfigOptionCapabilities | null;
+}
+
 export interface ClientSessionCapabilities extends Extensible {
-  configOptions?: Extensible | null;
+  configOptions?: SessionConfigOptionsCapabilities | null;
 }
 
 export interface ElicitationCapabilities extends Extensible {}
@@ -209,10 +229,124 @@ export interface SessionModeState extends Extensible {
   availableModes: SessionMode[];
 }
 
+/** One value a person may pick in a `select` config option, with the label to show for it. */
+export interface SessionConfigSelectOption extends Extensible {
+  value: string;
+  name: string;
+  description?: string | null;
+}
+
+/**
+ * The payload of a `type: "select"` config option: what is chosen now, and what could be chosen.
+ *
+ * This is the schema's `SessionConfigSelect` def, kept as a named interface for the same reason the
+ * arm exists: `select` and `boolean` disagree about `currentValue` — a value id against a boolean —
+ * so the two payloads cannot be one type. It is referenced from `SessionConfigSelectOption`'s
+ * sibling below rather than merged into the flat wire type, because a value is only meaningful
+ * together with the option it belongs to, and a `currentValue` of type `unknown` is precisely the
+ * field the projection has to validate.
+ */
+export interface SessionConfigSelect extends Extensible {
+  currentValue: string;
+  options: SessionConfigSelectOption[];
+}
+
+/**
+ * A `SessionConfigOption` that passed validation, for the `select` case.
+ *
+ * What the flat wire type cannot say and this can: that `currentValue` is one of `options`' own
+ * values. That is the invariant a dropdown depends on, and it is checkable, so `narrow.ts` checks
+ * it rather than leaving it to every consumer. A `select` whose `currentValue` is not among its
+ * values narrows to `null` — it does not narrow to a control showing one model and writing another.
+ */
+export type ValidSessionConfigSelect = SessionConfigSelect & SessionConfigOption;
+
+/**
+ * The categories the v1 schema names. It calls them a hint — "MUST NOT be required for
+ * correctness" — and says clients must handle a missing or unknown one, which is why
+ * `SessionConfigOptionCategory` is not this union but this union *plus any string*.
+ */
+export const KNOWN_CONFIG_CATEGORIES = ['mode', 'model', 'model_config', 'thought_level'] as const;
+
+/**
+ * The `type`s of `SessionConfigOption`'s `oneOf`, as a list rather than a union.
+ *
+ * A list, because the wire type stays flat and the *checking* is what needs the closed set: a
+ * `select` carries a value id plus a list of options, a `boolean` carries a boolean, and the
+ * projection in `app/src/core/config.ts` branches on this. A third arm in a later ACP therefore
+ * shows up as a value this client does not name — skipped rather than guessed at — and
+ * `scripts/check-schema.mjs` fails the build, because a new arm that nobody decided about is
+ * exactly the drift this repo checks for on method names.
+ */
+export const KNOWN_CONFIG_OPTION_TYPES = ['select', 'boolean'] as const;
+
+export type KnownConfigCategory = (typeof KNOWN_CONFIG_CATEGORIES)[number];
+
+/** A known category, or whatever an agent invented. Never narrowed away before the surface sees it. */
+export type SessionConfigOptionCategory = KnownConfigCategory | (string & {});
+
+/**
+ * A session configuration option: the model selector, the thought level, the session mode, or
+ * whatever else the agent offers.
+ *
+ * **Looser than the schema on purpose, and the looseness is in two named places.** The schema is a
+ * `oneOf` discriminated on `type` with exactly two arms — `select` (a value id plus `options`) and
+ * `boolean` (a boolean) — and a TypeScript mirror of that union cannot be narrowed without casts:
+ * an arm typed `{ type: string }` for a future third variant overlaps both literals, so
+ * `if (option.type === 'select')` leaves the unknown arm in the true branch and every field access
+ * needs an assertion. So the wire type stays flat and permissive, and the two things that actually
+ * need checking — the `type` and the payload that goes with it — are checked in exactly one place:
+ * `projectConfigOptions` in `app/src/core/config.ts`, which returns a closed union the surface can
+ * use without a cast. That is the same bargain `narrow.ts` makes for `sessionUpdate`, one level up.
+ */
 export interface SessionConfigOption extends Extensible {
   id: string;
   name: string;
-  [key: string]: unknown;
+  /**
+   * `select` or `boolean` in ACP v1. A `string` rather than a literal union, so an agent that sends
+   * a third kind is carried rather than mistyped — and is then skipped by the projection instead of
+   * guessed at.
+   */
+  type: string;
+  category?: SessionConfigOptionCategory | null;
+  description?: string | null;
+  /** A value id for `select`, a boolean for `boolean`. Untyped here; validated by the projection. */
+  currentValue?: unknown;
+  /** The choices, for `select`. */
+  options?: SessionConfigSelectOption[];
+}
+
+// ─── setting a mode or a config option ──────────────────────────────────────────────────────
+
+export interface SetSessionModeRequest extends Extensible {
+  sessionId: SessionId;
+  modeId: string;
+}
+
+/** The v1 schema defines no fields beyond `_meta` — the mode state comes back as an update. */
+export type SetSessionModeResponse = Extensible;
+
+export interface SetSessionConfigOptionRequest extends Extensible {
+  sessionId: SessionId;
+  configId: string;
+  /**
+   * A value id, or the boolean form. The schema puts the boolean in an `anyOf` on the *request*
+   * rather than on the value, so the `type` tag travels next to it: `{ type: "boolean", value:
+   * true }`. A bare string stays the default, and an unknown tag with a string payload still
+   * deserializes into it — so a value id never needs the tag.
+   */
+  value: string | { type: 'boolean'; value: boolean };
+}
+
+/**
+ * The **full** set of options after the change, not just the one that was set.
+ *
+ * Worth the wire cost: the agent is the only authority on what a value did, and an agent that
+ * rejected a value answers with a corrected list. Treating this as an acknowledgement and keeping
+ * the local guess is how a surface ends up showing a model that is not the one in use.
+ */
+export interface SetSessionConfigOptionResponse extends Extensible {
+  configOptions: SessionConfigOption[];
 }
 
 export interface NewSessionRequest extends Extensible {
@@ -221,10 +355,8 @@ export interface NewSessionRequest extends Extensible {
   additionalDirectories?: string[];
 }
 
-export interface NewSessionResponse extends Extensible {
+export interface NewSessionResponse extends SessionStateCarrier {
   sessionId: SessionId;
-  modes?: SessionModeState | null;
-  configOptions?: SessionConfigOption[] | null;
 }
 
 export interface LoadSessionRequest extends Extensible {
@@ -234,7 +366,20 @@ export interface LoadSessionRequest extends Extensible {
   additionalDirectories?: string[];
 }
 
-export type LoadSessionResponse = Extensible;
+/**
+ * `session/load` and `session/resume` answer with the same two things `session/new` does: the
+ * modes and the config options as they stand for this session.
+ *
+ * That matters more than it looks. Those values are the *agent's* truth about this session, and
+ * kurier keeps no copy — so an option row built from anything else would be showing a preference
+ * kurier invented. `opencode acp` 2.0.19 sends all three options here as well as on `session/new`.
+ */
+export interface SessionStateCarrier extends Extensible {
+  modes?: SessionModeState | null;
+  configOptions?: SessionConfigOption[] | null;
+}
+
+export type LoadSessionResponse = SessionStateCarrier;
 
 export interface ResumeSessionRequest extends Extensible {
   sessionId: SessionId;
@@ -243,7 +388,7 @@ export interface ResumeSessionRequest extends Extensible {
   additionalDirectories?: string[];
 }
 
-export type ResumeSessionResponse = Extensible;
+export type ResumeSessionResponse = SessionStateCarrier;
 
 export interface ListSessionsRequest extends Extensible {
   cwd?: string | null;
@@ -429,6 +574,20 @@ export interface CurrentModeUpdate extends Extensible {
   currentModeId: string;
 }
 
+/**
+ * The agent changed a session configuration option on its own — or is telling us what the options
+ * are, without having been asked.
+ *
+ * It carries the **full set**, the same way `SetSessionConfigOptionResponse` does, and for the same
+ * reason: the agent is the authority, and a partial list would be a list to guess the rest of.
+ *
+ * Typed here rather than left as `Extensible`, which is what it was until the surface needed it: a
+ * consumer that had to cast to read `configOptions` was a consumer nobody had written yet.
+ */
+export interface ConfigOptionUpdate extends Extensible {
+  configOptions: SessionConfigOption[];
+}
+
 export interface SessionInfoUpdate extends Extensible {
   title?: string | null;
 }
@@ -466,7 +625,7 @@ export type KnownSessionUpdate =
   | ({ sessionUpdate: 'plan' } & Plan)
   | ({ sessionUpdate: 'available_commands_update' } & AvailableCommandsUpdate)
   | ({ sessionUpdate: 'current_mode_update' } & CurrentModeUpdate)
-  | ({ sessionUpdate: 'config_option_update' } & Extensible)
+  | ({ sessionUpdate: 'config_option_update' } & ConfigOptionUpdate)
   | ({ sessionUpdate: 'session_info_update' } & SessionInfoUpdate)
   | ({ sessionUpdate: 'usage_update' } & UsageUpdate);
 

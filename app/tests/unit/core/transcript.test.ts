@@ -107,7 +107,20 @@ export default async () => {
     });
 
     await it('config_option_update produces no lines', async () => {
-      const entries = toTranscript(notification({ sessionUpdate: 'config_option_update' }), AT);
+      // Carries three real options, because a `config_option_update` without them is not a thing
+      // the protocol allows and a test that used one was asserting on an input no agent sends.
+      const entries = toTranscript(
+        notification({
+          sessionUpdate: 'config_option_update',
+          configOptions: [
+            { id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: 'a/b', options: [{ value: 'a/b', name: 'b' }] },
+            { id: 'effort', name: 'Effort', type: 'select', category: 'thought_level', currentValue: 'high', options: [{ value: 'high', name: 'High' }] },
+          ],
+        }),
+        AT,
+      );
+      // Configuration is surface state, not conversation: the transcript is a record of what
+      // happened in the session, and picking a model is not something that happened in it.
       expect(entries).toStrictEqual([]);
     });
   });
