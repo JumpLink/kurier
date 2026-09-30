@@ -38,6 +38,9 @@ export interface SessionListOptions {
 
 type ListState = 'list' | 'empty' | 'error';
 
+/** Read after the row's name, which is where "the one you are looking at" belongs. See `#mark`. */
+const OPEN_SESSION_DESC = 'The session you are looking at.';
+
 export class SessionList {
   /** Pack this. The list, the empty state and the error state are its three children. */
   readonly widget: Gtk.Stack;
@@ -153,20 +156,37 @@ export class SessionList {
   /**
    * Move the mark to this row, or to none.
    *
-   * A CSS class for the eye and `AccessibleState.SELECTED` for a screen reader, because the class is
-   * invisible to one and the state is invisible to everybody. Neither is GTK's own selection: with
-   * `SelectionMode.NONE` no row ever gets `:selected`, so the theme's selected-row styling never
-   * fires here and the mark has to be one this file applies.
+   * A CSS class for the eye and an `AccessibleProperty.DESCRIPTION` for a screen reader, because the
+   * class is invisible to one and the description is invisible to everybody. Neither is GTK's own
+   * selection: with `SelectionMode.NONE` no row ever gets `:selected`, so the theme's selected-row
+   * styling never fires here and the mark has to be one this file applies.
+   *
+   * **The description, not `AccessibleState.SELECTED`, and that is a measurement.** The obvious
+   * encoding of "this is the open session" is the selected state, and it cannot be set from GJS on
+   * GTK 4.22.5: `row.update_state([Gtk.AccessibleState.SELECTED], [true])` emits
+   * `GLib-GObject-CRITICAL: g_value_get_int: assertion 'G_VALUE_HOLDS_INT (value)' failed` — GTK holds
+   * the state as an integer, GJS hands over a boolean — and it does so **once per call**, so every
+   * click in the list cost a warning. Measured and ruled out, all on GTK 4.22.5 / GJS 1.88.1:
+   * `[true]`, `[1]`, the states flattened into one array, and a `GObject.Value` typed as boolean
+   * (`new GObject.Value(GObject.TYPE_BOOLEAN)`, which GJS rejects outright as "not initialized with a
+   * type"). `Gtk.AccessibleProperty.SELECTED_TEXT` is the same defect — it warns too.
+   * `AccessibleProperty.DESCRIPTION` and `.LABEL` are clean, and a description is the better sentence
+   * anyway: it is read after the name, which is where "the session you are looking at" belongs.
+   *
+   * What is lost: a screen reader no longer reports the row as *selected*, which is a state some
+   * assistive technology surfaces as such. In exchange the surface stops writing a critical to stderr
+   * on every click, and stderr is where this project's own warnings are counted. `AGENTS.md` sends
+   * that class of defect upstream rather than working around it silently — this comment is that note.
    */
   #mark(row: Gtk.ListBoxRow | null): void {
     if (this.#marked) {
       this.#marked.remove_css_class(CSS.openRow);
-      this.#marked.update_state([Gtk.AccessibleState.SELECTED], [false]);
+      this.#marked.update_property([Gtk.AccessibleProperty.DESCRIPTION], ['']);
     }
     this.#marked = row;
     if (!row) return;
     row.add_css_class(CSS.openRow);
-    row.update_state([Gtk.AccessibleState.SELECTED], [true]);
+    row.update_property([Gtk.AccessibleProperty.DESCRIPTION], [OPEN_SESSION_DESC]);
   }
 
   #rowOf(id: string | null): Gtk.ListBoxRow | null {

@@ -258,11 +258,7 @@ export default async () => {
       // Membership of the earlier section is asserted, not its internal order: whether a garbage
       // string collides above or below an ISO one is the runtime's collation, not this module's
       // contract, and the two runtimes need not agree on it.
-      expect([...groups[1]!.records.map((r) => r.id)].sort()).toStrictEqual([
-        'bad',
-        'earlier-10d',
-        'earlier-30d',
-      ]);
+      expect(groups[1]!.records.map((r) => r.id).sort()).toStrictEqual(['bad', 'earlier-10d', 'earlier-30d']);
     });
 
     await it('does not mutate the input array', async () => {

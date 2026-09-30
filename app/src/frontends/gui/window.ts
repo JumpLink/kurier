@@ -52,14 +52,15 @@
 
 import Adw from '@girs/adw-1';
 import GObject from '@girs/gobject-2.0';
-import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
 import { labelOf, type SessionRecord } from '@kurier/session';
 
 import { APP_NAME, COLLAPSE_WIDTH_PX, WINDOW_HEIGHT, WINDOW_WIDTH } from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
+import { Composer } from './composer.ts';
 import { SessionList } from './session-list.ts';
+import { TranscriptView } from './transcript-view.ts';
 
 export interface MainWindowOptions {
   /** Read once at startup. See `hooks.ts` — a state only a click can reach is a state untested. */
@@ -78,8 +79,22 @@ export class MainWindow extends Adw.ApplicationWindow {
   readonly #split: Adw.NavigationSplitView;
   readonly #sessions: SessionList;
   readonly #placeholder: Adw.StatusPage;
+  /** One transcript view for the whole window, refilled per session. See the constructor. */
+  readonly #transcript: TranscriptView;
+  /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
+  readonly #composer: Composer;
   readonly #contentPage: Adw.NavigationPage;
   readonly #contentHeader: Adw.HeaderBar;
+  /**
+   * The content pane's two states — "nothing is open" and "this session" — in one `Gtk.Stack`.
+   *
+   * A stack rather than swapping `Adw.ToolbarView.set_content`, and the reason is the composer: the
+   * header bar and the composer belong to the *pane* and must survive the switch. A session list of
+   * thirty rows behind thirty `NavigationPage`s would rebuild the composer's scroller on every click,
+   * which loses the entry's scroll position and its text — the two things a person is in the middle
+   * of. Two named children and one assignment is the whole mechanism.
+   */
+  readonly #contentStack: Gtk.Stack;
 
   constructor(app: Adw.Application, options: MainWindowOptions) {
     super({
@@ -96,7 +111,27 @@ export class MainWindow extends Adw.ApplicationWindow {
 
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#placeholder = buildPlaceholder();
-    const panes = buildSplitView(this.#sessions.widget, this.#placeholder);
+    // **One transcript view for the whole window, refilled — not a stack child per session.**
+    // Plan §7 step 4 asks for exactly that, and the review's F5 names the same reason: thirty sessions
+    // means thirty `NavigationPage`s, thirty scrollers, and a composer whose entry and scroll position
+    // are rebuilt on every click. One view, `setEntries` on each open, is also the reason a session
+    // switch cannot leak a row from the previous transcript — the rebuild is total, not a diff.
+    this.#transcript = new TranscriptView();
+    // **No `onSend`, and that is the step-4 state rather than an omission.** §7 step 4 is "transcript +
+    // composer + Stop, **without an agent**"; `openAgent` and `runTurn` are step 5. So there is nothing
+    // a message could reach, and a Send that accepted one and dropped it would be the
+    // control-that-points-at-nothing this window's own header forbids. `attached: false` makes
+    // `composerView` disable the button and put the reason on screen; step 5 passes `true` and a real
+    // `onSend`, and the widget needs no change for it.
+    this.#composer = new Composer({ attached: false });
+    this.#contentStack = new Gtk.Stack({ vexpand: true });
+    const panes = buildSplitView(
+      this.#sessions.widget,
+      this.#placeholder,
+      this.#transcript.widget,
+      this.#composer.widget,
+      this.#contentStack,
+    );
     this.#split = panes.split;
     this.#contentPage = panes.contentPage;
     this.#contentHeader = panes.contentHeader;
@@ -134,30 +169,29 @@ export class MainWindow extends Adw.ApplicationWindow {
    * Peer review caught that. Setting it is also what makes libadwaita's own back button appear —
    * see `buildContent`.
    *
-   * **Only `description` is escaped, and that is not an oversight.** `Adw.StatusPage.title` and
-   * `Adw.NavigationPage.title` are plain text on both: `adw-status-page.ui` sets `use-markup` on
-   * the description label only and the title label is filled with `gtk_label_set_text`. A label
-   * whose own words go through `gtk_label_set_text` would drop the agent's `<` and `&`, so escaping
-   * them would be the bug. `description` is the one field here that *is* Pango markup, so a working
-   * directory with an `&` in it has to be escaped — into nothing, and then the page reads right.
+   * **The `Adw.StatusPage` is left exactly as the constructor built it.** It used to be refilled here
+   * with the session's title, agent and directory, which was the whole content pane while the
+   * transcript did not exist. Now the transcript *is* the content pane, and a page one click away
+   * carrying the same title is a second answer to "which session am I looking at" — the defect
+   * `session-list.ts` avoids by keeping `#openId` as the one source of that answer. The status page now
+   * means one thing and one thing only: nothing is open.
    *
-   * What it shows is what the record holds, and no more: the transcript is the next step, and a
-   * page that pretended to have one would be the "control that points at nothing" in prose.
+   * **`record.turns` is handed over unchanged.** `TranscriptView.setEntries` takes exactly what the
+   * store holds and projects it through `core/transcript-items.ts`; a surface that filtered first
+   * would be re-deriving history the agent's own `session/load` is the authority on (AGENTS.md §
+   * Privacy: the transcript is a record of what happened, not a re-derivation of it).
    */
   #open(record: SessionRecord): void {
     const label = labelOf(record);
-    // Not `chat-symbolic`: the Adwaita icon theme has no such icon and the page showed a broken-image
-    // placeholder. Checked with `Gtk.IconTheme.has_icon`, like every icon name in this file.
-    this.#placeholder.iconName = 'utilities-terminal-symbolic';
-    // Plain text, not markup — see the note on escaping below.
-    this.#placeholder.title = label;
-    const entries = record.turns.length === 1 ? '1 entry' : `${record.turns.length} entries`;
-    // The description IS markup (`adw-status-page.ui` sets `use-markup` on that label), and a working
-    // directory is the person's own and may hold an `&`.
-    this.#placeholder.description = GLib.markup_escape_text(
-      `${record.agent} in ${record.cwd} · ${entries}`,
-      -1,
-    );
+    this.#transcript.setEntries(record.turns);
+    // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
+    // map, so an index would be a second naming scheme for the same three states.
+    //
+    // **`'empty'` is its own state, not the closed page reused.** A session that is open and holds no
+    // turns is a third thing, not the second one: `kurier start` with no prompt produces exactly
+    // that. Showing the transcript's blank column for it reads as a failed load, and showing
+    // "No session open" for a session that *is* open is a lie in the title bar's own words.
+    this.#contentStack.visibleChildName = record.turns.length === 0 ? 'empty' : 'open';
     this.#contentPage.title = label;
     // The title can be shown now: it names the session, not the app, so it is no longer the
     // double title `buildContent` hides it against.
@@ -279,10 +313,46 @@ function buildSidebar(list: Gtk.Widget): Adw.NavigationPage {
  *
  * The title comes back once there is a session to name — `MainWindow.#open` turns it on.
  */
-function buildContent(header: Adw.HeaderBar, placeholder: Adw.StatusPage): Adw.NavigationPage {
+function buildContent(
+  header: Adw.HeaderBar,
+  placeholder: Adw.StatusPage,
+  transcript: Gtk.Widget,
+  composer: Gtk.Widget,
+  stack: Gtk.Stack,
+): Adw.NavigationPage {
   const box = new Adw.ToolbarView({ vexpand: true });
   box.add_top_bar(header);
-  box.set_content(placeholder);
+  // **The stack, not a swap of `set_content`.** The empty state and a session are two answers to one
+  // question, and a `Gtk.Stack` holds both so switching back and forth is a `visibleChildName`
+  // assignment rather than a reparent. That matters because the *composer* is a bottom bar of this
+  // `Adw.ToolbarView` and not part of either child: putting the composer inside whichever child is
+  // showing would rebuild its entry on every session switch, and the composer's whole job is to
+  // survive one.
+  stack.add_named(placeholder, 'closed');
+  stack.add_named(transcript, 'open');
+  // The third state: a session that is open and has said nothing yet. `kurier start` with no prompt
+  // writes exactly such a record, so it arrives from the real CLI and not only from a hand-made
+  // fixture — an empty pane there would look like a failure to load somebody's conversation.
+  stack.add_named(
+    new Adw.StatusPage({
+      iconName: 'mail-send-receive-symbolic',
+      title: 'Nothing here yet',
+      description: 'No prompt has been sent in this session yet. The first one starts it.',
+      vexpand: true,
+      cssClasses: ['compact'],
+    }),
+    'empty',
+  );
+  box.set_content(stack);
+  // **The composer is the bottom bar, and `RAISED_BORDER` is a measured choice.** Plan §7 step 4 puts it
+  // here and §3 draws it under the conversation. The style is what decides whether the bar reads as
+  // part of the pane or as a floating panel: `FLAT` (the default, and what the sidebar's own
+  // `Adw.ToolbarView` uses) draws nothing under it, so the composer's rounded frame would sit directly
+  // on the transcript's own background with no separation at all. `RAISED_BORDER` gives an opaque
+  // background plus a persistent border, which is the one shape that reads correctly in both light and
+  // dark without a shadow that then has to be explained.
+  box.set_bottom_bar_style(Adw.ToolbarStyle.RAISED_BORDER);
+  box.add_bottom_bar(composer);
   return new Adw.NavigationPage({ title: APP_NAME, child: box });
 }
 
@@ -299,9 +369,15 @@ interface Panes {
 }
 
 /** The split view, with a page per side — see the file header on why there are two header bars. */
-function buildSplitView(sidebar: Gtk.Widget, content: Adw.StatusPage): Panes {
+function buildSplitView(
+  sidebar: Gtk.Widget,
+  placeholder: Adw.StatusPage,
+  transcript: Gtk.Widget,
+  composer: Gtk.Widget,
+  stack: Gtk.Stack,
+): Panes {
   const contentHeader = buildContentHeader();
-  const contentPage = buildContent(contentHeader, content);
+  const contentPage = buildContent(contentHeader, placeholder, transcript, composer, stack);
   const split = new Adw.NavigationSplitView({
     sidebar: buildSidebar(sidebar),
     content: contentPage,

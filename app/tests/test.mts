@@ -17,6 +17,7 @@ import config from './unit/core/config.test.ts';
 import policy from './unit/core/policy.test.ts';
 import interrupt from './unit/core/interrupt.test.ts';
 import transcript from './unit/core/transcript.test.ts';
+import composerState from './unit/core/composer-state.test.ts';
 import agents from './unit/core/agents.test.ts';
 import paths from './unit/core/paths.test.ts';
 import sessionGroups from './unit/core/session-groups.test.ts';
@@ -37,6 +38,7 @@ run({
   policy,
   interrupt,
   transcript,
+  composerState,
   agents,
   paths,
   sessionGroups,

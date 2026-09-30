@@ -147,6 +147,42 @@ export const APP_CSS = `
 .kurier-thought {
   opacity: 0.72;
 }
+
+/* The composer's frame. The same three properties \`.kurier-bubble\` already proves — background,
+   radius, padding — and for the same reason: it is an inset surface for text, and the toolkit has no
+   name for one. Deliberately NOT \`.kurier-bubble-agent\`'s alpha: the entry is not a message anybody
+   said yet, so it gets the agent bubble's step-away-from-the-window treatment rather than the accent,
+   which belongs to what the person actually said.
+   No \`border\` here — a border on a box that already differs from the window in lightness is the
+   Adwaita-1 \`frame\`-style double edge, and at a 480 px window it reads as a rule across the pane. */
+.kurier-composer-frame {
+  background-color: alpha(@window_fg_color, 0.07);
+  border-radius: 12px;
+  margin: 6px 12px;
+}
+
+/* The entry itself. Nothing visual: the frame is the surface and the text needs no class of its own,
+   which is why this rule is a marker rather than a style. It exists so the two are independently
+   targetable — the frame's background belongs to the window, the entry's text does not — and so a
+   future monospace mode has one place to land. */
+.kurier-composer-entry {
+  background-color: transparent;
+}
+
+/* The composer's reason line: why the button is disabled, in words, on screen. Caption-sized and
+   dimmed because it is an absence and absence should not be the loudest thing under the conversation —
+   the same reasoning as \`.kurier-quiet\` above. \`margin-top\` is 0 because the vertical box already
+   has \`spacing: 2\`; a second gap is two gaps. */
+.kurier-composer-reason {
+  margin-top: 0;
+  margin-bottom: 6px;
+  /* \`margin-left\`/\`margin-right\`, not the GTK 3 names \`margin-start\`/\`margin-end\`: GTK 4 has no
+     logical margins in CSS, and the parser rejects them with "No property named …" **while still
+     loading the rest of the stylesheet** — so the sheet works and the warning is easy to miss. Both
+     logical names were measured as a warning on GTK 4.22.5. */
+  margin-left: 18px;
+  margin-right: 18px;
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
@@ -164,6 +200,9 @@ export const CSS = {
   note: 'kurier-note',
   disclosureBody: 'kurier-disclosure-body',
   thought: 'kurier-thought',
+  composerFrame: 'kurier-composer-frame',
+  composerEntry: 'kurier-composer-entry',
+  composerReason: 'kurier-composer-reason',
   openRow: 'kurier-open-row',
   dim: DIM,
   title: TITLE,

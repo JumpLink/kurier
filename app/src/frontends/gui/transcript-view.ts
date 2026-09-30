@@ -45,16 +45,18 @@ import Pango from '@girs/pango-1.0';
 import type { TranscriptEntry } from '@kurier/session';
 
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
+import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
 /**
- * The conversation's measure, in logical pixels.
+ * The conversation's measure is `CONTENT_MAX_WIDTH_PX`, not a constant of this file.
  *
- * The plan's §3 number. Wide enough for a code line, narrow enough that a paragraph does not become a
- * wall on an ultrawide monitor — which is the difference between "chat" and "text editor", and the
- * reason it is a clamp and not a wider window.
+ * **The composer shares it, and sharing is the point.** The entry you type into and the answer above
+ * it are one column; a transcript capped at 720 under an entry capped at 700 puts the cursor nowhere
+ * near what it is answering. `constants.ts` carries the number and the reasoning. This file's clamp is
+ * the mechanism — `Adw.Clamp`, because it is the only thing here that caps a natural width without
+ * also ellipsizing.
  */
-const MAX_LINE_WIDTH = 720;
 
 /** Gap between two bubbles, in logical pixels. Smaller than the bubble's own internal padding. */
 const ITEM_SPACING = 4;
@@ -83,8 +85,8 @@ export class TranscriptView {
     this.#scroller = new Gtk.ScrolledWindow({
       child: new Adw.Clamp({
         child: this.#column,
-        maximumSize: MAX_LINE_WIDTH,
-        tighteningThreshold: MAX_LINE_WIDTH,
+        maximumSize: CONTENT_MAX_WIDTH_PX,
+        tighteningThreshold: CONTENT_MAX_WIDTH_PX,
       }),
       hexpand: true,
       vexpand: true,
@@ -104,9 +106,14 @@ export class TranscriptView {
    * history, not a feed, and a hand-patched list cannot leave a stale index behind — which is the
    * bug it gets.
    *
-   * An empty transcript draws nothing. The empty *state* is the window's sentence, and the window
-   * already has one; a second, competing placeholder here would be the "control that points at
-   * nothing" in prose.
+   * An empty transcript draws nothing, and that is a decision to correct once. The first version
+   * justified it with "the window already has an empty state" — true for a window with **no session
+   * open**, which is `Adw.StatusPage` in `window.ts`, and false for a session that *is* open and holds
+   * no turns (`kurier start` with no prompt does exactly that, so it is not hypothetical). There the
+   * pane is blank, which reads as a load failure rather than as a conversation that has not started.
+   * `window.ts` now puts a sentence in that case; this file stays out of it, because the empty state
+   * and the empty *transcript* are two different questions and only the window knows which pane is
+   * showing.
    */
   setEntries(entries: readonly TranscriptEntry[]): void {
     for (const row of this.#rows) this.#column.remove(row);
