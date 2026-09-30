@@ -107,6 +107,13 @@ export function appendTurns(record: SessionRecord, entries: TranscriptEntry[]): 
   return { ...record, turns: [...record.turns, ...entries], updatedAt: at };
 }
 
+/**
+ * Stamp `updatedAt` without adding anything.
+ *
+ * Exists for the case a record is edited without a new transcript line — a rename, a re-bind.
+ * A turn write goes through `appendTurns`, which sets the timestamp from the entry itself, so
+ * that the recorded time is when the thing happened rather than when it was saved.
+ */
 export function touch(record: SessionRecord, at: string): SessionRecord {
   return { ...record, updatedAt: at };
 }
@@ -120,10 +127,32 @@ export function forPrincipal(records: SessionRecord[], principal: Principal): Se
   return records.filter((record) => record.principal === principal);
 }
 
-/** The label a human sees: the title, else the first line of the agent's answer, else the id. */
+/**
+ * The label a human sees: the title, else the agent's opening answer, else the id.
+ *
+ * "Opening answer" means the **whole run of leading agent turns**, not the first one. An agent's
+ * reply arrives as `session/update` chunks and a stream boundary lands wherever the model happened
+ * to emit — measured: a one-word answer split into `RESUME-` and `OK`, two turns, and a `kurier
+ * sessions` row labelled `RESUME-`. Joining until the first user turn is what makes the label a
+ * sentence rather than a fragment of one.
+ */
 export function labelOf(record: SessionRecord): string {
   if (record.title) return record.title;
-  const first = record.turns.find((turn) => turn.kind === 'agent')?.text.trim();
-  if (first) return first.length > 72 ? `${first.slice(0, 72)}…` : first;
-  return record.id;
+  const parts: string[] = [];
+  for (const turn of record.turns) {
+    if (turn.kind === 'agent') {
+      parts.push(turn.text);
+      continue;
+    }
+    // A `thought` or `tool` line before the answer is not part of it and is skipped; one *between*
+    // the answer's chunks ends the run. Concatening across it would splice "reading the file" into
+    // a sentence that never contained it.
+    if (parts.length > 0) break;
+  }
+  // Trim once, at the end. Trimming each chunk before joining glues words together at the seam —
+  // `'first '` + `'answer'` becomes `'firstanswer'` — which is the same mid-word artefact this
+  // function exists to remove. Caught by the test that asserts the joined form.
+  const joined = parts.join('').trim();
+  if (!joined) return record.id;
+  return joined.length > 72 ? `${joined.slice(0, 72)}…` : joined;
 }

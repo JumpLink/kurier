@@ -12,13 +12,14 @@
 import type { CommandModule } from 'yargs';
 
 import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
+import { installInterruptHandler } from '../../core/interrupt.ts';
 import { sessionsFile } from '../../core/paths.ts';
-import { terminalGate } from '../../core/policy.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
-import { createSessionStore, touch } from '@kurier/session';
+import { createSessionStore } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 
+import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
 
@@ -71,34 +72,37 @@ const command: CommandModule = {
     const terminal = processTerminal();
     const at = () => new Date().toISOString();
 
-    const gate = {
-      permission: denyAll
-        ? () => null
-        : terminalGate({
-            terminal,
-            onDecision: (optionId) => {
-              err(`  → ${optionId === null ? 'declined' : `granted (${optionId})`}`);
-            },
-          }),
-    };
-
-    const handle = await openAgent({
-      command: launcher,
-      gate,
-      onLog: (line) => {
-        if (!quiet) err(`  [agent] ${line}`);
+    // Before the agent exists, for the same reason as in `start`: no window without a way out.
+    let handle: Awaited<ReturnType<typeof openAgent>> | null = null;
+    const interrupt = installInterruptHandler({
+      onCancel: (sessionId) => {
+        err('\n  cancelling — the agent will stop and report `cancelled`');
+        handle?.client.cancel({ sessionId });
       },
-      onNotice: (message) => err(message),
     });
 
     const transcript: TranscriptEntry[] = [];
     try {
+      const agent = await openAgent({
+        command: launcher,
+        gate: commandGate({ terminal, denyAll }),
+        onLog: (line) => {
+          if (!quiet) err(`  [agent] ${line}`);
+        },
+        onNotice: (message) => err(message),
+        onSpawn: (close) => {
+          interrupt.setClose(close);
+          interrupt.update({ agentRunning: true, turnRunning: false, sessionId: id });
+        },
+      });
+      handle = agent;
+
       // The cwd comes from the record, not from the shell: a session's scope is part of what it
       // is, and resuming it from somewhere else would change what it can reach.
       await withAuthHint(`reattach ${id}`, () =>
-        handle.client.reattach(id, { cwd: record.cwd, mcpServers: [] }),
+        agent.client.reattach(id, { cwd: record.cwd, mcpServers: [] }),
       );
-      const how: 'load' | 'resume' = handle.client.supportsLoadSession ? 'load' : 'resume';
+      const how: 'load' | 'resume' = agent.client.supportsLoadSession ? 'load' : 'resume';
       if (record.reattach && record.reattach !== how) {
         err(
           `  note: the agent ${how === 'load' ? 'loaded' : 'resumed'} this session; when it was ` +
@@ -106,29 +110,30 @@ const command: CommandModule = {
             'replay the history.',
         );
       }
-      err(`${handle.agentInfo} — ${how === 'load' ? 'loaded' : 'resumed'} ${id} in ${record.cwd}`);
+      err(`${agent.agentInfo} — ${how === 'load' ? 'loaded' : 'resumed'} ${id} in ${record.cwd}`);
 
       if (!text) return;
 
       transcript.push({ kind: 'user', text, at: at(), sessionId: id });
-      const { stopReason } = await runTurn(handle.client, {
+      interrupt.update({ agentRunning: true, turnRunning: true, sessionId: id });
+      const { stopReason } = await runTurn(agent.client, {
         sessionId: id,
         text,
         onUpdate: (notification) => {
           transcript.push(...toTranscript(notification, at()));
           showUpdate(notification, (chunk) => out(chunk));
         },
-        onInterrupt: () => {
-          err('\n  cancelling — the agent will stop and report `cancelled`');
-          handle.client.cancel({ sessionId: id });
-        },
       });
 
-      store.update(id, (current) => touch({ ...current, turns: [...current.turns, ...transcript] }, at()));
+      // `store.append`, not a hand-rolled spread: it is what sets `updatedAt` from the last entry
+      // and what runs the scope-canary on the way out. Re-implementing it here meant `resume` and
+      // `start` could disagree about what a transcript write does.
+      store.append(id, transcript);
       out();
       err(`— ${stopReason} —`);
     } finally {
-      handle.close();
+      interrupt.dispose();
+      handle?.close();
       terminal.close();
     }
   },

@@ -38,6 +38,16 @@ export interface OpenAgentOptions {
   onLog?: (line: string) => void;
   /** Printed once, before the handshake. */
   onNotice?: (message: string) => void;
+  /**
+   * Called the moment the child process exists and the connection can be closed — **before** the
+   * handshake, not after it.
+   *
+   * The gap this closes is a real orphan, not a theoretical one: a cold `opencode acp` takes
+   * seconds to answer `initialize`, and a Ctrl-C inside that window used to kill kurier with no
+   * handler installed and the agent still running. Handing the caller a closer at spawn time means
+   * there is no interval in which a process exists that nobody can end. See `interrupt.ts`.
+   */
+  onSpawn?: (close: () => void) => void;
 }
 
 /**
@@ -57,6 +67,8 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
     },
   });
   const client = new AcpClient({ transport, gate: options.gate });
+  // Before the handshake on purpose — see the note on `onSpawn`.
+  options.onSpawn?.(() => client.close());
 
   try {
     const result = await client.initialize();
@@ -111,8 +123,6 @@ export interface TurnOptions {
   text: string;
   /** Called for every `session/update`, in order, before the turn settles. */
   onUpdate: (notification: SessionNotification) => void;
-  /** Send `session/cancel` as soon as this fires. Used by Ctrl-C. */
-  onInterrupt?: () => void;
 }
 
 /**
@@ -120,13 +130,12 @@ export interface TurnOptions {
  *
  * `session/prompt` is the one request with no timeout: a turn legitimately runs for minutes while
  * the model thinks, and a timeout here would cancel work that was going to finish.
+ *
+ * **No signal handling here any more.** Ctrl-C belongs to the command, which owns the state that
+ * decides what it means — see `interrupt.ts` for the orphan this rearrangement closed.
  */
 export async function runTurn(client: AcpClient, options: TurnOptions): Promise<{ stopReason: StopReason }> {
   const unsubscribe = client.onSessionUpdate(options.onUpdate);
-  const interrupt = options.onInterrupt;
-  if (interrupt) {
-    process.once('SIGINT', interrupt);
-  }
   try {
     const response = await client.prompt({
       sessionId: options.sessionId,
@@ -135,6 +144,5 @@ export async function runTurn(client: AcpClient, options: TurnOptions): Promise<
     return { stopReason: response.stopReason };
   } finally {
     unsubscribe();
-    if (interrupt) process.off('SIGINT', interrupt);
   }
 }

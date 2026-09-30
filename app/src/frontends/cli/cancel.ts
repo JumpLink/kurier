@@ -17,6 +17,7 @@ import { sessionsFile } from '../../core/paths.ts';
 import { openAgent } from '../../core/run.ts';
 import { createSessionStore } from '@kurier/session';
 
+import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
 const command: CommandModule = {
@@ -50,7 +51,7 @@ const command: CommandModule = {
     const launcher = requireLauncher(agentId);
     const handle = await openAgent({
       command: launcher,
-      gate: { permission: () => null },
+      gate: silentGate(),
       onLog: (line) => {
         if (!quiet) err(`  [agent] ${line}`);
       },

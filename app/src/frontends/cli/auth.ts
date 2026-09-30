@@ -38,6 +38,7 @@ import { OPENCODE_LOGIN } from '../../core/agents/opencode.ts';
 import { which } from '../../core/agents/stdio.ts';
 import { openAgent } from '../../core/run.ts';
 
+import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
 /** The login command per adapter. A program to run, not a permission to hold. */
@@ -68,7 +69,7 @@ const command: CommandModule = {
     // First, ask: maybe the agent can do this itself, which is the protocol's own path.
     const first = await openAgent({
       command: launcher,
-      gate: { permission: () => null },
+      gate: silentGate(),
       onLog: (line) => {
         if (!quiet) err(`  [agent] ${line}`);
       },
@@ -122,7 +123,7 @@ const command: CommandModule = {
     // Ask the agent again, so the answer is the agent's own rather than kurier's assumption.
     const second = await openAgent({
       command: launcher,
-      gate: { permission: () => null },
+      gate: silentGate(),
       onLog: (line) => {
         if (!quiet) err(`  [agent] ${line}`);
       },

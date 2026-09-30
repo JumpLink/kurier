@@ -47,6 +47,7 @@ export interface AgentCommand {
 export interface StdioChannelOptions {
   command: AgentCommand;
   /** Lines the agent writes to stderr. ACP says stderr is for logs; kurier never parses it. */
+  /** One line at a time, from the agent's stderr. Delivered, never interpreted. */
   onStderr?: (line: string) => void;
   /** How long the process gets between `SIGTERM` and `SIGKILL`. */
   killGraceMs?: number;
@@ -83,15 +84,15 @@ export class StdioChannel implements RawChannel {
     this.#child.stderr.on('data', (chunk: string) => {
       if (!options.onStderr) return;
       this.#stderrBuffer += chunk;
-      let newline: number;
-      while ((newline = this.#stderrBuffer.indexOf('\n')) >= 0) {
-        const line = this.#stderrBuffer.slice(0, newline);
-        this.#stderrBuffer = this.#stderrBuffer.slice(newline + 1);
-        if (line.trim()) options.onStderr(line);
-      }
+      this.#flushStderr(options.onStderr);
     });
     this.#child.on('error', (error: Error) => this.#end(error));
     this.#child.on('exit', (code, signal) => {
+      // An agent killed mid-write leaves a partial line in the stderr buffer, and that line is
+      // usually the most interesting thing it ever said — "failed to load config X" arrives
+      // without a newline when the process is told to stop. Flushing it here is why `onStderr` sees
+      // it; without this the buffer is dropped on the floor exactly when it matters.
+      this.#flushStderr(options.onStderr);
       // exit(code 0) is a clean end; anything else carries a reason the client should surface
       // rather than swallow — a crashed agent and a cancelled one look the same otherwise.
       this.#end(
@@ -139,6 +140,24 @@ export class StdioChannel implements RawChannel {
     }, this.#killGraceMs);
     (this.#killTimer as { unref?: () => void }).unref?.();
     this.#child.stdin.end();
+  }
+
+  /**
+   * Hand out every complete line in the stderr buffer, keeping the rest.
+   *
+   * Split on newlines rather than on a fixed stride: an agent's stderr carries paths, JSON diffs
+   * and quoted model output, so a reader that guessed at boundaries would eventually split a line
+   * that happened to contain one. This layer moves bytes and never looks inside a line — that
+   * decision belongs to whoever reads them, not to the process that produced them.
+   */
+  #flushStderr(onStderr: ((line: string) => void) | undefined): void {
+    if (!onStderr) return;
+    let newline: number;
+    while ((newline = this.#stderrBuffer.indexOf('\n')) >= 0) {
+      const line = this.#stderrBuffer.slice(0, newline);
+      this.#stderrBuffer = this.#stderrBuffer.slice(newline + 1);
+      if (line.trim()) onStderr(line);
+    }
   }
 
   #end(reason: Error | undefined): void {

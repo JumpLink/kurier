@@ -14,13 +14,14 @@
 import type { CommandModule } from 'yargs';
 
 import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
+import { installInterruptHandler } from '../../core/interrupt.ts';
 import { sessionsFile } from '../../core/paths.ts';
-import { terminalGate } from '../../core/policy.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
 import { LOCAL_PRINCIPAL, createSessionStore, newSession } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 
+import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
 
@@ -63,34 +64,38 @@ const command: CommandModule = {
     const store = createSessionStore(sessionsFile());
     const at = () => new Date().toISOString();
 
-    // The gate is chosen before the agent starts, never after: a client that could switch from
-    // "ask" to "allow" mid-session is a client whose policy is the lifecycle.
-    const gate = {
-      permission: denyAll
-        ? () => null
-        : terminalGate({
-            terminal,
-            onDecision: (optionId) => {
-              err(`  → ${optionId === null ? 'declined' : `granted (${optionId})`}`);
-            },
-          }),
-    };
-
-    const handle = await openAgent({
-      command: launcher,
-      gate,
-      onLog: (line) => {
-        if (!quiet) err(`  [agent] ${line}`);
+    // Installed before the agent exists, so there is no window in which a process is running that
+    // Ctrl-C cannot reach. `onCancel` closes over `handle`, which is why it is declared first and
+    // filled in by `onSpawn`.
+    let handle: Awaited<ReturnType<typeof openAgent>> | null = null;
+    const interrupt = installInterruptHandler({
+      onCancel: (sessionId) => {
+        err('\n  cancelling — the agent will stop and report `cancelled`');
+        handle?.client.cancel({ sessionId });
       },
-      onNotice: (message) => err(message),
     });
 
     const transcript: TranscriptEntry[] = [];
     try {
+      const agent = await openAgent({
+        command: launcher,
+        gate: commandGate({ terminal, denyAll }),
+        onLog: (line) => {
+          if (!quiet) err(`  [agent] ${line}`);
+        },
+        onNotice: (message) => err(message),
+        onSpawn: (close) => {
+          // Only the closer and the flag — the handle is assigned below, when `openAgent` returns.
+          // `onSpawn` fires before the handshake, which is the entire reason it exists.
+          interrupt.setClose(close);
+          interrupt.update({ agentRunning: true, turnRunning: false, sessionId: null });
+        },
+      });
+      handle = agent;
       const session = await withAuthHint('session/new', () =>
-        handle.client.newSession({ cwd, mcpServers: [] }),
+        agent.client.newSession({ cwd, mcpServers: [] }),
       );
-      err(`${handle.agentInfo} — session ${session.sessionId} in ${cwd}`);
+      err(`${agent.agentInfo} — session ${session.sessionId} in ${cwd}`);
 
       const created = store.create(
         newSession({
@@ -102,9 +107,9 @@ const command: CommandModule = {
           at: at(),
           // Recorded now, from the agent's own capabilities, so `resume` knows what this session
           // was reattached with — not what it *should* have been.
-          reattach: handle.client.supportsLoadSession
+          reattach: agent.client.supportsLoadSession
             ? 'load'
-            : handle.client.supportsResumeSession
+            : agent.client.supportsResumeSession
               ? 'resume'
               : null,
         }),
@@ -116,18 +121,15 @@ const command: CommandModule = {
       }
 
       transcript.push({ kind: 'user', text, at: at(), sessionId: created.id });
-      const { stopReason } = await runTurn(handle.client, {
+      // Ctrl-C from here on means "stop the turn", not "kill the process": the agent stops cleanly
+      // and answers with `cancelled`, so the transcript ends where the work ended.
+      interrupt.update({ agentRunning: true, turnRunning: true, sessionId: created.id });
+      const { stopReason } = await runTurn(agent.client, {
         sessionId: created.id,
         text,
         onUpdate: (notification) => {
           transcript.push(...toTranscript(notification, at()));
           showUpdate(notification, (chunk) => out(chunk));
-        },
-        // Ctrl-C is the protocol's own cancellation, not a kill: the agent stops cleanly and
-        // answers the turn with `cancelled`, so the transcript ends where the work ended.
-        onInterrupt: () => {
-          err('\n  cancelling — the agent will stop and report `cancelled`');
-          handle.client.cancel({ sessionId: created.id });
         },
       });
 
@@ -135,7 +137,8 @@ const command: CommandModule = {
       out();
       err(`— ${stopReason} —`);
     } finally {
-      handle.close();
+      interrupt.dispose();
+      handle?.close();
       terminal.close();
     }
   },

@@ -117,6 +117,51 @@ export default async () => {
       expect(labelOf(record)).toBe('short reply');
     });
 
+    await it('joins a streamed answer instead of stopping at the first chunk', async () => {
+      // Measured against `opencode acp`: a one-word reply arrives as two `session/update` chunks,
+      // and taking the first alone labelled the session `RESUME-`. A label that stops mid-word is
+      // worse than none, because it looks like the answer.
+      const record = appendTurns(newSession({ id: 'ses_1', agent: 'x', cwd: '/tmp', at: AT }), [
+        { kind: 'user', text: 'say ok', at: AT },
+        { kind: 'agent', text: 'RESUME-', at: AT },
+        { kind: 'agent', text: 'OK', at: AT },
+      ]);
+      expect(labelOf(record)).toBe('RESUME-OK');
+    });
+
+    await it('stops at the next user turn', async () => {
+      // The label is the OPENING answer, not the whole conversation — joining every agent turn would
+      // make a long session's label its entire transcript.
+      const record = appendTurns(newSession({ id: 'ses_1', agent: 'x', cwd: '/tmp', at: AT }), [
+        { kind: 'agent', text: 'first ', at: AT },
+        { kind: 'agent', text: 'answer', at: AT },
+        { kind: 'user', text: 'and now?', at: AT },
+        { kind: 'agent', text: 'a much later answer', at: AT },
+      ]);
+      expect(labelOf(record)).toBe('first answer');
+    });
+
+    await it('skips a thought line before the answer', async () => {
+      // A model thinks out loud first, and that thinking is not the label. Recorded from the real
+      // agent: `thought` chunks routinely arrive before the first `agent_message_chunk`.
+      const record = appendTurns(newSession({ id: 'ses_1', agent: 'x', cwd: '/tmp', at: AT }), [
+        { kind: 'thought', text: 'the user wants a short reply', at: AT },
+        { kind: 'agent', text: 'OK', at: AT },
+      ]);
+      expect(labelOf(record)).toBe('OK');
+    });
+
+    await it("stops at a tool line between the answer's chunks", async () => {
+      // A tool call is not part of the answer, so it ends the run rather than being concatenated
+      // into it — otherwise a mid-tool stream boundary would splice `reading the file` into a reply.
+      const record = appendTurns(newSession({ id: 'ses_1', agent: 'x', cwd: '/tmp', at: AT }), [
+        { kind: 'agent', text: 'I will check', at: AT },
+        { kind: 'tool', text: 'read — completed', at: AT },
+        { kind: 'agent', text: 'the file first.', at: AT },
+      ]);
+      expect(labelOf(record)).toBe('I will check');
+    });
+
     await it('falls back to the id when there is no title and no agent turn', async () => {
       const record = newSession({ id: 'ses_1', agent: 'x', cwd: '/tmp', at: AT });
       expect(labelOf(record)).toBe('ses_1');

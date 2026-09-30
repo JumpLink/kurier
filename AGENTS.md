@@ -165,6 +165,17 @@ question. Both runtimes, as in postbote and beifahrer:
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.
 
+> **`gjsify test` reuses `app/dist/test.*.mjs` when the entry file looks unchanged — and its
+> staleness check misses workspace sources behind a symlink.** Measured here: editing
+> `packages/session/src/model.ts` and re-running left the bundle untouched (mtime unchanged) and
+> printed **136 tests passed** for code that no longer existed. Touching `app/tests/test.mts`, the
+> entry, forced the rebuild and the change appeared.
+>
+> So a green run here means "the last build is green", not "the source is green". **After editing
+> anything outside `app/tests/`, `rm -rf app/dist` before you trust a test result.** This is the
+> worst kind of failure — a silent green — and it is not kurier's bug: the runner belongs to
+> gjsify, and the fix belongs there.
+
 `refs/acp/schema.v1.json` is the normative artifact `packages/acp`'s types are written against,
 refreshed by `./scripts/update-acp-schema`. `scripts/check-schema.mjs` fails the build when the
 code and the schema disagree about a method name or a required field — read the diff before
@@ -189,6 +200,9 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
   release train; a CLI ↔ libs skew produces silently broken bundles.
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
+- **After editing a workspace source, `rm -rf app/dist` before trusting a test result** — see the
+  `gjsify test` staleness note above. This is the single most dangerous moment in the workflow,
+  because the failure mode is a green run.
 - `typescript` pinned `^6.0.3`, **not** 7: `gjsify tsc` runs a bundle with 6.0.3 baked in,
   regardless of what is installed locally.
 - Conventional commits (`feat(acp): …`, `fix(session): …`), imperative, subject ≤ 50 chars.

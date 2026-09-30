@@ -99,6 +99,13 @@ export class AcpClient {
   readonly #gate: ClientGate;
   readonly #reader = new MessageReader();
   readonly #pending = new Map<RequestId, Pending>();
+  /**
+   * The tail of the permission queue — see `#enqueuePermission`.
+   *
+   * Always a promise, never rejected, so the chain cannot be broken by one bad answer and leave the
+   * requests behind it unanswered forever.
+   */
+  #permissionQueue: Promise<void> = Promise.resolve();
   readonly #updateListeners = new Set<SessionUpdateListener>();
   readonly #wireListeners = new Set<WireListener>();
   readonly #clientInfo: Implementation;
@@ -458,7 +465,7 @@ export class AcpClient {
         } catch (error) {
           // One bad listener must not cost the other listeners their update, and must not take the
           // connection down — a UI that throws while rendering is a UI problem.
-          this.#reportListenerError(error);
+          this.#reportError('a session-update listener threw; its update was dropped', error);
         }
       }
       return;
@@ -476,7 +483,7 @@ export class AcpClient {
         this.#respondRefused(request.id, new FileSystemRefusedError(this.#pathOf(request.params)));
         return;
       case AGENT_METHODS.requestPermission:
-        void this.#answerPermission(request.id, request.params as RequestPermissionRequest);
+        this.#enqueuePermission(request.id, request.params as RequestPermissionRequest);
         return;
       default:
         // An agent extension we do not know. Method-not-found is the protocol's own answer for
@@ -491,6 +498,24 @@ export class AcpClient {
     }
   }
 
+  /**
+   * Put a permission request on a queue so the gate only ever sees **one at a time**.
+   *
+   * This is not politeness to the gate, it is a contract the gate needs to be safe. A gate is a
+   * decision, and a decision has to be made by one person (or one policy) about one thing. An agent
+   * doing parallel tool calls can send two `session/request_permission` requests before it has an
+   * answer to the first; a terminal gate happens to survive that because a person reads lines in
+   * order, but a modal dialog cannot — it has one window, and the second question either vanishes
+   * behind the first or overwrites it. Serialising here means every gate kurier ever grows,
+   * including the GTK one, can be written as "answer this, then that", with no queue of its own.
+   *
+   * The order is arrival order. Reversing it would answer the second question first, which is the
+   * one way to get a person's approval for the wrong thing.
+   */
+  #enqueuePermission(id: RequestId, params: RequestPermissionRequest): void {
+    this.#permissionQueue = this.#permissionQueue.then(() => this.#answerPermission(id, params));
+  }
+
   async #answerPermission(id: RequestId, params: RequestPermissionRequest): Promise<void> {
     let response: RequestPermissionResponse;
     try {
@@ -498,8 +523,8 @@ export class AcpClient {
       response = optionId === null ? cancelledOutcome() : selectedOutcome(optionId);
     } catch (error) {
       // A gate that throws is a gate that did not approve. Anything else would turn a bug in the
-      // decision path into an approval.
-      this.#reportListenerError(error);
+      // decision path into an approval — so this fails closed like any other decline.
+      this.#reportError('the permission gate threw, and the request was declined', error);
       response = cancelledOutcome();
     }
     this.#write(encodeSuccess(id, response));
@@ -523,9 +548,18 @@ export class AcpClient {
     }
   }
 
-  #reportListenerError(error: unknown): void {
+  /**
+   * One way to report something that went wrong on our side of the wire.
+   *
+   * It takes *what* failed as a phrase rather than baking one failure into the message, because the
+   * first version of this printed "a session-update listener failed" for a crashing permission
+   * gate — a sentence naming a component that was not involved, sent at 23:00 to somebody trying
+   * to work out why their approval never arrived. The phrase is the part that tells a reader where
+   * to look.
+   */
+  #reportError(what: string, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`kurier: a session-update listener failed: ${message}`);
+    console.error(`kurier: ${what}: ${message}`);
   }
 
   /**

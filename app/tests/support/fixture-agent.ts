@@ -63,6 +63,14 @@ export interface FixtureAgentOptions {
    * apart, and both are testable.
    */
   permissionOptions?: PermissionOption[];
+  /**
+   * How many permission requests ONE turn sends, all at once without waiting for the answers.
+   *
+   * Defaults to 1, which is polite. The point of `> 1` is the client's queue: with a sequential
+   * fixture, a client that delivered both requests to the gate at once would still pass, so only
+   * the burst can tell serialisation from luck.
+   */
+  permissionBurst?: number;
   /** Refuse every call with `-32_000 auth_required` until `authenticate` arrived. Trap 1's shape. */
   requireAuth?: boolean;
   /** Send `_meta` on every response, plus an unknown capability marker, to prove passthrough. */
@@ -271,8 +279,17 @@ export class FixtureAgent {
       }
       const permissionOptions = this.#options.permissionOptions ?? [];
       if (permissionOptions.length > 0) {
-        const outcome = await this.#askPermission(sessionId, permissionOptions);
-        if (outcome?.outcome.outcome !== 'selected') {
+        // A burst asks N times WITHOUT waiting for an answer to the first, which is how an agent
+        // doing parallel tool calls behaves and is the case the client's queue exists for. A
+        // sequential fixture would pass whether the client serialised or not, so this is the only
+        // version of this that can catch the bug.
+        const burst = Math.max(1, this.#options.permissionBurst ?? 1);
+        const pending: Promise<PermissionOutcome>[] = [];
+        for (let i = 0; i < burst; i++) {
+          pending.push(this.#askPermission(sessionId, permissionOptions, `call_${i + 1}`));
+        }
+        const outcomes = await Promise.all(pending);
+        if (outcomes.some((outcome) => outcome?.outcome.outcome !== 'selected')) {
           this.#reply(id, { stopReason: 'refusal' });
           return;
         }
@@ -297,7 +314,11 @@ export class FixtureAgent {
     return true;
   }
 
-  #askPermission(sessionId: string, options: PermissionOption[]): Promise<PermissionOutcome> {
+  #askPermission(
+    sessionId: string,
+    options: PermissionOption[],
+    toolCallId = 'call_1',
+  ): Promise<PermissionOutcome> {
     const id = this.#nextRequestId++;
     let settle!: (outcome: PermissionOutcome) => void;
     const answer = new Promise<PermissionOutcome>((resolve) => {
@@ -312,7 +333,7 @@ export class FixtureAgent {
         method: AGENT_METHODS.requestPermission,
         params: {
           sessionId,
-          toolCall: { toolCallId: 'call_1', title: 'write a file', kind: 'edit', status: 'pending' },
+          toolCall: { toolCallId, title: `write a file (${toolCallId})`, kind: 'edit', status: 'pending' },
           options,
           ...this.#meta(),
         },

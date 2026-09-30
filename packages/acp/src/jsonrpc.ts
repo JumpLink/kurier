@@ -131,9 +131,14 @@ export class MessageReader {
   push(chunk: string): JsonRpcMessage[] {
     this.#buffer += chunk;
     if (this.#buffer.length > this.#maxLineLength) {
+      // Keep an excerpt of what was actually unterminated. The buffer is cleared because nothing
+      // more will arrive to complete it, but the first bytes are the only clue to what the peer
+      // was sending — "no line ending after 4194304 bytes: " tells a reader nothing they can act
+      // on, and the whole point of throwing is that somebody will go looking.
+      const excerpt = this.#buffer.slice(0, 200);
       const overflow = this.#buffer.length;
       this.#buffer = '';
-      throw new ProtocolError(`no line ending after ${overflow} bytes`, '');
+      throw new ProtocolError(`no line ending after ${overflow} bytes`, excerpt);
     }
     const messages: JsonRpcMessage[] = [];
     let start = 0;

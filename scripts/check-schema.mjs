@@ -202,6 +202,125 @@ function schemaOptional(spec, field) {
   return !spec.required.includes(field);
 }
 
+// ─── 3. the agent→client direction ─────────────────────────────────────────────────────────
+//
+// Everything above checks what kurier SENDS. This part checks what an agent SENDS, which is where
+// the drift is more dangerous: the client→agent direction fails loudly (a `-32601` against a live
+// agent, in the first minute), while a wrongly-shaped inbound type fails silently — a capability
+// read as absent, an `authMethods` entry read as the wrong variant, a new `sessionUpdate` variant
+// quietly falling through to the wire listeners.
+//
+// That last one is not hypothetical. `SESSION_UPDATE_KINDS` in types.ts is a hand-maintained list of
+// the schema's `SessionUpdate.oneOf` discriminators. If upstream adds a variant and the list is not
+// extended, kurier keeps working — every new update goes to the wire listeners instead of the
+// typed ones, and nothing anywhere reports it.
+
+const TS_SOURCE = readFileSync(TYPES, 'utf8');
+
+/** The `sessionUpdate` literals in `types.ts`'s `KnownSessionUpdate` union. */
+function tsSessionUpdateKinds() {
+  const start = TS_SOURCE.indexOf('export type KnownSessionUpdate');
+  if (start < 0) return null;
+  const end = TS_SOURCE.indexOf(';', start);
+  const kinds = new Set();
+  for (const match of TS_SOURCE.slice(start, end).matchAll(/sessionUpdate:\s*'([^']+)'/g)) {
+    kinds.add(match[1]);
+  }
+  return kinds;
+}
+
+/** The discriminators of the schema's `SessionUpdate` oneOf, in schema order. */
+function schemaSessionUpdateKinds() {
+  const arms = defs['SessionUpdate']?.oneOf ?? defs['SessionUpdate']?.anyOf ?? [];
+  const kinds = [];
+  for (const arm of arms) {
+    const tag = arm?.properties?.['sessionUpdate'] ?? {};
+    if (typeof tag['const'] === 'string') kinds.push(tag['const']);
+    else if (Array.isArray(tag['enum'])) kinds.push(...tag['enum']);
+  }
+  return kinds;
+}
+
+const tsKinds = tsSessionUpdateKinds();
+const schemaKinds = schemaSessionUpdateKinds();
+
+if (!tsKinds || schemaKinds.length === 0) {
+  fail(`${TYPES}: could not read the session-update variants — the drift check cannot see them`);
+} else {
+  for (const kind of schemaKinds) {
+    if (!tsKinds.has(kind)) {
+      fail(
+        `the schema defines sessionUpdate "${kind}" and SESSION_UPDATE_KINDS does not — kurier ` +
+          'would route it to the wire listeners instead of the typed ones, with nothing reporting it',
+      );
+    }
+  }
+  for (const kind of tsKinds) {
+    if (!schemaKinds.includes(kind)) {
+      fail(`SESSION_UPDATE_KINDS names "${kind}" and the schema does not define it`);
+    }
+  }
+  notes.push(`${schemaKinds.length} session-update variants`);
+}
+
+// Capability markers: the schema's `SessionCapabilities` is what `AcpClient` branches on, and a
+// missing marker in the TypeScript is a capability kurier silently believes no agent has.
+const SESSION_CAPABILITY_KEYS = Object.keys(defs['SessionCapabilities']?.properties ?? {}).filter(
+  (key) => key !== '_meta',
+);
+const tsCapabilities = interfaceFields('SessionCapabilities');
+if (!tsCapabilities) {
+  fail(`${TYPES}: no interface named SessionCapabilities`);
+} else if (SESSION_CAPABILITY_KEYS.length > 0) {
+  for (const key of SESSION_CAPABILITY_KEYS) {
+    if (!tsCapabilities.required.has(key) && !tsCapabilities.optional.has(key)) {
+      fail(
+        `SessionCapabilities.${key} is a capability marker in the schema and absent from the ` +
+          'TypeScript — kurier would report the capability as unsupported for every agent',
+      );
+    }
+  }
+  notes.push(`${SESSION_CAPABILITY_KEYS.length} session-capability markers`);
+}
+
+// `authMethods` is trap 1 of the plan, and it is the one place where a wrong read changes what a
+// person has to do by hand: misreading it as a terminal method means kurier never runs the login,
+// and the first session dies on `-32000`. So the union is checked structurally — both branches must
+// exist, and `AuthMethodInfo` must actually carry the fields the schema marks required.
+// The union arms are inline wrappers, not bare `$ref`s: each is `{ properties: { type: { const } },
+// required: ['type'], allOf: [{ $ref: '#/$defs/AuthMethodAgent' }] }`. Reading only `arm.$ref` finds
+// nothing and the check then passes vacuously — a check that cannot fail is worse than no check,
+// because it reads as coverage. So resolve both shapes.
+const authArms = defs['AuthMethod']?.oneOf ?? defs['AuthMethod']?.anyOf ?? [];
+const authBranches = authArms
+  .map((arm) => arm?.$ref ?? (arm?.allOf ?? []).map((b) => b?.$ref).find(Boolean))
+  .filter(Boolean)
+  .map((ref) => String(ref).split('/').pop());
+for (const branch of authBranches) {
+  if (!defs[branch]) {
+    fail(`the schema's AuthMethod references ${branch}, which is not in $defs`);
+    continue;
+  }
+  const required = schemaRequired(defs[branch]);
+  // `AuthMethodInfo` deliberately flattens both branches into one shape — an agent may omit the
+  // `type` tag, which is the whole reason `kind` exists. So the requirement is that the fields
+  // survive the flattening, not that the interfaces match one for one.
+  const info = interfaceFields('AuthMethodInfo');
+  if (!info) {
+    fail(`${TYPES}: no interface named AuthMethodInfo`);
+    continue;
+  }
+  for (const field of required) {
+    if (!info.required.has(field) && !info.optional.has(field)) {
+      fail(
+        `AuthMethodInfo.${field} is required by the schema's ${branch} and absent from the ` +
+          'TypeScript — the flattened auth method would lose it',
+      );
+    }
+  }
+}
+notes.push(`${authBranches.length} auth-method variants`);
+
 // ─── report ─────────────────────────────────────────────────────────────────────────────────
 
 for (const note of notes) {
