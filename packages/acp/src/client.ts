@@ -347,7 +347,10 @@ export class AcpClient {
    * list, and a surface that kept the guess would show a model that is not in use.
    */
   async setConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
-    return (await this.#request(CLIENT_METHODS.setSessionConfigOption, params)) as SetSessionConfigOptionResponse;
+    return (await this.#request(
+      CLIENT_METHODS.setSessionConfigOption,
+      params,
+    )) as SetSessionConfigOptionResponse;
   }
 
   // ─── prompt turn ───────────────────────────────────────────────────────────────────────────

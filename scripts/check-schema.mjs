@@ -424,12 +424,12 @@ for (const type of schemaConfigTypes) {
   // (`SessionConfigSelect` / `SessionConfigBoolean`). Reading the wrapper for the payload finds
   // nothing and the check then passes vacuously — so the ref is followed, and a missing def is a
   // failure rather than an empty requirement list.
-  const payloadRef = (arm?.allOf ?? [])
-    .map((entry) => entry?.$ref)
-    .find(Boolean);
+  const payloadRef = (arm?.allOf ?? []).map((entry) => entry?.$ref).find(Boolean);
   const payloadName = payloadRef ? String(payloadRef).split('/').pop() : undefined;
   if (!payloadName) {
-    fail(`the "${type}" arm of SessionConfigOption has no allOf payload reference — this check cannot see it`);
+    fail(
+      `the "${type}" arm of SessionConfigOption has no allOf payload reference — this check cannot see it`,
+    );
     continue;
   }
   if (!defs[payloadName]) {
@@ -480,7 +480,9 @@ for (const type of schemaConfigTypes) {
   // Verified by negative test: `currentValue: unknown` and a missing field both now fail, and
   // `options: unknown` — which is how N12 got through the presence-only check — is caught here.
   for (const [field, expected] of Object.entries(PAYLOAD_PRIMITIVES[payloadName] ?? {})) {
-    const declared = new RegExp(`^\\s{2}${field}(\\?)?\\s*:\\s*([^;]+);`, 'm').exec(interfaceSource(payloadName));
+    const declared = new RegExp(`^\\s{2}${field}(\\?)?\\s*:\\s*([^;]+);`, 'm').exec(
+      interfaceSource(payloadName),
+    );
     if (!declared) continue; // absence is the presence check's failure, reported there
     const type = declared[2].trim();
     if (declared[1] === '?' || type !== expected) {

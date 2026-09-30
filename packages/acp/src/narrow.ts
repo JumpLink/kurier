@@ -114,7 +114,9 @@ export function usableConfigValues(options: unknown): UsableConfigValue[] {
  * value is not among the offered ones. The last is the one that cannot be seen by looking at the
  * widget afterwards.
  */
-export function narrowConfigSelect(option: SessionConfigOption | null | undefined): ValidSessionConfigSelect | null {
+export function narrowConfigSelect(
+  option: SessionConfigOption | null | undefined,
+): ValidSessionConfigSelect | null {
   if (!option || !isKnownConfigOptionType(option.type) || option.type !== 'select') return null;
   const currentValue = option.currentValue;
   if (typeof currentValue !== 'string') return null;
@@ -133,7 +135,9 @@ export function narrowConfigSelect(option: SessionConfigOption | null | undefine
  * says. A `boolean` with a string `currentValue` is not a switch with an odd label — it is an agent
  * that means something this version does not, and rendering it as on/off would be a guess.
  */
-export function narrowConfigBoolean(option: SessionConfigOption | null | undefined): ValidSessionConfigBoolean | null {
+export function narrowConfigBoolean(
+  option: SessionConfigOption | null | undefined,
+): ValidSessionConfigBoolean | null {
   if (!option || !isKnownConfigOptionType(option.type) || option.type !== 'boolean') return null;
   if (typeof option.currentValue !== 'boolean') return null;
   return option as ValidSessionConfigBoolean;
