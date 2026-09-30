@@ -24,6 +24,20 @@
  * The gap is upstream, and the honest move is both: build the shell kurier needs, and file the
  * feature request. A slice is not hostage to somebody else's release train, and a workaround that
  * ossifies is worse than a small local one that is honestly labelled.
+ *
+ * **The vertical line between the two panes is wanted. Do not "fix" it.** It is
+ * `AdwNavigationSplitView`'s own separator — `strings libadwaita-1.so.0` names
+ * `adw-navigation-split-view.c` and `adw_flap_set_separator` — and it runs the full window height,
+ * header row included. That looked wrong until the pixels said why: the header bars are transparent
+ * by design (libadwaita ≥ 1.4), so at y=25 in the header and at y=300 in the body the sidebar is the
+ * same (40,40,44) and the content the same (34,34,38). The two panes really are two surfaces, and
+ * the hairline is what says so. A 6-unit tonal step alone reads as a rendering seam; the line reads
+ * as structure — the better of the two.
+ *
+ * Asked, measured, answered: a bare `Adw.HeaderBar` in a `Gtk.Box` and an `Adw.ToolbarView` top bar
+ * render **pixel-identical** here, and `top_bar_style` RAISED/FLAT changes nothing, so none of those
+ * is the lever. There is no public property on `AdwNavigationSplitView` to hide the separator at
+ * all — only `collapsed`, `content`, `min_/max_sidebar_width`.
  */
 
 import Adw from '@girs/adw-1';
