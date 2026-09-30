@@ -7,9 +7,8 @@
  * up at all".
  *
  * **Two panes, two header bars, and that is not the thing being avoided.** An
- * `Adw.NavigationSplitView` gives each pane its own `Adw.HeaderBar`, and that is exactly what makes
- * the collapsed back button appear: `Adw.HeaderBar` grows one for you inside an `Adw.NavigationPage`.
- * The reference apps this surface is being compared against get minimalism wrong in a different way
+ * `Adw.NavigationSplitView` gives each pane its own `Adw.HeaderBar`. The reference apps this surface
+ * is being compared against get minimalism wrong in a different way
  * — Alpaca stacks two header rows of four icons each, LibreChat adds an icon rail *next to* a text
  * sidebar. The rule this window follows is not "fewer controls" but "no control that points at
  * nothing": every element is here because something in the kernel produced it.
@@ -207,29 +206,83 @@ function buildSidebar(list: Gtk.ListBox): Adw.NavigationPage {
  * instead of by a button. libadwaita says the same in as many words: "AdwNavigationPage … is
  * missing a title. To hide a header bar title, consider using AdwHeaderBar:show-title instead."
  *
- * The bar itself stays, empty, because it is what gives the collapsed view its back button — adding
- * a title later is a smaller change than discovering the surface has no way back from a
- * conversation.
+ * The bar carries the **back button**, and it has to: `Adw.NavigationSplitView` does not supply one.
+ *
+ * This file used to claim the opposite — that an `Adw.HeaderBar` inside an `Adw.NavigationPage`
+ * grows a back button for you, and that this is what the collapsed view shows. A screenshot of a
+ * window narrowed below the breakpoint disproved it: the pane collapsed, no button appeared, and the
+ * person was stuck. Measured across all four states (wide, narrow, wide again, narrow again),
+ * `AdwHeaderBar.get_start_widget()` is `null` in every one, with and without `show_content` set —
+ * libadwaita 1.9.3 adds nothing. The button is ours, in `#buildBackButton`, and it is shown only
+ * when there is somewhere to go back to.
+ *
+ * The title is the other thing the bar will grow later, once there is a session to name.
  */
-function buildContent(placeholder: Adw.StatusPage): Adw.NavigationPage {
+function buildContent(header: Adw.HeaderBar, placeholder: Adw.StatusPage): Adw.NavigationPage {
   const box = new Adw.ToolbarView({ vexpand: true });
-  box.add_top_bar(new Adw.HeaderBar({ showTitle: false }));
+  box.add_top_bar(header);
   box.set_content(placeholder);
   return new Adw.NavigationPage({ title: APP_NAME, child: box });
 }
 
+/** The content pane's header bar. Split out because the back button is packed into it after the
+ *  split view exists, and the split view needs the content page to already exist. */
+function buildContentHeader(): Adw.HeaderBar {
+  return new Adw.HeaderBar({ showTitle: false });
+}
+
+/**
+ * The button that gets a person back to the session list on a narrow window.
+ *
+ * **Visible only when there is somewhere to go back to**, which is the whole condition. On a wide
+ * window the sidebar is already there and a back button would be a second way of saying it; on a
+ * collapsed window showing content it is the *only* way back. `notify::collapsed` is the signal,
+ * because the breakpoint changes `collapsed` and nothing else announces it.
+ *
+ * It sets `show_content = false` and never touches `collapsed`. That is measured, not stylistic:
+ * assigning `collapsed` by hand fights the breakpoint permanently, because a breakpoint applies on a
+ * **condition change** — one manual `collapsed = false` while the window is already narrow means it
+ * never collapses again, at any width, in that process. `show_content` is the property libadwaita
+ * wants a client to set; it manages `collapsed` itself.
+ */
+function buildBackButton(split: Adw.NavigationSplitView): Gtk.Button {
+  const button = new Gtk.Button({
+    iconName: 'go-previous-symbolic',
+    tooltipText: 'Back to the sessions',
+    // Hidden until the window is actually narrow. A button the window hides by clipping is worse
+    // than one that is simply not there.
+    visible: false,
+  });
+  button.update_property([Gtk.AccessibleProperty.LABEL], ['Back to the sessions']);
+  button.connect('clicked', () => split.set_show_content(false));
+  const sync = () => {
+    button.set_visible(split.get_collapsed() && split.get_show_content());
+  };
+  split.connect('notify::collapsed', sync);
+  split.connect('notify::show-content', sync);
+  sync();
+  return button;
+}
+
 /** The split view, with a page per side — see the file header on why there are two header bars. */
 function buildSplitView(sidebar: Gtk.ListBox, content: Adw.StatusPage): Adw.NavigationSplitView {
-  return new Adw.NavigationSplitView({
+  const contentHeader = buildContentHeader();
+  const split = new Adw.NavigationSplitView({
     sidebar: buildSidebar(sidebar),
-    content: buildContent(content),
+    content: buildContent(contentHeader, content),
     minSidebarWidth: 260,
     maxSidebarWidth: 340,
     // Not collapsed on a wide monitor: a sidebar that starts hidden hides the list for no reason,
-    // which is the "control that points at nothing" in its other direction. The breakpoint below
-    // collapses it when the window genuinely has no room.
+    // which is the "control that points at nothing" in its other direction. The breakpoint collapses
+    // it when the window genuinely has no room — and only the breakpoint may do that, see
+    // `buildBackButton`.
     collapsed: false,
   });
+  // Packed in here and not in `buildContent`, because the button binds to `split` and `split` needs
+  // the content page: the first version threaded a throwaway `Adw.NavigationSplitView` through to
+  // break the cycle, which bound the button to an object nothing ever displayed.
+  contentHeader.pack_start(buildBackButton(split));
+  return split;
 }
 
 GObject.registerClass(MainWindow);
