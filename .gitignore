@@ -7,6 +7,12 @@ dist/
 # gjsify
 .gjsify/
 
+# gjsify's dev link — a LOCAL override pointing the install at the gjsify checkout in this
+# workspace. Never committed: `gjsify install --immutable` refuses to run while it is present, and
+# CI installs only what gjsify-lock.json pins. Create it with `gjsify link <path>` when working on
+# gjsify itself; `gjsify unlink` removes it.
+.gjsify-link.json
+
 # npm is not the package manager here — `gjsify install` is (see AGENTS.md).
 package-lock.json
 

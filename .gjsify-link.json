@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "checkout": "/home/jumplink/Projekte/werkstatt/gjsify/gjsify",
-  "packages": [
-    "@gjsify/*"
-  ]
-}

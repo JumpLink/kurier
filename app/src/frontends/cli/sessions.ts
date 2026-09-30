@@ -37,11 +37,14 @@ const command: CommandModule = {
     } else {
       showSessionTable(records);
     }
+    // One message, and it says which of the two empty cases this is. Printing both (a generic
+    // "no sessions yet" from the renderer plus a specific one here) is how an output teaches a
+    // person to stop reading it.
     if (records.length === 0) {
       err(
         pickArgv<boolean>(raw, 'all') === true
           ? 'kurier has no sessions yet — `kurier start` opens one'
-          : `no sessions for principal "${principal}"`,
+          : `no sessions for principal "${principal}" (try --all)`,
       );
     }
   },

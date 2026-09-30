@@ -84,7 +84,7 @@ jobs:
         run: gjsify workspace kurier-cli test
 
       # The bundle a person would install has to at least start and print its command table.
-      - name: Smoke: the built bundle starts
+      - name: Smoke — the built bundle starts and lists its agents
         run: |
           gjsify run app/dist/kurier.gjs.mjs agents
           gjsify run app/dist/kurier.gjs.mjs sessions

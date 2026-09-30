@@ -96,12 +96,15 @@ export function showSession(record: SessionRecord): void {
   }
 }
 
-/** One row per session, newest first. Aligned, because a list of ids is not a list. */
+/**
+ * One row per session, newest first. Aligned, because a list of ids is not a list.
+ *
+ * Says nothing when the list is empty: the caller owns that message, because only it knows whether
+ * an empty list means "no sessions at all" or "no sessions for THIS principal" — two different
+ * sentences, and printing both is how a person learns to ignore the output.
+ */
 export function showSessionTable(records: SessionRecord[]): void {
-  if (records.length === 0) {
-    err('no sessions yet — `kurier start` opens one');
-    return;
-  }
+  if (records.length === 0) return;
   const idWidth = Math.min(28, Math.max(...records.map((record) => record.id.length)));
   for (const record of records) {
     const scope = record.boundTo ? `→ ${record.boundTo}` : 'standalone';
