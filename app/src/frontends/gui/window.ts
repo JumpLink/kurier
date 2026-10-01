@@ -67,7 +67,13 @@ import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { agentStatus } from '../../core/turn.ts';
-import { APP_NAME, COLLAPSE_WIDTH_PX, WINDOW_HEIGHT, WINDOW_WIDTH } from './constants.ts';
+import {
+  APP_NAME,
+  COLLAPSE_WIDTH_PX,
+  WINDOW_HEIGHT,
+  WINDOW_MIN_WIDTH_PX,
+  WINDOW_WIDTH,
+} from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
 import { SessionList } from './session-list.ts';
@@ -144,8 +150,11 @@ export class MainWindow extends Adw.ApplicationWindow {
       title: APP_NAME,
       defaultWidth: WINDOW_WIDTH,
       defaultHeight: WINDOW_HEIGHT,
-      // A floor, not the phone form factor. See `constants.ts`.
-      widthRequest: 480,
+      // The phone form factor, replacing a 480 px floor that was asserted rather than measured.
+      // `WINDOW_MIN_WIDTH_PX` carries the measurement — `scripts/probes/window-min-width.mjs` — and
+      // the finding that no widget in this window wants anything near 480, so the old number was a
+      // property of a literal and not of the layout.
+      widthRequest: WINDOW_MIN_WIDTH_PX,
       heightRequest: 400,
     });
 

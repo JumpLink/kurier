@@ -34,18 +34,46 @@ export const APP_VERSION = '0.1.0';
 export const DEV_HOOK_PREFIX = 'KU_APP';
 
 /**
- * The window's floor size, in logical pixels.
+ * The window's *default* size, in logical pixels — a default, not a floor.
  *
- * **1024×600, and that number is a decision with a reason.** GNOME's HIG asks every app for a
- * minimum *and* a sensible default, and reserves the phone form factor (360×294) for apps that are
- * actually meant to be used on a phone. kurier is not yet: the composer, the config row and the
- * header do not fit together below about 900 px, and a window that is too small to hold its own
- * controls is worse than one that says it needs more room. The 720 px collapse below still makes it
- * usable in a narrow pane; it does not make it a phone app, and nothing in the UI should imply
- * otherwise.
+ * **1024×600, and the number is a decision with a reason.** GNOME's HIG asks every app for a
+ * sensible default as well as a minimum. 1024 is a desktop conversation at a readable measure; the
+ * floor that actually decides whether kurier fits a phone is `WINDOW_MIN_WIDTH_PX` below, and the two
+ * are deliberately not the same number.
  */
 export const WINDOW_WIDTH = 1024;
 export const WINDOW_HEIGHT = 600;
+
+/**
+ * The narrowest width the window claims it can be used at.
+ *
+ * **360 px, the phone form factor, and the history of the 480 it replaced is worth keeping.** The
+ * first version asked for `widthRequest: 480` on the reasoning that the collapsed conversation plus
+ * its composer stop being usable below that, and 480 sat "deliberably above the 360×294 a phone app
+ * would have to claim". That reasoning was never measured — it was asserted, and it was wrong.
+ * `scripts/probes/window-min-width.mjs` is the measurement that replaced it, on GTK 4.22.5 /
+ * libadwaita 1.9.3:
+ *
+ * | asked | granted, floor 480 | granted, floor removed |
+ * | ----- | ----------------- | ---------------------- |
+ * | 420   | 480 (clamped)     | 420                    |
+ * | 360   | 480 (clamped)     | 360                    |
+ * | 320   | 480 (clamped)     | 320                    |
+ * | 280   | 480 (clamped)     | 280                    |
+ *
+ * `widthRequest` was the *only* constraint. Asked for its preferred width, no contributing widget —
+ * the composer's row, the bubbles, the transcript column, the `Adw.Clamp`, the collapsed header bar —
+ * claims a minimum anywhere near 480; the same unmodified tree grants 280 and even 200 with zero
+ * Gtk-WARNINGs at each. So 480 was never a property of the layout, only of a number somebody typed.
+ *
+ * **Why 360 and not the 200 the content allows.** The layout survives narrower than any phone, and
+ * a floor below the form factor would let a window shrink to a shape nobody asked for and nobody can
+ * read. 360 is the narrowest width in common use on a phone, so it is the narrowest width kurier
+ * claims; below it the answer is the user's window manager, not this constant. If a real phone form
+ * factor later turns out to need less, this is the number to move, and `window-min-width.mjs` is
+ * what says whether the content can follow.
+ */
+export const WINDOW_MIN_WIDTH_PX = 360;
 
 /**
  * Below this width the sidebar collapses and the conversation takes the whole window.
