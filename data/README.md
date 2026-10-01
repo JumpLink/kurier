@@ -57,7 +57,10 @@ deliberate and are the reason to read it before trusting it:
   are **host** programs (`opencode` and its own credentials, model config and git).
   Inside a Flatpak, `node:child_process` spawns *inside the sandbox*, where those do not
   exist. Reaching the host means `flatpak-spawn --host`, and this argument is the bus
-  name that call goes through.
+  name that call goes through. `app/src/core/agents/sandbox.ts` builds that command; it is
+  a no-op outside a Flatpak (it tests `/.flatpak-info` and nothing else — deliberately
+  not `FLATPAK_ID`, which a Flatpak-installed terminal also sets), so a desktop install
+  spawns exactly what it always did.
 - `--filesystem=host` — and it is not a detail: granting host spawn to an app whose
   whole job is running a program that edits your files is close to no filesystem
   sandbox at all. kurier's own permission gate still stands (`session/request_permission`
@@ -68,12 +71,46 @@ Together they say: **the Flatpak is a convenient installer, not a sandbox.** Any
 reviewing a Flathub submission should be told that in the description, not left to
 infer it from the manifest.
 
-Not yet buildable end to end: the manifest's `build-commands` need
-`build-aux/gjsify.gjs.mjs` (the committed ~7 MB `@gjsify/cli` GJS bundle, the same file
-easy6502 keeps) and `gjsify-sources.json` (`gjsify flatpak sources`, the offline
-tarball cache — without it `gjsify install --immutable` cannot fetch anything inside
-the Flathub sandbox). `kurier` has no `v0.1.0` tag either, so the `sources` `tag` in the
-manifest does not resolve yet.
+### What it does to start the agent, and what it cannot do
+
+`app/src/core/agents/sandbox.ts` rewrites an agent command into
+`flatpak-spawn --host … /bin/sh -c …`, and it is a **no-op outside a Flatpak** — a
+desktop install spawns exactly what it always did. Two things about the host side are
+worth knowing before filing an issue against "kurier cannot find my agent":
+
+- **The PATH is the host's, recovered from the person's own shell config.** `flatpak-spawn
+  --host` passes the *session bus* PATH, which is not the PATH an interactive terminal
+  has, and on this machine it does not contain `~/.opencode/bin` at all. kurier therefore
+  runs the agent through the host's login shell and reads `~/.zshrc` or `~/.bashrc` first.
+  **Known limit:** a `.bashrc` guarded by `[ -t 0 ]` returns early when there is no
+  terminal, and there never is one here, so such a person gets the login PATH and
+  `kurier agents` says NOT FOUND. A `$-`-style guard is fine. The fix belongs on the
+  machine: put the agent's PATH in `~/.profile` or `~/.bash_profile`.
+- **`$SHELL` that is not zsh or bash (fish, nushell, csh) gets the login PATH and no
+  rc**, because the inner script is POSIX `sh` and their config is not.
+
+Ending the agent is subtler than it looks: the pid kurier holds is the sandbox-side
+`flatpak-spawn`, and SIGTERM to it *is* forwarded (measured — Stop and a closed window
+leave no `opencode acp` behind), while **SIGKILL cannot be forwarded** and would orphan
+the host process. `killGraceMs` exists for that reason.
+
+The build is end to end: it installs `kurier-app` and the `kurier` CLI, both with a
+`#!/usr/bin/gjs -m` shebang, because the manifest's `command` execs them directly and a
+bundle without a shebang is handed to `/bin/sh`, which answers with a syntax error. Two
+generated inputs make it work offline and both are committed: `build-aux/gjsify.gjs.mjs`
+(the ~7 MB `@gjsify/cli` GJS bundle, the same file easy6502 keeps) and
+`gjsify-sources.json` (`gjsify flatpak sources` — the offline tarball cache; without it
+`gjsify install --immutable` cannot fetch anything inside the Flathub sandbox).
+
+**The icons have to keep their comments INSIDE the `<svg>` root.** `flatpak
+build-export` validates an icon by loading it through gdk-pixbuf, whose SVG loader fails
+on a comment before the root element and refuses to export with "is not a valid icon:
+Format not recognized". Measured here on both icons: unchanged fails, comment inside
+succeeds.
+
+What is still open: `kurier` has no `v0.1.0` tag, so the `sources` `tag` in the manifest
+does not resolve until one is pushed; and both icons are placeholders (see the table
+above) until the real mark lands.
 
 ## Validate
 

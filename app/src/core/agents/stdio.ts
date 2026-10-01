@@ -16,10 +16,18 @@
  * *look* like using the project's own runtime library and would break the Node half of the test run.
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 
 import { channelTransport, type RawChannel, type Transport } from '@kurier/acp/transport';
+
+import {
+  currentSandboxFacts,
+  FLATPAK_SPAWN,
+  hostProbeArgv,
+  toHostCommand,
+  type SandboxFacts,
+} from './sandbox.ts';
 
 /** How an agent process is started. A launcher is a *program*, not a permission. */
 export interface AgentCommand {
@@ -51,9 +59,44 @@ export interface StdioChannelOptions {
   onStderr?: (line: string) => void;
   /** How long the process gets between `SIGTERM` and `SIGKILL`. */
   killGraceMs?: number;
+  /**
+   * The sandbox facts to decide with. Defaults to the real ones; a test injects them so the
+   * sandboxed path can be exercised on a machine that is not a Flatpak. It is a seam for exactly
+   * one decision — `toHostCommand` — and it cannot make the spawn itself succeed, because
+   * `flatpak-spawn` only exists inside a Flatpak.
+   */
+  sandboxFacts?: SandboxFacts;
 }
 
 const DEFAULT_KILL_GRACE_MS = 2000;
+
+/**
+ * How long the "is it installed" host probe may take. Short, because the probe sits on the path of
+ * `kurier agents` and of any window that reports launcher state: a slow answer reads as a broken
+ * app, and nothing about resolving one program's location is worth more than this.
+ */
+const HOST_PROBE_TIMEOUT_MS = 5000;
+
+/**
+ * The command to hand to `spawn`, which is NOT always the command that was asked for.
+ *
+ * This exists as its own function because the one thing that is easy to get wrong here is
+ * invisible from the outside: **`cwd` and `env` must be read off the REWRITTEN command.** The rewrite
+ * folds them into the `flatpak-spawn` argv as `--directory=`/`--env=` — they are properties of the
+ * HOST process — and drops them from the result. So on a desktop install they are the same values as
+ * before, and on a Flatpak they are absent, and that is exactly the point. Reading them off the
+ * ORIGINAL command instead puts `flatpak-spawn` itself into a directory that only exists on the host,
+ * and the spawn dies with ENOENT before it ever crosses.
+ *
+ * A separate export so a test can assert that decision without a Flatpak: `flatpak-spawn` exists only
+ * inside one, so the spawn itself cannot be made to succeed on a build host.
+ */
+export function resolveSpawnCommand(
+  command: AgentCommand,
+  facts: SandboxFacts = currentSandboxFacts(),
+): AgentCommand {
+  return toHostCommand(command, facts);
+}
 
 export class StdioChannel implements RawChannel {
   readonly command: AgentCommand;
@@ -66,10 +109,14 @@ export class StdioChannel implements RawChannel {
   #killGraceMs: number;
 
   constructor(options: StdioChannelOptions) {
+    const { program } = options.command;
+    // The AGENT's command, not the one that will be spawned: an error message has to name
+    // `opencode`, never the `flatpak-spawn` that happens to be carrying it. See sandbox.ts.
     this.command = options.command;
     this.#killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
-    const { program, args, cwd, env } = options.command;
-    this.#child = spawn(program, args, {
+    const actual = resolveSpawnCommand(options.command, options.sandboxFacts ?? currentSandboxFacts());
+    const { cwd, env } = actual;
+    this.#child = spawn(actual.program, actual.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       ...(cwd ? { cwd } : {}),
       ...(env ? { env: { ...process.env, ...env } } : {}),
@@ -95,6 +142,7 @@ export class StdioChannel implements RawChannel {
       this.#flushStderr(options.onStderr);
       // exit(code 0) is a clean end; anything else carries a reason the client should surface
       // rather than swallow — a crashed agent and a cancelled one look the same otherwise.
+      // `program`, not `actual.program`: a message has to name the agent a person recognises.
       this.#end(
         code === 0
           ? undefined
@@ -177,13 +225,33 @@ export function stdioTransport(options: StdioChannelOptions): Transport {
 /**
  * Whether a program is on PATH, and where.
  *
- * Pure in its environment argument, so a test can say "`/usr/bin` has opencode in it" without a
- * subprocess and without depending on what happens to be installed. This is the difference
- * between `kurier agents` reporting "not installed" and reporting "broken", which are two very
- * different messages to somebody reading them at 23:00.
+ * **Three answers, in order, and the order is the point.** A program named by path is the person's
+ * own answer and is only ever checked here. Failing that, the sandbox's own PATH is walked (pure,
+ * fast, and right for a desktop install). Only if that finds nothing AND kurier is inside a Flatpak
+ * is the host asked, because then the sandbox's PATH is the wrong PATH: the agent is a host program
+ * and the host's shell is the only thing that can say where it is. See `sandbox.ts`.
+ *
+ * The first two steps stay pure in their `env` argument, so a test can still say "/usr/bin has
+ * opencode in it" without a subprocess; the third is the one impure step, and it sits behind the
+ * injected `facts` argument so a test that does not want it can say so.
+ *
+ * This is the difference between `kurier agents` reporting "not installed" and reporting "broken",
+ * which are two very different messages to somebody reading them at 23:00.
  */
-export function which(program: string, env: NodeJS.ProcessEnv = process.env): string | null {
+export function which(
+  program: string,
+  env: NodeJS.ProcessEnv = process.env,
+  facts = currentSandboxFacts(),
+): string | null {
   if (program.includes('/')) return isExecutable(program, env) ? program : null;
+  const local = whichOnPath(program, env);
+  if (local) return local;
+  const probe = hostProbeArgv(program, facts);
+  return probe ? probeOnHost(probe) : null;
+}
+
+/** The pure PATH walk, exactly as it was. */
+function whichOnPath(program: string, env: NodeJS.ProcessEnv): string | null {
   const path = env['PATH'] ?? '';
   // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `kurier agents`
   // honest on the platform the app is eventually meant to run on.
@@ -194,6 +262,57 @@ export function which(program: string, env: NodeJS.ProcessEnv = process.env): st
     if (isExecutable(candidate, env)) return candidate;
   }
   return null;
+}
+
+/**
+ * The host's answer, or `null`.
+ *
+ * `null` for anything but a clean exit: a `flatpak-spawn` that could not reach the bus, a shell that
+ * could not read the rc, a program the host does not have. All of them are "not installed" as far
+ * as the person reading the table is concerned, and the difference is not worth a subprocess failure
+ * on the screen. stdout is trimmed and the LAST line taken, because a login shell that printed a
+ * MOTD would otherwise hand back a sentence instead of a path.
+ */
+function probeOnHost(argv: string[]): string | null {
+  // `stdin: 'ignore'` and a bounded `timeout` because this runs on a path a person waits on: a host
+  // whose shell hangs — an rc that blocks on a terminal read, a `gpg-agent` prompt, a network mount
+  // in a login script — would otherwise hang `kurier agents` and, through it, the window that asks.
+  // `stdio` rather than `stdin`: this is `spawnSync`, and there the option that covers all three
+  // descriptors is `stdio` — `stdin` is an `spawn` option and the type says so. The probe must not
+  // read stdin (a host rc could block on one) and does not write stderr, so 'ignore' on both is the
+  // honest answer rather than a leftover. Measured on GJS: `stdio: ['ignore','pipe','pipe']` closes
+  // fd 0, and a numeric `timeout` aborts with `ETIMEDOUT` and `status === null`.
+  const result = spawnSync(FLATPAK_SPAWN, argv, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: HOST_PROBE_TIMEOUT_MS,
+  });
+  if (result.status !== 0) return null;
+  const found = (result.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .pop();
+  // **Only an absolute path counts.** `command -v` also answers for an alias, a function, a keyword
+  // and a builtin — and those print their own name, e.g. bare `opencode` for an alias, which is
+  // emphatically not something `spawn` can execute. kurier spawns a program, so anything that is not
+  // a path is "not installed" as far as this table is concerned.
+  return found !== undefined && probeAccepts(found) ? found : null;
+}
+
+/**
+ * Is this what a probe may report as "installed"?
+ *
+ * **Only an absolute path.** `command -v` also answers for an alias, a function, a keyword and a
+ * builtin, and each of those prints its own NAME — bare `opencode` for an alias, which is not
+ * something `spawn` can execute. kurier spawns a *program*, so anything that is not a path is "not
+ * installed" as far as this table is concerned; reporting it otherwise would put a name in a
+ * `kurier agents` STATE column that would fail the moment somebody acted on it.
+ *
+ * Exported because it is the whole of the rule, and a rule with no test is a comment.
+ */
+export function probeAccepts(answer: string): boolean {
+  return answer.startsWith('/');
 }
 
 function isExecutable(candidate: string, env: NodeJS.ProcessEnv): boolean {

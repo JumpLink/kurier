@@ -305,10 +305,32 @@ the same way. `packaging:install` installs metadata only: `bin/kurier-app` is pr
 **Two finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
 reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
 cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
-this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer. The manifest
-is also not buildable end to end yet (no committed `build-aux/gjsify.gjs.mjs`, no
-`gjsify-sources.json`, and `sources.tag: v0.1.0` against a repo with no tags). Full details,
-including the placeholder icons and the missing `<releases>`: [data/README.md](data/README.md).
+this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
+
+`app/src/core/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
+it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
+same object. Four things about it are measured rather than assumed, and each has a test:
+
+- **Detection is `/.flatpak-info` alone, not `FLATPAK_ID`.** A terminal, editor or IDE installed *as a
+  Flatpak* sets `FLATPAK_ID` in an otherwise host environment; treating that as sandboxed would route
+  its agents through `flatpak-spawn --host` and lose the PATH it already had.
+- **The agent's PATH comes from the host's own shell config.** `flatpak-spawn --host` passes the
+  *session bus* PATH, which on this machine does not contain `~/.opencode/bin` at all, so the agent is
+  run through the host's login shell with `~/.zshrc`/`~/.bashrc` read first. A login shell ALONE is not
+  enough — `-l` does not read `~/.zshrc` — and neither is sourcing it from `/bin/sh`, because `~/.zshrc`
+  is zsh syntax that dash cannot parse. The bash limit is real and named: a `[ -t 0 ]` guard in
+  `.bashrc` returns early with no terminal, and the answer stays "not installed" rather than a guess.
+- **The protocol pipes are fenced off.** A login shell reads several files before the agent starts and
+  any of them may print (a banner lands in the JSON-RPC stream) or `read` from stdin (an `ssh-add`
+  prompt swallows `initialize` and the handshake hangs with no error). The wrapper parks the pipes on
+  fds 3/4 and points the inherited ones at `/dev/null`/stderr, and the inner script hands them back
+  before the agent starts.
+- **Ending the agent is not a signal to the agent.** The pid kurier holds is the sandbox-side
+  `flatpak-spawn`; the agent is under `flatpak-session-helper` on the other side of the bus. SIGTERM
+  *is* forwarded (measured: Stop and `flatpak kill` leave no `opencode acp`), SIGKILL cannot be and
+  would orphan the host process — which is what `killGraceMs` is for.
+
+Full details, including the placeholder icons and the build inputs: [data/README.md](data/README.md).
 
 ## The project rule that came out of a mismeasurement
 

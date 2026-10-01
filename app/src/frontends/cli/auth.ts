@@ -35,6 +35,7 @@ import { classifyAuthMethods } from '@kurier/acp/gate';
 
 import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
 import { OPENCODE_LOGIN } from '../../core/agents/opencode.ts';
+import { currentSandboxFacts, toHostCommand } from '../../core/agents/sandbox.ts';
 import { which } from '../../core/agents/stdio.ts';
 import { openAgent } from '../../core/run.ts';
 
@@ -140,10 +141,28 @@ const command: CommandModule = {
   },
 };
 
-/** Run a command with stdio inherited from this process, and resolve with its exit code. */
+/**
+ * Run a command with stdio inherited from this process, and resolve with its exit code.
+ *
+ * Routed through the same host rewrite as the ACP channel (`sandbox.ts`), because a login is a host
+ * program for exactly the reason the agent is: it opens a browser and keeps its credentials under
+ * the person's own home. A `kurier auth` that only worked on a desktop install would be a second
+ * version of the same bug.
+ */
 function runInteractively(command: { program: string; args: string[] }): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command.program, command.args, { stdio: 'inherit' });
+    // `cwd`/`env` are read off the rewritten command for the same reason as in StdioChannel: on a
+    // Flatpak they are the host's, carried in the argv, and re-applying them to `flatpak-spawn` would
+    // place it in a directory that does not exist in the sandbox.
+    const actual = toHostCommand(
+      { id: 'interactive', title: command.program, program: command.program, args: command.args },
+      currentSandboxFacts(),
+    );
+    const child = spawn(actual.program, actual.args, {
+      stdio: 'inherit',
+      ...(actual.cwd ? { cwd: actual.cwd } : {}),
+      ...(actual.env ? { env: { ...process.env, ...actual.env } } : {}),
+    });
     child.on('error', reject);
     child.on('exit', (code) => resolve(code ?? 1));
   });
