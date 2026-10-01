@@ -406,7 +406,7 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 ## Conventions
 
 - `gjsify install` — never `npm install`, it prunes gjsify deps.
-- All `@gjsify/*` packages pinned to the **same exact version** (0.49.0 here). gjsify ships as one
+- All `@gjsify/*` packages pinned to the **same exact version** (0.52.0 here). gjsify ships as one
   release train; a CLI ↔ libs skew produces silently broken bundles.
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
