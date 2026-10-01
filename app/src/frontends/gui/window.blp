@@ -1,0 +1,138 @@
+using Gtk 4.0;
+using Adw 1;
+
+/**
+ * The window's shell — the whole widget tree that does not depend on a session.
+ *
+ * What is here and what is not, is the split `window.ts` documents at length: the two panes and
+ * their header bars are static, so they are declared once, here, as a tree; the session list, the
+ * transcript and the composer are built in TypeScript because what they contain is a running
+ * agent's, and each of them is slotted into an `Adw.Bin` host from the constructor.
+ *
+ * The `Adw.Bin` hosts are deliberately the thinnest container in the toolkit — one child, no
+ * layout of its own — so a host is invisible in the result rather than a level of nesting that
+ * has to be argued about. `Adw.NavigationPage`s WITHOUT a `title:` here is the same
+ * "show-title: false" the header bar asks for; the titles themselves are applied from
+ * `constants.ts` in the constructor, so there is one place that spells the app's name.
+ */
+template $KurierMainWindow: Adw.ApplicationWindow {
+  content: Adw.NavigationSplitView split {
+    min-sidebar-width: 260;
+    max-sidebar-width: 340;
+    // Not collapsed on a wide monitor: a sidebar that starts hidden hides the list for no reason,
+    // which is the "control that points at nothing" in its other direction. The breakpoint in
+    // `window.ts` collapses it when the window genuinely has no room — and **only** the breakpoint
+    // may do that. Measured: a breakpoint applies on a condition *change*, so one manual
+    // `collapsed = false` while the window is already narrow means it never collapses again, at
+    // any width, in that process. A client moves between the panes with `show_content`;
+    // libadwaita owns `collapsed`.
+    collapsed: false;
+
+    sidebar: Adw.NavigationPage sidebarPage {
+      // **`Adw.ToolbarView` with the header bar as its `[top]` bar — never a bare
+      // `Adw.HeaderBar` in a plain `Gtk.Box`.** That is the documented shape since libadwaita
+      // 1.4 and it is what `@gjsify/adwaita-app`'s own `createNavShell` builds. It also decides how
+      // the pane's edge looks: a bare header bar does not merge with the pane beside it, and
+      // `Adw.NavigationSplitView` then draws its separator straight through the header row — a
+      // vertical rule across the top of the window that no GNOME app has. The pixels are in
+      // `scripts/probes/headerbar-ab.mjs` and in the `window.ts` header.
+      child: Adw.ToolbarView {
+        vexpand: true;
+        [top]
+        Adw.HeaderBar {
+          // No `show-title: false` and no `show-*TitleButtons: false` here. The former is what
+          // keeps the page's own title out of this bar; the latter hid the close button on the
+          // collapsed window, where this bar is the only one on screen, and left alone libadwaita
+          // puts the window buttons on whichever bar sits at the window's edge, in both shapes.
+          //
+          // `Adw.WindowTitle`, not a `Gtk.Label` with `title-1`: that name class is for a *window*
+          // title, and at that size a sidebar label reads as shouting. The empty subtitle is the
+          // measured shape, not an oversight — see `window.ts`.
+          title-widget: Adw.WindowTitle sidebarTitle {
+            subtitle: "";
+          };
+        }
+        content: Adw.Bin sidebarHost {};
+      };
+    };
+
+    content: Adw.NavigationPage contentPage {
+      child: Adw.ToolbarView {
+        vexpand: true;
+        // **The composer is the bottom bar, and `RAISED_BORDER` is a measured choice.** Plan §7
+        // step 4 puts it here and §3 draws it under the conversation. The style is what decides
+        // whether the bar reads as part of the pane or as a floating panel: `FLAT` (the default,
+        // and what the sidebar's own `Adw.ToolbarView` uses) draws nothing under it, so the
+        // composer's rounded frame would sit directly on the transcript's own background with no
+        // separation at all. `RAISED_BORDER` gives an opaque background plus a persistent border,
+        // which is the one shape that reads correctly in both light and dark without a shadow that
+        // then has to be explained.
+        bottom-bar-style: raised-border;
+        [top]
+        // `show-title: false`, and **that is not cosmetic.** An `Adw.HeaderBar` inside an
+        // `Adw.NavigationPage` shows that page's title, so naming this page up front printed the
+        // app's name twice across the top of the window — the sidebar said it and the content pane
+        // said it again, which is this file's own "no control that points at nothing" rule
+        // committed by a title instead of by a button. libadwaita says the same in as many words:
+        // "AdwNavigationPage … is missing a title. To hide a header bar title, consider using
+        // AdwHeaderBar:show-title instead." `MainWindow.#open` turns the title on, because from that
+        // point it names a session rather than the app.
+        //
+        // **The back button is libadwaita's, not ours.** An `Adw.HeaderBar` in the content page of
+        // a collapsed `Adw.NavigationSplitView` grows one by itself as soon as `show_content` is
+        // true. This file once claimed the opposite and shipped its own button, from a measurement
+        // that rested on an API that does not exist: there is no `get_start_widget()` in libadwaita
+        // 1.9.3 (0 hits in `Adw-1.gir`), and `show_content` was `false` — its default — in every
+        // state measured, so nothing could have been seen to go back to. The screenshot after the
+        // session list first set it to `true` then showed two back buttons side by side. What the
+        // collapsed window was missing was never a button; it was `MainWindow.#open`.
+        Adw.HeaderBar contentHeader {
+          show-title: false;
+        }
+        // **The stack, not a swap of `set_content`.** The empty state and a session are two
+        // answers to one question, and a `Gtk.Stack` holds both so switching back and forth is a
+        // `visibleChildName` assignment rather than a reparent. That matters because the *composer*
+        // is a bottom bar of this `Adw.ToolbarView` and not part of any child: putting it inside
+        // whichever child is showing would rebuild its entry on every session switch, and the
+        // composer's whole job is to survive one.
+        content: Gtk.Stack contentStack {
+          vexpand: true;
+          StackPage {
+            name: "closed";
+            child: Adw.StatusPage {
+              icon-name: "mail-send-receive-symbolic";
+              title: _("No session open");
+              // Neither "on the left" (on a narrow window the list is a page of its own) nor
+              // "start one" (there is no control for that yet, and copy that points at one is a
+              // control that isn't there). The wording is about kurier rather than about the
+              // agent: no agent is running yet, and copy that implies otherwise is a small lie in
+              // the first screen anybody sees.
+              description: _("Pick a session from the list to see it here.");
+              // `vexpand` so it centres in the pane: an empty area with content jammed under the
+              // header reads as a layout bug rather than as a deliberate empty state.
+              vexpand: true;
+            };
+          }
+          StackPage {
+            name: "open";
+            child: Adw.Bin transcriptHost {};
+          }
+          StackPage {
+            name: "empty";
+            child: Adw.StatusPage {
+              icon-name: "mail-send-receive-symbolic";
+              title: _("Nothing here yet");
+              description: _("No prompt has been sent in this session yet. The first one starts it.");
+              vexpand: true;
+              styles [
+                "compact",
+              ]
+            };
+          }
+        };
+        [bottom]
+        Adw.Bin composerHost {}
+      };
+    };
+  };
+}
