@@ -19,9 +19,13 @@ import interrupt from './unit/core/interrupt.test.ts';
 import transcript from './unit/core/transcript.test.ts';
 import composerState from './unit/core/composer-state.test.ts';
 import agents from './unit/core/agents.test.ts';
+import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
+import scroll from './unit/core/scroll.test.ts';
 import sessionGroups from './unit/core/session-groups.test.ts';
 import transcriptItems from './unit/core/transcript-items.test.ts';
+import turn from './unit/core/turn.test.ts';
+import agentSession from './unit/core/agent-session.test.ts';
 
 import smoke from './unit/smoke.test.ts';
 
@@ -40,8 +44,12 @@ run({
   transcript,
   composerState,
   agents,
+  devAgent,
   paths,
+  scroll,
   sessionGroups,
   transcriptItems,
+  turn,
+  agentSession,
   smoke,
 });

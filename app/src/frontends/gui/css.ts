@@ -169,11 +169,17 @@ export const APP_CSS = `
   background-color: transparent;
 }
 
-/* The composer's reason line: why the button is disabled, in words, on screen. Caption-sized and
-   dimmed because it is an absence and absence should not be the loudest thing under the conversation —
-   the same reasoning as \`.kurier-quiet\` above. \`margin-top\` is 0 because the vertical box already
-   has \`spacing: 2\`; a second gap is two gaps. */
-.kurier-composer-reason {
+/* The composer's status line: why the button is disabled, or what is happening right now. Caption-sized
+   because it is the quietest thing in the bottom bar — \`margin-top\` is 0 because the vertical box
+   already has \`spacing: 2\`; a second gap is two gaps.
+
+   NO \`opacity\` here, and that is deliberate rather than an oversight. \`.kurier-composer-reason\` was
+   dimmed as a rule (\`composerReason\`), which was right when the line only ever said "here is what is
+   wrong". A *running* turn is not that: "Working — the agent is answering" at 55% opacity reads as a
+   disabled caption rather than as the window telling them to wait, and the whole job of the line is to
+   distinguish the two. The dimming now happens per-render instead, where the surface knows which of the
+   two it is drawing — see \`Composer.#render\`. */
+.kurier-composer-status {
   margin-top: 0;
   margin-bottom: 6px;
   /* \`margin-left\`/\`margin-right\`, not the GTK 3 names \`margin-start\`/\`margin-end\`: GTK 4 has no
@@ -202,7 +208,7 @@ export const CSS = {
   thought: 'kurier-thought',
   composerFrame: 'kurier-composer-frame',
   composerEntry: 'kurier-composer-entry',
-  composerReason: 'kurier-composer-reason',
+  composerStatus: 'kurier-composer-status',
   openRow: 'kurier-open-row',
   dim: DIM,
   title: TITLE,

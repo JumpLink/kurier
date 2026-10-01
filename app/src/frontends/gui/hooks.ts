@@ -33,6 +33,17 @@ export interface KurierHooks extends FrameworkHooks {
   session?: string;
 
   /**
+   * `KU_APP_AGENT` — which agent this window talks to. Unset means the CLI's default launcher.
+   *
+   * Not an `AgentCommand` and not a path: an *agent id*, resolved in `core/agents/dev-agent.ts`. The
+   * two accepted values are a real launcher (`opencode`) and `stand-in`, the dev fixture — and the
+   * fixture is the reason the hook exists at all, because a real turn costs a model call and is not
+   * reproducible, so every running/streaming/stopped state in this window is looked at against it.
+   * An unknown id falls back to the default with a line in the log rather than refusing to start.
+   */
+  agent?: string;
+
+  /**
    * `KU_APP_PERMISSION` — stage an open `session/request_permission` at startup.
    *
    * The dialog is the **reason this project exists**: a modal that must appear, must show what the
@@ -50,13 +61,20 @@ export interface KurierHooks extends FrameworkHooks {
   config?: string;
 
   /**
-   * `KU_APP_THINKING` — start a turn that streams and never ends on its own.
+   * `KU_APP_THINKING` — send a prompt at startup, so a running turn can be reached without a pointer.
    *
-   * A real turn against a real agent is the only honest way to see the streaming state, and it
-   * costs a model call and is not reproducible. A staged turn is neither, and it is the one that can
-   * be screenshotted on demand.
+   * The turn that follows is a **real** turn against whatever `KU_APP_AGENT` selected: this hook starts
+   * it, it does not stage a fake one. Against the stand-in agent that is free and repeatable, and
+   * against `opencode` it is a model call — which is exactly why the fixture is the default way to look
+   * at this state and why the prompt it sends is a fixture prompt rather than anything of the person's.
    */
-  thinking?: boolean;
+  thinking?: string;
+
+  /**
+   * `KU_APP_PROMPT` — the text `KU_APP_THINKING` sends. Fixed English, synthetic: a screenshot must
+   * not carry a real conversation out of a real session file.
+   */
+  prompt?: string;
 }
 
 /**
@@ -75,8 +93,10 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
   return {
     ...framework,
     session: trimmed('SESSION'),
+    agent: trimmed('AGENT'),
     permission: trimmed('PERMISSION') !== undefined,
     config: trimmed('CONFIG'),
-    thinking: trimmed('THINKING') !== undefined,
+    thinking: trimmed('THINKING'),
+    prompt: trimmed('PROMPT'),
   };
 }

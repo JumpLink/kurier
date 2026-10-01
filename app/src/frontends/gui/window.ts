@@ -1,10 +1,11 @@
 /**
- * The window — the shell, and nothing else yet.
+ * The window: the shell, the surface, and the wiring between them.
  *
- * This file is deliberately the *smallest* thing that can be wrong in an instructive way. It proves
- * the whole chain — `gi://Adw` → the bundler → a real display — before there is a transcript in it,
- * because every later mistake is cheaper to find while the only variable is "does the window come
- * up at all".
+ * **This file decides nothing.** Every question it answers — may Send be pressed, what does the
+ * status line say, where does the scroll go — is answered by `core/`, and the window's job is to pass
+ * the answer to a widget and to hand the widget's events back. Plan §7 step 5 is where that stops
+ * being theoretical: there is a live turn behind the composer now, so a decision taken here would be a
+ * decision with a process behind it.
  *
  * **Two panes, two header bars, and that is not the thing being avoided.** An
  * `Adw.NavigationSplitView` gives each pane its own `Adw.HeaderBar`. The reference apps this surface
@@ -13,11 +14,11 @@
  * sidebar. The rule this window follows is not "fewer controls" but "no control that points at
  * nothing": every element is here because something in the kernel produced it.
  *
- * **The shell is built here rather than taken from `createNavShell`.** That is a real decision with
- * a measured reason, not a preference: the packaged shell takes a `readonly NavItem[]` and hands
+ * **The shell is built here rather than taken from `createNavShell`.** That is a real decision with a
+ * measured reason, not a preference: the packaged shell takes a `readonly NavItem[]` and hands
  * back a plain `Gtk.Stack` with no `Gtk.ListBox` in it, so the list cannot grow when a session
  * arrives, has no handle for `Gtk.ListBox`'s `set_header_func` (which is how "Today" / "Yesterday"
- * groups work), and has no bottom bar — and the composer *has* to be in a bottom bar, because it is
+ * groups work), and has no bottom bar — and the composer *has to* be in a bottom bar, because it is
  * the one control that belongs under the conversation rather than in it. The breakpoint is copied
  * from it verbatim.
  *
@@ -48,20 +49,39 @@
  * So `ToolbarView` is the shape, see `buildSidebar`. There is no public property on
  * `AdwNavigationSplitView` to hide the separator at all — only `collapsed`, `content`,
  * `min_/max_sidebar_width`.
+ *
+ * **One agent subprocess for this whole window, and the window never touches it.** `AgentSession` owns
+ * the process and the turns; `window.ts` only passes it a callback for lines and one for snapshots. It
+ * is the reason a person can click through thirty sessions without spawning thirty `opencode`s (plan
+ * §6), and the reason the composer's Send was able to be a real button in this step instead of the
+ * disabled one step 4 shipped.
  */
 
 import Adw from '@girs/adw-1';
 import GObject from '@girs/gobject-2.0';
 import Gtk from '@girs/gtk-4.0';
 
-import { labelOf, type SessionRecord } from '@kurier/session';
+import { labelOf, type SessionRecord, type TranscriptEntry } from '@kurier/session';
 
+import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
+import type { AgentCommand } from '../../core/agents/stdio.ts';
+import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
+import { agentStatus } from '../../core/turn.ts';
 import { APP_NAME, COLLAPSE_WIDTH_PX, WINDOW_HEIGHT, WINDOW_WIDTH } from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
 
+/**
+ * What the window needs in order to own a turn.
+ *
+ * **`append` is a separate argument from `loadSessions` rather than one store passed whole**, because
+ * the window's two uses of it have nothing to do with each other: one reads the file once at startup
+ * (and may fail, which belongs to the sidebar's error page), the other writes a line per streamed chunk.
+ * A `SessionStore` would drag `create`/`update`/`remove` in beside them, and the window would then
+ * have methods nothing calls.
+ */
 export interface MainWindowOptions {
   /** Read once at startup. See `hooks.ts` — a state only a click can reach is a state untested. */
   readonly hooks: KurierHooks;
@@ -71,6 +91,12 @@ export interface MainWindowOptions {
    * error page instead of killing the app before there is a window to say why.
    */
   readonly loadSessions: () => readonly SessionRecord[];
+  /** Which agent to start on the first prompt. Resolved from `KU_APP_AGENT` in `main.ts`. */
+  readonly agent: AgentCommand;
+  /** Persist streamed transcript lines. Called once per arriving batch, in order. */
+  readonly appendTurns?: (sessionId: string, entries: TranscriptEntry[]) => void;
+  /** The clock, injected so a screenshot run is the only place a real one is used. */
+  readonly now?: () => string;
 }
 
 export class MainWindow extends Adw.ApplicationWindow {
@@ -95,6 +121,22 @@ export class MainWindow extends Adw.ApplicationWindow {
    * of. Two named children and one assignment is the whole mechanism.
    */
   readonly #contentStack: Gtk.Stack;
+  /** The turn machinery. One per window, one agent subprocess behind it. */
+  readonly #agent: AgentSession;
+  /** The session on screen, or `null` while none is. The only place the window answers "which". */
+  #openRecord: SessionRecord | null = null;
+  /**
+   * The spawn-time closer, once the agent has one. Written by the `onCloser` hook below.
+   *
+   * Held here so the window's own close path is not the only thing that knows a process exists: during
+   * the handshake there is one and no turn, and a window closed in that moment would otherwise leave it
+   * running behind it.
+   */
+  #agentClose: (() => void) | null = null;
+  /** True between "a close was requested" and "the agent has ended", so a second close is not blocked. */
+  #closing = false;
+  /** Lines from the agent that are not transcript entries. Nowhere to put them yet — see `#onNotice`. */
+  readonly #notices: string[] = [];
 
   constructor(app: Adw.Application, options: MainWindowOptions) {
     super({
@@ -102,9 +144,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       title: APP_NAME,
       defaultWidth: WINDOW_WIDTH,
       defaultHeight: WINDOW_HEIGHT,
-      // A floor, not the phone form factor. See `constants.ts`: 480×400 is roughly the narrowest
-      // window in which the collapsed conversation plus its composer are still usable, and it is
-      // deliberately well above the 360×294 a phone app would have to claim.
+      // A floor, not the phone form factor. See `constants.ts`.
       widthRequest: 480,
       heightRequest: 400,
     });
@@ -117,13 +157,35 @@ export class MainWindow extends Adw.ApplicationWindow {
     // are rebuilt on every click. One view, `setEntries` on each open, is also the reason a session
     // switch cannot leak a row from the previous transcript — the rebuild is total, not a diff.
     this.#transcript = new TranscriptView();
-    // **No `onSend`, and that is the step-4 state rather than an omission.** §7 step 4 is "transcript +
-    // composer + Stop, **without an agent**"; `openAgent` and `runTurn` are step 5. So there is nothing
-    // a message could reach, and a Send that accepted one and dropped it would be the
-    // control-that-points-at-nothing this window's own header forbids. `attached: false` makes
-    // `composerView` disable the button and put the reason on screen; step 5 passes `true` and a real
-    // `onSend`, and the widget needs no change for it.
-    this.#composer = new Composer({ attached: false });
+    this.#agent = new AgentSession({
+      command: options.agent,
+      ...(options.appendTurns ? { append: options.appendTurns } : {}),
+      ...(options.now ? { now: options.now } : {}),
+      events: {
+        onSnapshot: (snapshot) => this.#onSnapshot(snapshot),
+        onEntries: (entries) => this.#onEntries(entries),
+        onNotice: (message) => this.#onNotice(message),
+        // Kept so `close-request` can end a process that exists while the handshake is still running
+        // and no turn has been awaited — the orphan `onSpawn` exists to prevent. `shutdown()` below
+        // already ends it; this is the same closer, held here so the window's own close path is not
+        // the only thing that knows a process exists.
+        onCloser: (close) => {
+          this.#agentClose = close;
+        },
+      },
+    });
+    // `attached: false` in step 4 became a real render input in step 5: the controller reports the
+    // agent's own life and the composer asks `core/composer-state.ts` what to do with it.
+    this.#composer = new Composer({
+      // **From the controller's own `snapshot`, not from a hand-written initial value.** A literal
+      // `idle / none / null` here would be a second source of truth for the composer's inputs that has
+      // to be kept in step with the controller's defaults by hand — and the first version of this line
+      // did exactly that, and then the controller's constructor emitted its own state into a composer
+      // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
+      input: composerInput(this.#agent.snapshot),
+      onSend: (text) => this.#onSend(text),
+      onStop: () => this.#agent.stop(),
+    });
     this.#contentStack = new Gtk.Stack({ vexpand: true });
     const panes = buildSplitView(
       this.#sessions.widget,
@@ -150,6 +212,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#applyBreakpoint();
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
+    this.#watchCloseRequest();
   }
 
   #load(loadSessions: () => readonly SessionRecord[]): void {
@@ -180,9 +243,16 @@ export class MainWindow extends Adw.ApplicationWindow {
    * store holds and projects it through `core/transcript-items.ts`; a surface that filtered first
    * would be re-deriving history the agent's own `session/load` is the authority on (AGENTS.md §
    * Privacy: the transcript is a record of what happened, not a re-derivation of it).
+   *
+   * **Selecting a session spawns nothing** (plan §6). `#open` calls `AgentSession.bind`, which records
+   * the session and emits a snapshot; the process starts on the first prompt. That is what lets this
+   * method stay a pure view operation — no await, no failure path, no process to leak when a person
+   * clicks through a list.
    */
   #open(record: SessionRecord): void {
     const label = labelOf(record);
+    this.#openRecord = record;
+    this.#agent.bind({ id: record.id, cwd: record.cwd });
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
     // map, so an index would be a second naming scheme for the same three states.
@@ -203,8 +273,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    * Collapse the sidebar below `COLLAPSE_WIDTH_PX`, and only below it.
    *
    * Copied from `@gjsify/adwaita-app`'s `createNavShell` rather than imported, because the packaged
-   * shell cannot host this window — see the file header. The number is the same, and the reason is
-   * the same: it is where a 300 px sidebar plus a readable conversation stops being possible.
+   * shell cannot host this window — see the file header. The number is the same, and the reason is the
+   * same: it is where a 300 px sidebar plus a readable conversation stops being possible.
    *
    * `Adw.Breakpoint` rather than a `size-allocate` handler, so the condition is declared once and
    * the framework owns the transition — a handler that sets `collapsed` on every allocation also
@@ -216,6 +286,96 @@ export class MainWindow extends Adw.ApplicationWindow {
     const breakpoint = new Adw.Breakpoint({ condition });
     breakpoint.add_setter(this.#split, 'collapsed', true);
     this.add_breakpoint(breakpoint);
+  }
+
+  // ─── the turn ───────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Send: record the prompt, clear the entry, start the turn.
+   *
+   * **The prompt is written down before the turn starts, and by this file rather than by the
+   * controller.** The controller's `prompt()` appends it too — through the same `append` the stream
+   * uses, so a crash cannot lose the message — and the window draws it, because the widget that will
+   * show it is the one that has to decide it is shown. The draft is cleared here for the same reason
+   * `keepsDraft` exists in core: sending is a person clearing their own message, which is not the same
+   * event as a state change arriving.
+   */
+  #onSend(text: string): void {
+    if (text.trim() === '') return;
+    this.#composer.clearDraft();
+    void this.#agent.prompt(text);
+  }
+
+  /** A new snapshot: hand it to the composer, and act on a state that changed the draft's fate. */
+  #onSnapshot(snapshot: AgentSnapshot): void {
+    this.#composer.setInput(composerInput(snapshot));
+    // `keepsDraft` is the decision and it lives in core; the window only carries it out. An agent that
+    // exited can never receive what is in the entry, and leaving it there collects words that go
+    // nowhere — so `gone` is the one state that discards it.
+    if (!keepsDraft(snapshot.state)) this.#composer.clearDraft();
+  }
+
+  /**
+   * Lines that just arrived. Drawn as they come, with no batching and no timer.
+   *
+   * **Appended, never re-projected from the store.** The window's copy of the session is the one the
+   * sidebar read at startup; re-reading the file per chunk would mean a JSON parse and a full rebuild
+   * of a thirty-session file for every token, and it would draw the *stored* transcript rather than the
+   * one being streamed.
+   */
+  #onEntries(entries: TranscriptEntry[]): void {
+    this.#transcript.appendEntries(entries);
+    // A session that was showing `'empty'` has just said something. Left as it is, the pane keeps the
+    // "Nothing here yet" status page *underneath* the new bubble, and the sentence contradicts what is
+    // on top of it.
+    if (this.#contentStack.visibleChildName === 'empty') this.#contentStack.visibleChildName = 'open';
+  }
+
+  /**
+   * A line from the agent that is not a transcript entry.
+   *
+   * **Collected and counted in one line, and that is a limitation with a name.** An auth advertisement,
+   * a `SIGTERM` from a killed tool, a cancellation that could not be sent: all real, all things a
+   * person wants to know, none of them belonging in the conversation. There is nowhere in this layout
+   * to put them — a notice area is a control, and a control that is a text box nobody can act on is the
+   * control-this-window-forbids. Plan §7 step 6's permission dialog is where a real notice area arrives.
+   * Until then they are on stderr with a count, which is honest: they are reported, and nothing claims
+   * they are on screen.
+   */
+  #onNotice(message: string): void {
+    this.#notices.push(message);
+    console.log(`kurier: ${message}`);
+  }
+
+  /**
+   * Close with a live turn: cancel, wait, terminate, and only then let the window go.
+   *
+   * **`return true` holds the close**, and the second `close()` after `shutdown()` is what actually
+   * closes it — `#closing` is what keeps that second call from being held again, so this cannot loop.
+   * The order inside `shutdown()` is plan §6's and is not interchangeable: cancelling first gives the
+   * agent the chance to answer `cancelled` and flush, and terminating first would SIGTERM it out of
+   * the turn it is in the middle of, which is the one ordering that loses work.
+   *
+   * **A close with nothing running is left to GTK.** The handler is only installed once the window has
+   * an agent behind it at all, so the common case — a window somebody opened, read and closed — does
+   * not go through an async path at all.
+   */
+  #watchCloseRequest(): void {
+    this.connect('close-request', () => {
+      if (this.#closing) return false;
+      if (!this.#agent.turnRunning && !this.#agent.agentRunning) return false;
+      this.#closing = true;
+      void (async () => {
+        await this.#agent.shutdown();
+        // The spawn-time closer, as a backstop for a process that existed while this window was closing
+        // and that no turn ever awaited. `shutdown()` has already ended the connection; `AcpClient.close`
+        // and `StdioChannel.terminate` are both idempotent, so a second call costs nothing.
+        this.#agentClose?.();
+        this.#closing = false;
+        this.close();
+      })();
+      return true;
+    });
   }
 
   /**
@@ -238,13 +398,44 @@ export class MainWindow extends Adw.ApplicationWindow {
     for (const [name, value] of [
       ['CONFIG', hooks.config],
       ['PERMISSION', hooks.permission],
-      ['THINKING', hooks.thinking],
     ] as const) {
       if (value === undefined || value === false) continue;
       console.log(`kurier: KU_APP_${name}=${String(value)} — read, not yet acted on`);
     }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
+    // `KU_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
+    // turn against whatever agent was selected — no staged fake stream — because a fake one would test
+    // the staging code instead of the window. The prompt defaults to a fixture sentence rather than to
+    // anything from the session file: a screenshot must not carry a real conversation out of it.
+    if (hooks.thinking !== undefined) {
+      const prompt = hooks.prompt ?? 'Summarise this repository in three sentences.';
+      const record = this.#openRecord;
+      if (!record) {
+        console.log('kurier: KU_APP_THINKING — no session is open, so there is nowhere to send it');
+      } else {
+        console.log(`kurier: KU_APP_THINKING — sending to ${record.id}`);
+        this.#composer.clearDraft();
+        void this.#agent.prompt(prompt);
+      }
+    }
   }
+}
+
+/**
+ * The composer's render inputs from a snapshot.
+ *
+ * **A function rather than an object literal at the call site**, because it is the *only* place that
+ * knows `AgentSnapshot` and `ComposerInput` are two views of one thing: `agentStatus` turns the
+ * attachment into the two fields the composer needs, and `composerView` turns those into a button. If
+ * the window assembled the input itself, the join between the two core modules would be a second
+ * implementation of it — and this file's header is about not having decisions here.
+ */
+function composerInput(snapshot: AgentSnapshot): ComposerInput {
+  return {
+    state: snapshot.state,
+    agent: agentStatus(snapshot.attachment),
+    sessionId: snapshot.sessionId,
+  };
 }
 
 /**

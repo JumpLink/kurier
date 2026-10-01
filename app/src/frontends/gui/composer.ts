@@ -23,28 +23,40 @@
  * **Nothing here is markup, and that is structural rather than a flag.** The Send button's label is
  * our own word. The entry is a `Gtk.TextView`, which has no markup rendering at all — there is no
  * `set_use_markup` anywhere near a typed message. The one label that *could* have taken somebody
- * else's words is `#reason`, and it passes `useMarkup: false` **in the constructor**, because Pango
+ * else's words is `#status`, and it passes `useMarkup: false` **in the constructor**, because Pango
  * parses on assignment: `css.ts` and `transcript-view.ts` both record that a later
  * `set_use_markup(false)` is too late.
  *
  * **The placeholder is a visible line, not `Gtk.TextView:placeholder-text`.** That property exists on
  * the GTK 4.22.5 this runs against (measured: `scripts/probes/composer-props.mjs`) and does **not**
  * exist in the `@girs/gtk-4.0` 4.6.0 typings this repo compiles against — so writing it would be a
- * type error here and a silently absent placeholder on any older GTK. `#reason` carries the same
- * sentence under the entry, which is better anyway: it is on screen in a screenshot taken with no
+ * type error here and a silently absent placeholder on any older GTK. `#status` carries the same
+ * sentences under the entry, which is better anyway: they are on screen in a screenshot taken with no
  * pointer anywhere near the button.
  *
  * **The button is one widget whose content is swapped, never two widgets shown and hidden.** Two
  * buttons in one spot means two tab stops, two tooltips and a `Gtk.Stack` to keep in step with the
  * turn state. `composerView` returns one action and `Adw.ButtonContent` is re-filled with that one's
  * icon and label.
+ *
+ * **Two lines under the entry, and only one of them is ever visible at a time.** `ComposerView.reason`
+ * explains a *disabled* control and is therefore empty exactly when the button works; `ComposerView.status`
+ * says what is happening when there is nothing to disable. One merged label rather than two stacked
+ * ones: with a dead agent and no session both have something to say, and two sentences under an entry
+ * read as two problems when there is one.
+ *
+ * **`clearDraft` is a method rather than a side effect of `setState`, for one reason.** Whether a
+ * draft survives a state change is a decision, and it lives in `core/composer-state.ts` as
+ * `keepsDraft`. A widget that quietly emptied the entry whenever the state changed would put that
+ * decision in the widget, where it could not be tested without a display — and the window would have to
+ * remember to ask instead of being unable to forget.
  */
 
 import Adw from '@girs/adw-1';
 import Gdk from '@girs/gdk-4.0';
 import Gtk from '@girs/gtk-4.0';
 
-import { composerView, type TurnState } from '../../core/composer-state.ts';
+import { composerView, type ComposerInput, type TurnState } from '../../core/composer-state.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
@@ -80,24 +92,22 @@ const ENTRY_MAX_HEIGHT = 180;
 
 export interface ComposerOptions {
   /**
-   * Called with the entry's text when Send is pressed.
+   * Called with the entry's text when Send is pressed. Only reachable while an agent is attached and a
+   * session is open, because `composerView` disables the button otherwise.
    *
-   * **Absent means "no agent", and the button is then disabled.** Plan §7 step 4 builds the composer
-   * *without an agent* and step 5 adds `openAgent` and `runTurn`, so in this slice there is genuinely
-   * nowhere for a message to go. A Send that accepted and dropped the text would be the
-   * control-that-points-at-nothing this window's own header forbids, so the honest state is the
-   * disabled button carrying its reason on screen.
+   * The window's implementation appends the prompt to the store and the transcript itself: the surface
+   * that will show it is the one that has to write it, and a controller that recorded it would mean the
+   * controller knew about a widget it does not own.
    */
   readonly onSend?: (text: string) => void;
-  /** Called when Stop is pressed. Never reachable in step 4, because no turn can start. */
+  /** Called when Stop is pressed. Reachable only while a turn runs, so it needs no guard. */
   readonly onStop?: () => void;
   /**
-   * Whether an agent is behind this window. **Not a guess and not a global:** the caller says, and
-   * step 4 says `false`. This is the one input `composerView` needs beyond the turn state, and it is a
-   * parameter so a test can ask "what does the composer look like with nothing attached" and get an
-   * answer rather than whatever the machine happens to be running.
+   * The render inputs, read once. See `core/composer-state.ts`: every one of them is somebody else's
+   * answer (the turn machine, the agent's life, which session is open), which is what makes the composer
+   * a renderer rather than a second opinion.
    */
-  readonly attached: boolean;
+  readonly input: ComposerInput;
 }
 
 export class Composer {
@@ -107,15 +117,14 @@ export class Composer {
   readonly #entry: Gtk.TextView;
   readonly #button: Gtk.Button;
   readonly #buttonContent: Adw.ButtonContent;
-  /** The reason line under the entry, so "why" is on screen and not only in a tooltip. */
-  readonly #reason: Gtk.Label;
+  /** The one line under the entry: the reason, or the status, never both. See the file header. */
+  readonly #status: Gtk.Label;
   readonly #onSend: ((text: string) => void) | undefined;
   readonly #onStop: (() => void) | undefined;
-  #state: TurnState = 'idle';
-  #attached: boolean;
+  #input: ComposerInput;
 
   constructor(options: ComposerOptions) {
-    this.#attached = options.attached;
+    this.#input = options.input;
     this.#onSend = options.onSend;
     this.#onStop = options.onStop;
 
@@ -160,14 +169,14 @@ export class Composer {
     });
     this.#button.connect('clicked', () => this.#activate());
 
-    this.#reason = new Gtk.Label({
+    this.#status = new Gtk.Label({
       // In the constructor, and the reason is in the file header: Pango parses on assignment, so a
       // later `set_use_markup(false)` is too late (measured, `css.ts`).
       useMarkup: false,
       xalign: 0,
       wrap: true,
       label: '',
-      cssClasses: [CSS.composerReason, CSS.dim, 'caption'],
+      cssClasses: [CSS.composerStatus, 'caption'],
     });
 
     const row = new Gtk.Box({
@@ -183,9 +192,9 @@ export class Composer {
 
     const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
     column.append(row);
-    column.append(this.#reason);
+    column.append(this.#status);
 
-    // `append`, not a `child:` constructor property: `Gtk.Box` has no such property (only
+    // `append`, not `child:` constructor property: `Gtk.Box` has no such property (only
     // `Gtk.ScrolledWindow` and `Adw.Clamp` do), and `window.ts`'s `buildSidebar` builds its box the
     // same way.
     const frame = new Gtk.Box({
@@ -209,16 +218,20 @@ export class Composer {
     this.#render();
   }
 
-  /** Set when the turn state changes. Renders through `composerView` and nothing else. */
-  setState(state: TurnState): void {
-    this.#state = state;
+  /** New render inputs. Renders through `composerView` and nothing else. */
+  setInput(input: ComposerInput): void {
+    this.#input = input;
     this.#render();
   }
 
-  /** Whether an agent is behind this window. Step 5 turns this on; see `ComposerOptions.attached`. */
-  setAttached(attached: boolean): void {
-    this.#attached = attached;
-    this.#render();
+  /** Empty the entry. The *caller* decides whether to — see `keepsDraft`. */
+  clearDraft(): void {
+    const buffer = this.#entry.get_buffer();
+    if (!buffer) return;
+    // The explicit length, not the one-argument form: `Gtk.TextBuffer.set_text` has wanted both since
+    // GTK 3 and only the two-argument one is in the `@girs` typings this repo compiles against. An
+    // empty string with length 0 is "replace the whole buffer with nothing", which is what is meant.
+    buffer.set_text('', 0);
   }
 
   /** The entry's text, trimmed. Trimmed here so "did I type anything" has exactly one answer. */
@@ -239,7 +252,7 @@ export class Composer {
    * that acts on a stale view is the control-this-window-forbids.
    */
   #activate(): void {
-    const view = composerView(this.#state, this.#attached);
+    const view = composerView(this.#input);
     if (!view.buttonEnabled) return;
     if (view.action === 'stop') {
       this.#onStop?.();
@@ -278,7 +291,7 @@ export class Composer {
    * the shape of the bug.
    */
   #render(): void {
-    const view = composerView(this.#state, this.#attached);
+    const view = composerView(this.#input);
     const isStop = view.action === 'stop';
 
     this.#buttonContent.iconName = isStop ? STOP_ICON : SEND_ICON;
@@ -315,9 +328,11 @@ export class Composer {
     this.#entry.tooltipText = view.reason;
 
     // **On screen, not only on hover.** A reason nobody can see is a reason the surface has not given.
-    this.#reason.label = view.buttonEnabled ? '' : view.reason;
+    // The reason wins over the status: they never both have anything to say (`composerView` returns a
+    // reason only where the button is off), and a disabled control is the more urgent of the two.
+    this.#status.label = view.reason || view.status;
     // With nothing to explain, the line takes no height: an empty caption under the composer is a gap
     // that reads as a layout bug.
-    this.#reason.visible = this.#reason.label !== '';
+    this.#status.visible = this.#status.label !== '';
   }
 }

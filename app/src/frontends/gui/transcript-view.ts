@@ -39,11 +39,13 @@
  */
 
 import Adw from '@girs/adw-1';
+import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 import Pango from '@girs/pango-1.0';
 
 import type { TranscriptEntry } from '@kurier/session';
 
+import { followLanded, followTarget, isAtBottom, shouldRetryFollow } from '../../core/scroll.ts';
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
@@ -67,8 +69,90 @@ export class TranscriptView {
 
   readonly #scroller: Gtk.ScrolledWindow;
   readonly #column: Gtk.Box;
-  /** Rows currently in the column, so a refill can tell a rebuild from a change. */
+  /** Rows currently in the column, in order, so the last one can be replaced in place. */
   #rows: Gtk.Widget[] = [];
+  /**
+   * The entries behind those rows, and the items they projected to.
+   *
+   * **Why this file keeps the transcript instead of only the rows.** An arriving chunk is *not* a new
+   * bubble: `toTranscriptItems` merges a run of adjacent chunks of one kind into one message (its file
+   * header, decision 1), so the second chunk of an answer changes the last item instead of adding one.
+   * A view that only held widgets could not tell those two cases apart and would draw every chunk as its
+   * own bubble. Keeping the entries makes the two paths computable — and it is the same array
+   * `setEntries` was given, so there is one source of truth rather than a widget list that has to be
+   * diffed against a record it no longer holds.
+   */
+  #entries: readonly TranscriptEntry[] = [];
+  #items: readonly TranscriptItem[] = [];
+  /**
+   * The queued follow-the-end idle, or `null`. One at a time — see `#scrollToEnd`.
+   *
+   * `GLib.Source` ids are positive integers and `0` is `GLib.SOURCE_REMOVE`, so `0` is deliberately
+   * not the "nothing pending" marker: it is a return value, never a handle.
+   */
+  #scrollSource: number | null = null;
+  /**
+   * True while a scroll-to-end is still owed because the adjustment could not be read yet.
+   *
+   * **This is the flag that fixes the defect, and it exists because the previous version's comment
+   * promised a retry that nothing performed.** `setEntries` runs from the window's constructor —
+   * `#applyDevHooks` opens `KU_APP_SESSION`, and a click can land before the first frame — so the
+   * scrolled window is not allocated yet, `upper` and `page_size` are both `0`, and the one idle that
+   * used to do the scrolling read them, found no end, and gave up silently.
+   *
+   * Measured on GTK 4.22.5 (`scripts/probes/scroll-settle.mjs`): armed before `present()`, `upper`
+   * stays `0` across three consecutive `PRIORITY_LOW` idles; the identical call after `present()`
+   * reads the real numbers on its **first** idle and lands exactly on the end, with `upper` not moving
+   * afterwards. So the layout is never "one frame behind" — the reading was simply taken before the
+   * window existed and then thrown away, and what is needed is a retry keyed to the window's own
+   * first layout. `scripts/probes/widget-signals.mjs` is what found the signal that carries it.
+   */
+  #followPending = false;
+  /** Retries spent on the current follow, bounded by `shouldRetryFollow`. */
+  #followAttempts = 0;
+  /**
+   * Whether the reader is currently following the newest end.
+   *
+   * **The one place the plan's §6 rule is remembered across events**, and it exists because
+   * position alone cannot answer "is this person reading?". A window narrowed mid-turn re-wraps every
+   * bubble into a taller column; a view that was at the end is now short of it, and re-deriving
+   * "were they at the bottom?" from the new numbers would read as *no* — so the stream would stop
+   * following, having invented a reader who never scrolled. Tracking the intent from the reader's own
+   * scroll events keeps the two cases apart: a deliberate scroll up clears it, a resize does not.
+   */
+  #following = true;
+  /**
+   * True only while this class is calling `set_value` itself.
+   *
+   * **`set_value` is a scroll, and `value-changed` cannot tell whose it is.** The handler below
+   * re-derives `#following` from `isAtBottom`, which is right for a person and wrong for us: our own
+   * scroll is issued against the `upper` of the moment, and if the layout re-wraps before it lands —
+   * which it does at a narrow width, because a bubble becomes several lines taller — the position we
+   * asked for is no longer the end, so `isAtBottom` says no and the follow is switched off **by the
+   * very act of trying to follow**. After that nothing re-arms it, because every later `changed`
+   * finds `#following` false.
+   *
+   * The symptom is the one this file was written to kill and it is width-dependent, which is what
+   * made it survive: `isAtBottom` has a 24 px tolerance (`core/scroll.ts`), so at 1024 px the
+   * shortfall of a short bubble stays inside the band and the stream keeps following, while at
+   * 360 px the same shortfall is a full line and the view stops one bubble short and stays there.
+   * Measured at 360×720 mid-stream, with zero warnings: the newest bubble cut off at the composer's
+   * edge while the status line read "Working — the agent is answering".
+   *
+   * So the flag is set around our own write and the re-derivation is skipped for it. `#following` is
+   * then changed only by a scroll this class did not cause, which is the sentence its own comment
+   * above already claims.
+   */
+  #selfScrolling = false;
+  /**
+   * The last scroll position this class saw, so a `changed` can be read as *what* changed.
+   *
+   * `GtkAdjustment::changed` does not say which property moved, and the two cases must be answered
+   * oppositely: the layout re-measuring means a follow is owed, a person scrolling means it is not.
+   * Comparing against this is the whole discriminator — see the `changed` connection in the
+   * constructor.
+   */
+  #lastValue = 0;
 
   constructor() {
     this.#column = new Gtk.Box({
@@ -97,6 +181,61 @@ export class TranscriptView {
     });
 
     this.widget = this.#scroller;
+
+    // **Follow the layout instead of guessing when it settles.** This is the whole fix for the
+    // "newest bubble cut off at the composer's edge" defect, and `GtkAdjustment::changed` is the
+    // signal that carries the news.
+    //
+    // Two other signals were tried and measured first, and both are wrong —
+    // `scripts/probes/widget-signals.mjs` is the record:
+    //
+    // - `GtkScrolledWindow::size-allocate` **throws in this binding**: `GObject.signal_lookup` finds no
+    //   such signal, and `connect()` raises
+    //   `No signal 'size-allocate' on object 'GtkScrolledWindow'`. It exists in C
+    //   (`gtk_widget_signals[SIZE_ALLOCATE]`) but is not introspectable, so a constructor that connects
+    //   to it dies before there is a window to report it on.
+    // - `notify::page_size` **never fires.** The probe counts 0 on present and 0 on a resize, where
+    //   `page_size` demonstrably falls from 561 to 261. A follow built on it silently never re-arms,
+    //   which is this defect in its purest form: with the window made shorter, the adjustment reported
+    //   `end = 479` against `value = 299` — 180 px short — and nothing in this file was even told.
+    //   `notify::upper` does fire, but only for `upper`, and a window made *shorter* does not move it.
+    //
+    // `changed` is the documented "any property changed" signal, and the probe counts it firing on
+    // both events (1 -> 2 across that resize).
+    //
+    // **A `changed` handler that re-armed unconditionally would yank a reader who scrolled up**, since
+    // scrolling moves the value and that is a `changed` too. So the value is compared against the last
+    // one this class saw: a change in `value` is a person reading and is left strictly alone, and a
+    // `changed` with the value unmoved is the layout re-measuring itself. That is the whole
+    // distinction, and it is what keeps the plan's section 6 rule intact — the follow only ever fires
+    // for `#following`, and `#following` is only cleared by a real scroll.
+    this.#scroller.get_vadjustment()?.connect('changed', () => {
+      const value = this.#scroller.get_vadjustment()?.get_value() ?? 0;
+      if (value !== this.#lastValue) {
+        this.#lastValue = value;
+        return; // The reader moved; `value-changed` below records that they are no longer following.
+      }
+      if (this.#following) {
+        this.#followPending = true;
+        this.#followAttempts = 0;
+      }
+      this.#tryFollow();
+    });
+
+    // The reader's own scrolling, recorded as it happens. `#atBottom` is still sampled before every
+    // append — this is not the only place the answer comes from, it is the place that knows about a
+    // scroll with **no** append behind it, which is exactly what a person reading does. Without it a
+    // reader who scrolled up and then a resize that made the content taller would look like one
+    // continuous "following" state, and the next chunk would yank them back down.
+    this.#scroller.get_vadjustment()?.connect('value-changed', () => {
+      const value = this.#scroller.get_vadjustment()?.get_value() ?? 0;
+      this.#lastValue = value;
+      // Our own scroll lands here too, and re-deriving from it is how a follow switched itself off.
+      // See `#selfScrolling` for the measurement; the short version is that we only scroll while
+      // following, so a scroll we caused can only ever mean "still following".
+      if (this.#selfScrolling) return;
+      this.#following = this.#atBottom();
+    });
   }
 
   /**
@@ -114,16 +253,100 @@ export class TranscriptView {
    * `window.ts` now puts a sentence in that case; this file stays out of it, because the empty state
    * and the empty *transcript* are two different questions and only the window knows which pane is
    * showing.
+   *
+   * **This one scrolls to the end; `appendEntries` does not.** Opening a session is a request to see it,
+   * and the newest entry is what the person asked for. A chunk arriving into a conversation already
+   * open is not a request at all — see `appendEntries`.
    */
   setEntries(entries: readonly TranscriptEntry[]): void {
+    this.#entries = entries;
     for (const row of this.#rows) this.#column.remove(row);
     this.#rows = [];
-    for (const item of toTranscriptItems(entries)) {
-      const row = buildItem(item);
-      this.#rows.push(row);
-      this.#column.append(row);
-    }
+    this.#items = toTranscriptItems(entries);
+    for (const item of this.#items) this.#appendRow(item);
+    // Opening a session *is* a request to see its newest entry, so it re-arms the follow the resize
+    // path reads. Without this, opening a session at a narrow width while `#following` was false from
+    // a previous session's scroll would leave the newest bubble below the fold on purpose.
+    this.#following = true;
     this.#scrollToEnd();
+  }
+
+  /**
+   * Add entries that just arrived, and do not steal the view.
+   *
+   * **Two cases, and the difference is not cosmetic.** An arriving chunk usually *extends* the last
+   * bubble (that is what `toTranscriptItems`' merging means), so this rebuilds the last row in place;
+   * a `plan` update or a tool call adds rows, and those are appended. Either way the row for a
+   * *finished* message is never touched, so an open disclosure does not collapse under the reader.
+   *
+   * **Whether to follow is decided before anything is appended**, because the question is "where was
+   * the view a moment ago" and after the append it is unanswerable — the newest row has already moved
+   * the end. `isAtBottom` is in `core/scroll.ts` precisely because that rule (plan §6: auto-scroll only
+   * when already at the bottom) has to be testable without a display.
+   */
+  appendEntries(entries: readonly TranscriptEntry[]): void {
+    if (entries.length === 0) return;
+    const follow = this.#atBottom();
+    // Sampled into the field the resize path reads, so a reader who was following keeps following
+    // across a re-wrap and a reader who scrolled up stays where they are. See `#following`.
+    this.#following = follow;
+    this.#entries = [...this.#entries, ...entries];
+    const items = toTranscriptItems(this.#entries);
+    const previous = this.#items.length;
+    this.#items = items;
+    if (items.length === previous) {
+      // The chunk merged into the run that was already there — one message, one bubble, more text.
+      this.#replaceLastRow();
+      if (follow) this.#scrollToEnd();
+      return;
+    }
+    // More items than before, which is the only other thing that can happen to an append-only list: the
+    // projection merges runs, it never splits them or reorders them.
+    for (const item of items.slice(previous)) this.#appendRow(item);
+    if (follow) this.#scrollToEnd();
+  }
+
+  /** Add one item as a new row at the end of the column. */
+  #appendRow(item: TranscriptItem): void {
+    const row = buildItem(item);
+    this.#rows.push(row);
+    this.#column.append(row);
+  }
+
+  /**
+   * Rebuild the last row from the current items.
+   *
+   * **`insert_child_after` rather than remove-and-append**, because the row has to land back at the
+   * *same index*: appending would move that line to the bottom of the conversation every time a chunk
+   * arrived, so a turn whose last thing was a tool call would shuffle it downwards with each chunk of the
+   * answer above it. `insert_child_after(row, sibling)` with the row before it puts the replacement
+   * exactly where the old one was, and `null` puts it first — which is what an only-row column needs.
+   *
+   * GTK 4 removed `gtk_box_reorder_child`, so there is no "move" call to reach for here; the insertion
+   * point is the whole mechanism.
+   */
+  #replaceLastRow(): void {
+    const index = this.#rows.length - 1;
+    const previous = this.#rows[index];
+    const item = this.#items[index];
+    if (!previous || !item) return;
+    const row = buildItem(item);
+    const sibling = this.#rows[index - 1] ?? null;
+    this.#column.insert_child_after(row, sibling);
+    this.#column.remove(previous);
+    this.#rows[index] = row;
+  }
+
+  /**
+   * Where the view is now, in the three numbers `isAtBottom` reads.
+   *
+   * `true` for a missing adjustment: an unallocated scrolled window cannot have been scrolled away
+   * from anything, so "following" is the honest answer and the same one `isAtBottom(0, 0, 0)` gives.
+   */
+  #atBottom(): boolean {
+    const adjustment = this.#scroller.get_vadjustment();
+    if (!adjustment) return true;
+    return isAtBottom(adjustment.get_value(), adjustment.get_upper(), adjustment.get_page_size());
   }
 
   /**
@@ -135,6 +358,25 @@ export class TranscriptView {
    * the one case that matters — the first fill. `PRIORITY_LOW` runs after the frame that does the
    * measuring, so the numbers are real by the time this reads them.
    *
+   * **This was measured, not assumed, and the inline version was the bug.** The first cut of this
+   * method set the value inline, against a comment that already described the idle — and a
+   * mid-stream screenshot showed the newest bubble sitting *below* the fold, half the prompt bubble
+   * cut off at the composer's edge while the status line read "Working — the agent is answering".
+   * The reason is that a row appended during a turn is not in `upper` yet: the column's natural
+   * height grows at the next allocation, so inline arithmetic targets the *previous* end and lands
+   * one bubble short. The idle is what makes `upper` include the bubble that just arrived.
+   *
+   * **One pending idle, not one per call.** A fast stream calls this once per chunk, and a burst of
+   * ten would queue ten idle callbacks each re-reading the same adjustment; the second one already
+   * has nothing to do. A single pending source is cancelled and replaced, so the callback always
+   * reads the numbers as of the *latest* append rather than of a queued one.
+   *
+   * **And when the adjustment still cannot be read, the follow stays *owed* rather than being
+   * dropped.** That is `#followPending`, and it is the part the old comment got wrong: the layout
+   * does not settle on its own schedule that one idle happened to catch, and nothing was retrying.
+   * The scroll is therefore attempted immediately, on the next idle, and on every later allocation
+   * until it lands — bounded by `shouldRetryFollow` so a layout that never measures cannot spin.
+   *
    * Scrolling on every fill is right for a *fill* and wrong for a stream, and the difference is
    * where this method sits: `setEntries` replaces the whole transcript, so the newest entry is what
    * the person asked to see. A chunk arriving into an open conversation must not yank the view while
@@ -142,11 +384,69 @@ export class TranscriptView {
    * whether the view is already at the bottom first.
    */
   #scrollToEnd(): void {
+    this.#followPending = true;
+    this.#followAttempts = 0;
+    if (this.#scrollSource !== null) GLib.source_remove(this.#scrollSource);
+    // Inline first: for a turn's chunk the window has been allocated for seconds, so this lands on the
+    // first try and the idle below has nothing left to do. The constructor-time fill takes the idle
+    // and the `size-allocate` path instead, because at that moment neither can succeed.
+    this.#tryFollow();
+    if (this.#followPending) {
+      this.#scrollSource = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+        this.#scrollSource = null;
+        this.#tryFollow();
+        return GLib.SOURCE_REMOVE;
+      });
+    }
+  }
+
+  /**
+   * Put the view on the end, if the adjustment will say where it is.
+   *
+   * **`null` from `followTarget` is not a failure, it is "not measurable yet"** — and it is the only
+   * thing that keeps `#followPending` set. Retrying on the next allocation rather than giving up is
+   * what makes a fill issued from the constructor reach the end once the window exists; see the
+   * field's own comment for the measurement.
+   */
+  #tryFollow(): void {
+    if (!this.#followPending) return;
     const adjustment = this.#scroller.get_vadjustment();
-    if (!adjustment) return;
-    const end = adjustment.get_upper() - adjustment.get_page_size();
-    if (end <= 0) return; // Not measured yet; the first frame's allocation retries this.
-    adjustment.set_value(end);
+    const end = adjustment ? followTarget(adjustment.get_upper(), adjustment.get_page_size()) : null;
+    if (adjustment === null || end === null) {
+      this.#followAttempts += 1;
+      if (shouldRetryFollow(this.#followAttempts)) return; // Still owed; a later notification retries.
+      // Bounded out on a layout that never measures. Giving up loudly is better than scrolling to a
+      // guessed position, and the next append re-arms the whole attempt.
+      this.#followPending = false;
+      return;
+    }
+    this.#selfScrolling = true;
+    try {
+      adjustment.set_value(end);
+    } finally {
+      this.#selfScrolling = false;
+    }
+    // **Verify, then re-arm — do not trust the request.** `set_value` clamps silently, and a re-wrap
+    // moves `upper` and `page_size` in separate notifications, so this call may have asked past the
+    // real maximum and been given it instead. Reading the value back is the only way to know whether
+    // the newest entry is actually on screen; measured as a partially visible last line at 480 px.
+    if (followLanded(end, adjustment.get_value(), adjustment.get_upper(), adjustment.get_page_size())) {
+      this.#followPending = false;
+      return;
+    }
+    this.#followAttempts += 1;
+    if (!shouldRetryFollow(this.#followAttempts)) {
+      this.#followPending = false;
+      return;
+    }
+    // Landed short, so ask again. On an idle rather than inline: the remaining `page_size` change is
+    // still to come, and re-reading it in the same frame would read the same stale numbers.
+    if (this.#scrollSource !== null) GLib.source_remove(this.#scrollSource);
+    this.#scrollSource = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+      this.#scrollSource = null;
+      this.#tryFollow();
+      return GLib.SOURCE_REMOVE;
+    });
   }
 }
 

@@ -26,6 +26,7 @@ import { runAdwaitaApp } from '@gjsify/adwaita-app';
 
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 
+import { chooseAgent } from '../../core/agents/dev-agent.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
@@ -42,6 +43,18 @@ void Gtk;
  * exist at all, and why a state that only a click can reach is a state nobody has checked.
  */
 const hooks = readHooks();
+
+/**
+ * Which agent this window will start on its first prompt.
+ *
+ * **Resolved once, here, and handed to the window as an `AgentCommand`.** The alternative — the window
+ * reading `KU_APP_AGENT` itself — would put an environment lookup and a fallback rule in a widget file,
+ * and `hooks.ts` exists precisely so that every environment read happens once at startup and can be
+ * reasoned about as a whole. An unknown id prints its line here, where a person watching the terminal
+ * will see it, and falls back rather than refusing to start.
+ */
+const agent = chooseAgent(hooks.agent);
+if (agent.note) console.log(`kurier: ${agent.note}`);
 
 const status = await runAdwaitaApp({
   applicationId: APP_ID,
@@ -63,7 +76,16 @@ const status = await runAdwaitaApp({
   createWindow: (app) =>
     new MainWindow(app, {
       hooks,
+      agent: agent.command,
       loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
+      // **One store for the window's lifetime, not one per call.** The window reads the file once at
+      // startup and appends a batch per streamed chunk; a fresh store per append would re-read and
+      // re-parse a file that may hold thirty conversations, for every token an agent emits. The store is
+      // a synchronous JSON file with no cache of its own, so this is the only place that can be improved,
+      // and "improve it" is a change to `@kurier/session` rather than a decision for a surface.
+      appendTurns: (sessionId, entries) => {
+        createSessionStore(sessionsFile()).append(sessionId, entries);
+      },
     }),
 });
 

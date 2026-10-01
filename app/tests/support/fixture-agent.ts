@@ -176,6 +176,17 @@ export interface FixtureAgentOptions {
   pushConfigOptionUpdate?: boolean;
   /** Never answer `initialize` — for the initialize timeout. */
   hangOnInitialize?: boolean;
+  /**
+   * Hold the turn open after its chunks, until `session/cancel` arrives or `releaseTurn()` is called.
+   *
+   * **Why a fixture needs this, when the fixture's turn is otherwise a burst of microtasks.** Without it
+   * the turn is over before a caller can observe anything about it, so "Stop cancels the turn" can only
+   * be asserted by reading a flag *after* the fact — and the flag says nothing about whether the state
+   * machine left `thinking` when the turn answered or when the button was pressed. A real agent works
+   * for seconds and answers `cancelled` when told to stop; holding the turn is what makes that shape
+   * reproducible in a unit test.
+   */
+  holdTurn?: boolean;
   /** Ask for a file the client refused to answer, mid-turn. */
   requestFileSystem?: 'read' | 'write';
   /** Send a method the client has never heard of, right after the handshake. */
@@ -211,6 +222,8 @@ export class FixtureAgent {
   #authenticated: boolean;
   #turnRunning = false;
   #cancelRequested = false;
+  /** Releases a held turn. See `FixtureAgentOptions.holdTurn`. */
+  #releaseTurn: (() => void) | null = null;
   #nextRequestId = 10_000;
   #pendingPermissions = new Map<RequestId, (outcome: PermissionOutcome) => void>();
   #sessions = new Map<string, { cwd: string; mcpServers: McpServer[] }>();
@@ -382,6 +395,10 @@ export class FixtureAgent {
 
       case CLIENT_NOTIFICATIONS.cancel:
         this.#cancelRequested = true;
+        // A held turn is released by the cancel, which is the whole point of holding it: the client sees
+        // the notification arrive, the turn then answers `cancelled` on its own, and a caller that left
+        // `thinking` early is caught.
+        this.#releaseTurn?.();
         return;
 
       default:
@@ -405,6 +422,14 @@ export class FixtureAgent {
       for (const chunk of this.#options.chunks ?? ['answer']) {
         if (this.#cancelRequested) break;
         this.#update({ sessionId, update: this.#agentChunk(chunk) });
+      }
+      if (this.#options.holdTurn) {
+        // Park here until a cancel arrives or a test releases it. Nothing before this point awaits, so a
+        // test that calls `stop()` between `prompt()` and `flush()` lands inside the hold.
+        await new Promise<void>((resolve) => {
+          this.#releaseTurn = resolve;
+        });
+        this.#releaseTurn = null;
       }
       if (this.#cancelRequested) {
         this.#reply(id, { stopReason: 'cancelled' });
@@ -692,5 +717,13 @@ export class FixtureAgent {
   /** True while a prompt turn is in flight. Lets a test cancel precisely. */
   get turnRunning(): boolean {
     return this.#turnRunning;
+  }
+
+  /**
+   * Let a held turn finish on its own. Only meaningful with `holdTurn`; the alternative to a cancel,
+   * so a test can tell "ended because stopped" from "ended because it was done".
+   */
+  releaseTurn(): void {
+    this.#releaseTurn?.();
   }
 }
