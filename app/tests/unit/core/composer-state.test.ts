@@ -83,7 +83,9 @@ export default async () => {
       });
 
       await it('outranks a failed agent for the same reason', async () => {
-        const view = composerView(from('thinking', { status: 'failed', message: 'no such program' }, null));
+        const view = composerView(
+          from('thinking', { status: 'failed', kind: 'start', message: 'no such program' }, null),
+        );
         expect(view.action).toBe('stop');
         expect(view.buttonEnabled).toBe(true);
       });
@@ -136,7 +138,7 @@ export default async () => {
       await it('shows the auth remedy verbatim — it is the only useful thing on screen', async () => {
         const message =
           'attaching to the session failed: the agent wants a human to log in first. Run `kurier auth`, then try again.';
-        const view = composerView(from('idle', { status: 'failed', message }));
+        const view = composerView(from('idle', { status: 'failed', kind: 'auth', message }));
         expect(view.buttonEnabled).toBe(false);
         expect(view.reason).toBe(message);
       });
@@ -184,7 +186,7 @@ export default async () => {
         { status: 'attaching' },
         ATTACHED,
         { status: 'gone', reason: 'exited with code 1' },
-        { status: 'failed', message: 'run `kurier auth`' },
+        { status: 'failed', kind: 'auth', message: 'run `kurier auth`' },
       ];
 
       await it('a sensitive button never carries a reason, and a disabled one always does', async () => {

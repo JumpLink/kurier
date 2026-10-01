@@ -5,6 +5,7 @@ import type { TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../../src/core/agent-session.ts';
 import type { ConfigRowView } from '../../../src/core/config-row.ts';
+import { failureNotice } from '../../../src/core/failure.ts';
 import type { PermissionQuestion } from '../../../src/core/permission.ts';
 import { OPENCODE_COMMAND } from '../../../src/core/agents/opencode.ts';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
@@ -676,7 +677,47 @@ export default async () => {
         // `withAuthHint`'s sentence, which names `kurier auth` — the remedy a window has no terminal
         // for (plan §6, trap 1).
         expect(attachment.message).toContain('kurier auth');
+        // **And the kind, which is what lets a surface tell this from a bad command.** The message
+        // alone cannot: both reach the composer as one caption, and only one of them has a command to
+        // run elsewhere. `core/failure.ts` decides the rest from this.
+        expect(attachment.kind).toBe('auth');
       }
+    });
+
+    await it('a bad command is a failure to start, and gets no kind that has a dialog', async () => {
+      // The other half of the split: if ENOENT also came out as `auth`, every missing binary would
+      // put a modal naming `kurier auth` on screen, which is a remedy for a problem the person does
+      // not have.
+      const h = harness({ failWith: new Error('spawn opencode ENOENT') });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status).toBe('failed');
+      if (attachment.status === 'failed') expect(attachment.kind).toBe('start');
+    });
+
+    await it('an agent that can neither load nor resume is a refusal, not a start failure', async () => {
+      // Trap 2 through the real path. The fixture advertises `loadSession: false` *and* no `resume`
+      // capability, so `AcpClient.reattach` rejects with `UnsupportedCapabilityError` — and plan §6
+      // asks for that to be shown as a refusal rather than as an empty transcript.
+      const h = harness({ capabilities: { loadSession: false, sessionCapabilities: {} } });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status).toBe('failed');
+      if (attachment.status === 'failed') {
+        expect(attachment.kind).toBe('unsupported');
+        expect(failureNotice(attachment.kind)).not.toBe(null);
+        expect(failureNotice(attachment.kind)?.command).toBe(null);
+      }
+    });
+
+    await it('records no transcript line for a refusal — no turn ran, so nothing happened to record', async () => {
+      // The transcript is a record of what happened (`AGENTS.md` § Privacy). A failure to start is not
+      // an event in the conversation, and a line here would be the fabricated-history rule again.
+      const h = harness({ capabilities: { loadSession: false, sessionCapabilities: {} } });
+      await h.session.prompt('hello');
+      expect(h.entries.map((entry) => entry.text)).not.toContain(
+        'this agent can neither load nor resume a session, so an existing one cannot be reattached',
+      );
     });
 
     await it("keeps the person's own prompt, which was recorded before the failure", async () => {

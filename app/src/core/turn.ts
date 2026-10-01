@@ -30,9 +30,10 @@ import type { RequestPermissionRequest, SessionId, StopReason } from '@kurier/ac
 import type { TranscriptEntry } from '@kurier/session';
 
 import type { TurnState } from './composer-state.ts';
+import type { FailureKind } from './failure.ts';
 import type { PermissionDecision } from './permission.ts';
 
-export type { TurnState };
+export type { FailureKind, TurnState };
 
 /**
  * Who cancelled, as far as **this** controller can tell.
@@ -144,7 +145,16 @@ export type AgentAttachment =
   | { readonly status: 'attaching' }
   | { readonly status: 'attached'; readonly name: string }
   | { readonly status: 'gone'; readonly reason: string }
-  | { readonly status: 'failed'; readonly message: string };
+  /**
+   * The agent never came up.
+   *
+   * **`kind` is the whole reason this is not just a `message`.** Three failures land here and two of
+   * them need something a person must do somewhere else — an auth trap (`kurier auth`, trap 1) and a
+   * reattach refusal (trap 2, which leaves the window empty) — so the surface has to be able to tell
+   * them from "the binary is not on PATH". Classified by `failureKind` in `core/failure.ts`, which is
+   * where the three ways of reading it are argued; nothing here decides what a dialog says.
+   */
+  | { readonly status: 'failed'; readonly kind: FailureKind; readonly message: string };
 
 /** What the composer needs: whether a prompt has somewhere to go, and what may be said about it. */
 export interface AgentStatus {

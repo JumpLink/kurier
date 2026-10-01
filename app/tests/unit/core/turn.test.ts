@@ -159,7 +159,7 @@ export default async () => {
       { attachment: { status: 'gone', reason: 'exited with code 1' }, attached: false, mentions: 'code 1' },
       { attachment: { status: 'gone', reason: '' }, attached: false, mentions: 'exited' },
       {
-        attachment: { status: 'failed', message: 'run `kurier auth`, then try again' },
+        attachment: { status: 'failed', kind: 'auth', message: 'run `kurier auth`, then try again' },
         attached: false,
         mentions: 'kurier auth',
       },
@@ -196,13 +196,13 @@ export default async () => {
     await it('carries the auth hint through verbatim — it is the remedy', async () => {
       const message =
         'attaching to the session failed: the agent wants a human to log in first. Run `kurier auth`, then try again.';
-      expect(agentStatus({ status: 'failed', message }).note).toBe(message);
+      expect(agentStatus({ status: 'failed', kind: 'auth', message }).note).toBe(message);
     });
 
     await it('names the agent only while it is attached', async () => {
       expect(agentName({ status: 'attached', name: 'OpenCode 2.0.19' })).toBe('OpenCode 2.0.19');
       expect(agentName({ status: 'gone', reason: 'x' })).toBe(null);
-      expect(agentName({ status: 'failed', message: 'x' })).toBe(null);
+      expect(agentName({ status: 'failed', kind: 'start', message: 'x' })).toBe(null);
       expect(agentName({ status: 'none' })).toBe(null);
     });
   });

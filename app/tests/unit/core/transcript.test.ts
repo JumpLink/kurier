@@ -148,6 +148,22 @@ export default async () => {
       expect(entries[0]?.kind).toBe('system');
       expect(entries[0]?.text).toBe('usage: in 120, out 45');
     });
+
+    await it('rounds the cost through core/usage, so a float never reaches a transcript line', async () => {
+      // The wiring this pins is `toTranscript` calling the shared formatter rather than building its own
+      // clause: the value is the one opencode reports, and the old inline `${cost.amount}` printed all
+      // seventeen digits of the double into a person's history.
+      const entries = toTranscript(
+        notification({
+          sessionUpdate: 'usage_update',
+          inputTokens: 120,
+          outputTokens: 45,
+          cost: { amount: 0.0014555100000000001, currency: 'USD' },
+        }),
+        AT,
+      );
+      expect(entries[0]?.text).toBe('usage: in 120, out 45, 0.0015 USD');
+    });
   });
 
   await describe('toTranscript — session_info_update (title)', async () => {

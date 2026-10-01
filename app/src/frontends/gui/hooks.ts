@@ -3,11 +3,14 @@
  * verifiable at all.
  *
  * This is not a debug leftover and the reason is measured. gjsify's devtools plane over `gdbus`
- * cannot type into an entry (`SendKey` takes accelerators, not text) and **cannot operate a combo
- * row**: `ActivateWidget` on an `Adw.ComboRow`'s internal list row reports `true` and changes no
- * selection. So a config dropdown, a permission dialog answered by clicking, and a stopped turn are
- * three states that a screenshot of the running app cannot reach from the outside. Without a hook
- * they are the parts of this surface that are written and never checked.
+ * cannot type into an entry (`SendKey` takes accelerators, not text), **cannot operate a combo
+ * row** (`ActivateWidget` on an `Adw.ComboRow`'s internal list row reports `true` and changes no
+ * selection), and **cannot dismiss an `Adw.AlertDialog`** (its response buttons report `true` and
+ * emit no `response` — measured on the permission dialog too). A pointer is no substitute: under
+ * Wayland `XTestFakeMotionEvent` does not move the pointer, and under `GDK_BACKEND=x11` a dialog is
+ * mapped but never painted. So a config dropdown, a permission answer, a stopped turn, a dismissed
+ * failure dialog and a session row are five things a screenshot of the running app cannot reach from
+ * the outside. Without a hook they are the parts of this surface that are written and never checked.
  *
  * Read from the environment at startup and passed down, rather than read at the point of use: a hook
  * that is read late can be flipped between two states inside one run, and a test that says
@@ -17,6 +20,7 @@
 import { readAppDevHooks, type AppDevHooks } from '@gjsify/adwaita-app';
 
 import { DEV_HOOK_PREFIX } from './constants.ts';
+import { hookFlag, hookList, hookValue } from './hook-value.ts';
 
 /** What the hooks framework gives us: `view`, `file`, `debug`. */
 export type FrameworkHooks = AppDevHooks;
@@ -80,6 +84,40 @@ export interface KurierHooks extends FrameworkHooks {
   config?: string;
 
   /**
+   * `KU_APP_STOP` — press Stop once the turn is running, at the point `KU_APP_THINKING` runs.
+   *
+   * **Stop is otherwise photographable only by driving the button through `ActivateWidget`, and that is
+   * not the same thing.** A stopped turn is one of the five states plan §6 names and the one no env var
+   * reaches; every screenshot of it so far was taken by activating a widget at its
+   * `toplevel:0/child:7/…` path, which rots the moment the composer is rebuilt — and it is rebuilt on
+   * every state change. A named hook is a path that does not rot.
+   *
+   * **It goes through the composer's `onStop`, not straight to `agent.stop()`.** The button's handler
+   * dismisses the permission dialog with `turn-cancelled` *before* cancelling, and that ordering is the
+   * behaviour a screenshot of Stop-with-a-dialog-open has to show: the dialog gone, the turn cancelled,
+   * in that order. Calling the controller directly would photograph the controller instead of the
+   * surface, which is the rule every other hook in this file follows.
+   */
+  stop?: boolean;
+
+  /**
+   * `KU_APP_STOP_ESCAPE` — dismiss the open permission dialog **the way Escape does**, and stop
+   * nothing else.
+   *
+   * **Escape's answer is `cancelled` on the wire and `not-answered: dismissed` in the transcript**, and
+   * the two are not the same string, so the hook uses the reason and not the outcome: the dialog
+   * reports a dismissal as the id `'close'`, `decideFromView` reads it as `dismissed`, and `answerFor`
+   * is what turns *that* into `cancelled` on the wire. A hook that passed `cancelled` would be claiming
+   * an outcome `dismissPermission` does not take, and one that skipped the transcript would lose the
+   * line guardrail 2 is about.
+   *
+   * **The half that needs this most.** `SendKey` takes accelerators and answers `false` for Escape
+   * (measured), so the fail-closed-on-dismissal path cannot be reached from outside the process at all,
+   * and its only screenshot in this project's history was taken by hand.
+   */
+  stopEscape?: boolean;
+
+  /**
    * `KU_APP_THINKING` — send a prompt at startup, so a running turn can be reached without a pointer.
    *
    * The turn that follows is a **real** turn against whatever `KU_APP_AGENT` selected: this hook starts
@@ -94,12 +132,48 @@ export interface KurierHooks extends FrameworkHooks {
    * not carry a real conversation out of a real session file.
    */
   prompt?: string;
+
+  /**
+   * `KU_APP_DISMISS_FAILURE` — press the failure dialog's own Close, once it is up.
+   *
+   * **The second control no outside caller can reach, and the reason is measured.** `ActivateWidget`
+   * on the response button of an `Adw.AlertDialog` returns `true` and dismisses nothing — measured on
+   * the failure dialog *and* on the permission dialog, so it is libadwaita rather than this dialog.
+   * A real pointer is no better: under Wayland `XTestFakeMotionEvent` does not move the pointer at all,
+   * and under `GDK_BACKEND=x11` the dialog is mapped but never painted, so there is no button to click
+   * even if it moved. `SendKey` answers `false` for Escape.
+   *
+   * So the "the person closed it" half of a modal's life is unreachable from outside the process, and
+   * with it the question that matters: does the *same* failure come back on the next state move? The
+   * hook answers it the same way `KU_APP_STOP` answers its question — through the surface, not around
+   * it (`FailureDialog.dismiss()` emits the response libadwaita emits when the button is pressed).
+   */
+  dismissFailure?: boolean;
+
+  /**
+   * `KU_APP_SWITCH` — open these session ids in turn, once a failure is on screen. Comma-separated,
+   * so a walk away and back is one variable: `fixture-1,fixture-2`.
+   *
+   * **The sidebar row is the third pointer-only control, and unlike the other two it has no keyboard
+   * equivalent either** — nothing in devtools moves the selection in a `Gtk.ListBox`. Without it a
+   * window cannot be photographed after a person has moved on to another conversation, which is the
+   * only way to see whether a dialog about the *last* session is still up.
+   *
+   * It waits for a **failure** rather than for a number of seconds, for the reason the permission hook
+   * polls: the interesting moment is "the dialog is up and the person clicks away", and a fixed delay
+   * would beat the failure on a slow agent and lose to it on a fast one.
+   *
+   * **A list, not the raw string, because this reader is where a variable's syntax is read** — the
+   * same place `'0'` stops meaning on. A bare id is one entry and an entry that is only whitespace is
+   * not an entry, so `KU_APP_SWITCH=,` asks for no session at all rather than for one called `''`.
+   */
+  switchTo?: string[];
 }
 
 /**
  * Read `KU_APP_*` at startup.
  *
- * **The framework's reader is spread in, and it does not read these six.** `readAppDevHooks` knows
+ * **The framework's reader is spread in, and it does not read these ten.** `readAppDevHooks` knows
  * `VIEW`, `FILE` and `DEBUG` and nothing else, so kurier's hooks are read here — the earlier version
  * of this comment claimed the framework's "empty means unset" and truthiness rules were being used,
  * which was false for every key, and it named `KU_APP_THINKING=0` as the disagreement it prevented
@@ -110,27 +184,30 @@ export interface KurierHooks extends FrameworkHooks {
  * **`flag` is the same rule the stand-in agent uses** (`scripts/stand-in-agent.mjs`), copied rather
  * than imported because that script is a standalone program and this is a bundle. It is one rule in
  * the repo and not two: a value that is unset, empty, `0` or `false` is not set; anything else is.
- * A dev hook that is read two ways is a hook whose screenshots depend on which reader ran.
+ * A dev hook that is read two ways is a hook whose screenshots depend on which reader ran. The rule
+ * and its test live in `hook-value.ts`; this function only wires the keys to it.
  */
 export function readHooks(env: Record<string, string | undefined> = process.env): KurierHooks {
   const framework = readAppDevHooks({ prefix: DEV_HOOK_PREFIX, env });
-  const raw = (key: string): string | undefined => {
-    const value = env[`${DEV_HOOK_PREFIX}_${key}`]?.trim();
-    return value === undefined || value === '' ? undefined : value;
-  };
-  const flag = (key: string): boolean => {
-    const value = raw(key);
-    return value !== undefined && value !== '0' && value.toLowerCase() !== 'false';
-  };
   return {
     ...framework,
-    session: raw('SESSION'),
-    agent: raw('AGENT'),
-    permission: flag('PERMISSION'),
-    config: raw('CONFIG'),
-    // A boolean, not the string, so `KU_APP_THINKING=0` reads as off at the call site too. The old
-    // `!== undefined` in `window.ts` would have accepted the string `'0'` just as happily.
-    thinking: flag('THINKING'),
-    prompt: raw('PROMPT'),
+    session: hookValue(env, 'SESSION'),
+    agent: hookValue(env, 'AGENT'),
+    permission: hookFlag(env, 'PERMISSION'),
+    config: hookValue(env, 'CONFIG'),
+    // Every flag below is a boolean, not the string, so `KU_APP_THINKING=0` reads as off at the call
+    // site too — the old `!== undefined` in `window.ts` would have accepted the string `'0'` just as
+    // happily. Both Stop hooks are flags for the same reason `THINKING` is: `KU_APP_STOP=0` has to
+    // mean "do not press Stop", or the one hook that changes the state under test would be the one
+    // that ignores its own off-switch. **The rules themselves live in `hook-value.ts`**, which has no
+    // `gi://` in it and is therefore tested on both runtimes — this function is the wiring.
+    stop: hookFlag(env, 'STOP'),
+    stopEscape: hookFlag(env, 'STOP_ESCAPE'),
+    dismissFailure: hookFlag(env, 'DISMISS_FAILURE'),
+    // A list, read here because a variable's syntax is read here: the decision of *which* session to
+    // open is the window's `#open`, and the order is the variable's own.
+    switchTo: hookList(env, 'SWITCH'),
+    thinking: hookFlag(env, 'THINKING'),
+    prompt: hookValue(env, 'PROMPT'),
   };
 }

@@ -15,6 +15,8 @@ import sessionStore from './unit/session/store.test.ts';
 
 import config from './unit/core/config.test.ts';
 import configRow from './unit/core/config-row.test.ts';
+import failure from './unit/core/failure.test.ts';
+import usage from './unit/core/usage.test.ts';
 import policy from './unit/core/policy.test.ts';
 import interrupt from './unit/core/interrupt.test.ts';
 import transcript from './unit/core/transcript.test.ts';
@@ -30,6 +32,8 @@ import turn from './unit/core/turn.test.ts';
 import permission from './unit/core/permission.test.ts';
 import agentSession from './unit/core/agent-session.test.ts';
 
+import hookValue from './unit/gui/hook-value.test.ts';
+
 import smoke from './unit/smoke.test.ts';
 
 run({
@@ -43,6 +47,8 @@ run({
   sessionStore,
   config,
   configRow,
+  failure,
+  usage,
   policy,
   interrupt,
   transcript,
@@ -57,5 +63,6 @@ run({
   turn,
   permission,
   agentSession,
+  hookValue,
   smoke,
 });

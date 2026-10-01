@@ -66,8 +66,10 @@ import { labelOf, type SessionRecord, type TranscriptEntry } from '@kurier/sessi
 
 import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
+import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
+import { failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
 import { agentStatus } from '../../core/turn.ts';
 import {
   APP_NAME,
@@ -79,6 +81,7 @@ import {
 import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
 import { ConfigRow } from './config-row.ts';
+import { FailureDialog } from './failure-dialog.ts';
 import { PermissionDialog } from './permission-dialog.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
@@ -102,6 +105,22 @@ import { TranscriptView } from './transcript-view.ts';
  */
 const PERMISSION_STAGE_POLL_MS = 250;
 const PERMISSION_STAGE_DEADLINE_MS = 8_000;
+
+/**
+ * How often the failure-dialog hooks reconsiders, and what one step buys them.
+ *
+ * **A step, not a deadline, because there is nothing here to wait *for* except the failure.** Both
+ * hooks photograph the same moment — a dialog about session A while the person moves to session B —
+ * and that moment is defined by the failure, which arrives when the agent's `session/load` answers and
+ * not before. A deadline would have to be long enough for the slowest agent in reach and short enough
+ * that a screenshot run does not sit through it, which is the same false choice `PERMISSION_STAGE_*`
+ * documents.
+ *
+ * **250 ms is long enough to be sure the dialog is on screen and short enough not to matter.** The
+ * dialog for the failure has just been presented when the first tick that finds it runs, and a
+ * screenshot taken afterwards shows the state the hook set out to create.
+ */
+const FAILURE_HOOK_STEP_MS = 250;
 
 /**
  * What the window needs in order to own a turn.
@@ -153,6 +172,25 @@ export class MainWindow extends Adw.ApplicationWindow {
    * queues the rest, and `PermissionDialog.show` replaces rather than stacks.
    */
   readonly #permissions: PermissionDialog;
+  /**
+   * The modal a start failure earns. Plan §6's auth trap and its reattach refusal.
+   *
+   * **Its own field, and only ever raised from `#onSnapshot`.** What to say is `core/failure.ts`'s
+   * decision; all this file does is notice that the controller reported a failure *of a kind that has
+   * a dialog* and put the sentence up. `start` failures never come here — see `failureNotice`.
+   */
+  readonly #failures: FailureDialog;
+  /**
+   * The failure this window has already put a dialog up for, held by identity.
+   *
+   * **The field that stops the dialog from coming back.** `#onSnapshot` runs on every state move and
+   * `attachment` stays `failed` until the next attach, so a guard on "is a dialog up right now" is not a
+   * guard at all — dismissing one clears it and the next emit opens it again. Holding the *object* is
+   * what makes the rule right in both directions: this failure is never shown twice, and the next
+   * failure — which `AgentSession` builds as a new attachment — is shown as soon as it happens. The
+   * decision itself is `failureToShow` in `core/failure.ts`; this is only where the answer is kept.
+   */
+  #shownFailure: AgentAttachment | null = null;
   readonly #contentPage: Adw.NavigationPage;
   readonly #contentHeader: Adw.HeaderBar;
   /**
@@ -186,6 +224,25 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
   #permissionTicks = 0;
 
+  /**
+   * `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`, and the one timer that runs both.
+   *
+   * **One state object and one timer for two hooks, because they are one photograph.** "The person
+   * closes the dialog" and "the person opens another conversation" are the same moment seen from two
+   * sides, and running them from two timers would let the second one fire in between and photograph a
+   * walk that nobody made.
+   *
+   * `waiting` is the half that is not a timestamp: the hooks do nothing until a failure is *on
+   * screen*, because a dismissal before the dialog exists dismisses nothing and a session switch
+   * before the failure is just a different starting point.
+   */
+  #failureHooks: { dismiss: boolean; switchTo: string[]; waiting: boolean; source: number | null } = {
+    dismiss: false,
+    switchTo: [],
+    waiting: false,
+    source: null,
+  };
+
   constructor(app: Adw.Application, options: MainWindowOptions) {
     super({
       application: app,
@@ -203,6 +260,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#placeholder = buildPlaceholder();
     this.#permissions = new PermissionDialog(this);
+    this.#failures = new FailureDialog();
     // **One transcript view for the whole window, refilled — not a stack child per session.**
     // Plan §7 step 4 asks for exactly that, and the review's F5 names the same reason: thirty sessions
     // means thirty `NavigationPage`s, thirty scrollers, and a composer whose entry and scroll position
@@ -342,6 +400,13 @@ export class MainWindow extends Adw.ApplicationWindow {
   #open(record: SessionRecord): void {
     const label = labelOf(record);
     this.#openRecord = record;
+    // **A session switch takes the failure dialog down, and keeps `#shownFailure`.** The dialog is about
+    // the window, not about the session — but a person who clicked another conversation while a modal
+    // sentence about the last one was up is now looking at a *different* conversation, and a modal that
+    // no longer describes what is on screen is the "control that points at nothing" this window forbids.
+    // `#open` then emits, and `failureToShow` answers `null` for the failure this window already showed,
+    // so closing it here does not buy it back on the next state move — that was the whole defect.
+    this.#failures.close();
     this.#agent.bind({ id: record.id, cwd: record.cwd });
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
@@ -414,6 +479,37 @@ export class MainWindow extends Adw.ApplicationWindow {
     // nowhere — so `gone` is the one state that discards it.
     if (!keepsDraft(snapshot.state)) this.#composer.clearDraft();
     if (snapshot.attachment.status === 'gone') this.#permissions.close();
+    this.#showFailure(snapshot);
+  }
+
+  /**
+   * Put up the dialog a start failure has earned — **once per failure, and never a stale one.**
+   *
+   * Two decisions, both made in `core/failure.ts` and both about as easy to get wrong as they look:
+   *
+   * - `failureToShow(attachment, shown)` — is this failure still owed a dialog? It is `null` for a
+   *   failure this window has already shown (identity, not "is one open": a dismissal closes the dialog
+   *   and the *next* snapshot would otherwise re-open it, which is the bug this field exists for) and
+   *   `null` for a `start` failure, which earns no modal at all.
+   * - `staleDialog(shown, attachment)` — is a dialog that is up now about something the window has
+   *   moved on from? A dialog is modal, so one left up over an attached agent or another session both
+   *   lies and blocks the window.
+   *
+   * **`#shownFailure` is only forgotten when a dialog is genuinely closed as stale.** Clearing it on
+   * every session switch would put the *same* auth dialog straight back up, because the attachment is
+   * still the same object; the switch closes the dialog and keeps the memory, so the failure stays
+   * shown-once and a genuinely new failure is a new object and is shown.
+   *
+   * **Nothing here decides anything.** This method carries out `core/failure.ts`'s answers and holds
+   * the one piece of state those answers need.
+   */
+  #showFailure(snapshot: AgentSnapshot): void {
+    const attachment = snapshot.attachment;
+    if (staleDialog(this.#shownFailure, attachment)) this.#failures.close();
+    const notice: FailureNotice | null = failureToShow(attachment, this.#shownFailure);
+    if (notice === null) return;
+    this.#shownFailure = attachment;
+    this.#failures.show(notice, this);
   }
 
   /**
@@ -473,12 +569,23 @@ export class MainWindow extends Adw.ApplicationWindow {
       // answers are `cancelled` over the wire, and only one of them says which ending this was.
       this.#agent.dismissPermission('window-closed');
       this.#permissions.close();
+      // A failure dialog is the same case: it is modal, so a close-request it swallowed would leave a
+      // window that cannot be closed. Nothing is waiting on it, so taking it down before the async
+      // close path costs nothing.
+      this.#failures.close();
       // The staging timer dies with the window. `source_remove` is only reached for a timer that has
       // not fired yet — the callback clears the field before it returns, so an already-fired id is
       // never removed twice.
       if (this.#permissionSource !== null) {
         GLib.source_remove(this.#permissionSource);
         this.#permissionSource = null;
+      }
+      // Same for the failure-dialog hooks: a window closed between arming them and the failure
+      // arriving would otherwise be called back into — and the walk opens sessions, which is the last
+      // thing a closing window should do.
+      if (this.#failureHooks.source !== null) {
+        GLib.source_remove(this.#failureHooks.source);
+        this.#failureHooks.source = null;
       }
       if (!this.#agent.turnRunning && !this.#agent.agentRunning) return false;
       this.#closing = true;
@@ -581,6 +688,126 @@ export class MainWindow extends Adw.ApplicationWindow {
         this.#composer.clearDraft();
         void this.#agent.prompt(prompt);
       }
+    }
+    this.#applyStopHook(hooks);
+    this.#applyFailureHooks(hooks);
+  }
+
+  /**
+   * Arm `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`.
+   *
+   * **Both are about one control that nothing outside the process can press.** `ActivateWidget` on the
+   * failure dialog's response button reports `true` and dismisses nothing, and neither can a pointer
+   * (measured; `hooks.ts` has the three-way result), so the sidebar row and the dialog's own Close
+   * are the last two pointer-only controls in this window. A guard that cannot be observed is a guard
+   * that has not been checked, and the guard in question is the one that decides whether a failure is
+   * shown once or on every state move.
+   *
+   * **Armed but idle until a failure is on screen** — see `#failureHooksStep`. Nothing here runs at
+   * startup, so a run that sets these hooks and never fails is a run that did what it was asked and
+   * said nothing, rather than a run that switched sessions for no reason.
+   */
+  #applyFailureHooks(hooks: KurierHooks): void {
+    const switchTo = hooks.switchTo ?? [];
+    if (hooks.dismissFailure !== true && switchTo.length === 0) return;
+    this.#failureHooks.dismiss = hooks.dismissFailure === true;
+    this.#failureHooks.switchTo = [...switchTo];
+    this.#failureHooks.waiting = true;
+    this.#failureHooks.source = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FAILURE_HOOK_STEP_MS, () =>
+      this.#failureHooksStep(),
+    );
+  }
+
+  /**
+   * One step of the failure-dialog hooks: dismiss, then walk the sessions.
+   *
+   * **`#shownFailure` is the trigger, because it is the one thing that says the dialog is up.** It is
+   * set in `#showFailure` at the moment the dialog is presented and never cleared, so the first tick
+   * that finds it is the tick after the failure was photographed — a `status === 'failed'` test would
+   * fire on the same snapshot, before `present()` had a frame, and the screenshot would catch a dialog
+   * on its way in.
+   *
+   * **The dismissal is the dialog's own `close()`, and that *is* the person's Close.** This dialog has
+   * one response, and `scripts/probes/alert-dialog-close.mjs` (case 1) measures that an external
+   * `close()` emits `closed` and then `response("close")` — the same pair with the same argument the
+   * button produces. There is no second way to dismiss it: `Adw.AlertDialog` has no callable
+   * `response()`, which the same probe records.
+   */
+  #failureHooksStep(): boolean {
+    const hooks = this.#failureHooks;
+    if (hooks.source === null) return GLib.SOURCE_REMOVE;
+    if (hooks.waiting) {
+      if (this.#shownFailure === null) return GLib.SOURCE_CONTINUE;
+      hooks.waiting = false;
+      if (hooks.dismiss) {
+        console.log('kurier: KU_APP_DISMISS_FAILURE — closing the failure dialog');
+        hooks.dismiss = false;
+        this.#failures.close();
+        // **A step of its own, so the walk starts only after the dismissal has had a frame.** The
+        // question these hooks exist for is whether the *same* failure comes back on the emit a
+        // session switch causes, and a walk that began in the same tick would be photographed with
+        // the dialog never having been visibly closed.
+        return GLib.SOURCE_CONTINUE;
+      }
+    }
+    const next = hooks.switchTo.shift();
+    if (next === undefined) {
+      hooks.source = null;
+      return GLib.SOURCE_REMOVE;
+    }
+    const record = this.#sessions.select(next);
+    if (record === undefined) {
+      console.log(`kurier: KU_APP_SWITCH=${next} — no such session in the list, not opened`);
+    } else {
+      // `#open`, because that is what a row click does — `SessionList`'s `onOpen` is a closure over
+      // this method. A hook that called `agent.bind()` directly would skip the window's own half and
+      // photograph a session the window did not open.
+      console.log(`kurier: KU_APP_SWITCH — opening ${next}`);
+      this.#open(record);
+    }
+    return GLib.SOURCE_CONTINUE;
+  }
+
+  /**
+   * Press Stop once the turn is running, for `KU_APP_STOP`.
+   *
+   * **Once, synchronously, because the turn already exists.** `AgentSession.prompt()` assigns `#turn`
+   * *before its first `await* (`agent-session.ts:456`; every statement above that one is synchronous),
+   * and `KU_APP_THINKING` calls it immediately above this one — so there is nothing to wait for, and a
+   * poll over an already-set field either fires on its first tick or has already missed the turn.
+   *
+   * **Through the composer's handler, not the controller.** See `hooks.ts`: the ordering the screenshot
+   * has to show — the permission dialog dismissed with `turn-cancelled` first, then the cancel sent — is
+   * the *window's* contribution, and bypassing it would photograph the controller.
+   */
+  #applyStopHook(hooks: KurierHooks): void {
+    if (hooks.stop !== true && hooks.stopEscape !== true) return;
+    if (!this.#openRecord) {
+      console.log('kurier: KU_APP_STOP — no session is open, so there is no turn to stop');
+      return;
+    }
+    // **No timer, and the earlier version had one that could not do anything.** `AgentSession.prompt()`
+    // assigns `#turn` *before its first `await* (`agent-session.ts:456`, and every statement above that
+    // is synchronous), so by the time `KU_APP_THINKING` has called it — and it is the statement right
+    // above this one — `turnRunning` is already true. A poll over that either fires on its first tick
+    // or has already missed the turn, which is why the version this replaces gave up on tick 2 and left
+    // its own deadline unreachable. One check, and the log says what it did.
+    if (!this.#agent.turnRunning) {
+      console.log('kurier: KU_APP_STOP — no turn is running, so nothing was stopped');
+      return;
+    }
+    if (hooks.stopEscape === true) {
+      // Escape's path and only Escape's. See `hooks.ts`: `PermissionDialog` reports a dismissal as the
+      // id `'close'`, `decideFromView` maps that to `not-answered: dismissed`, and `answerFor` sends
+      // `cancelled` — so `dismissPermission('dismissed')` is literally what Escape does, and the turn
+      // keeps running afterwards, which is the difference from Stop that `dismissed` names.
+      console.log('kurier: KU_APP_STOP_ESCAPE — dismissing the open permission dialog as Escape does');
+      this.#agent.dismissPermission('dismissed');
+      this.#permissions.close();
+    }
+    if (hooks.stop === true) {
+      console.log('kurier: KU_APP_STOP — pressing Stop');
+      this.#composer.stop();
     }
   }
 

@@ -10,7 +10,6 @@ import { describe, expect, it } from '@gjsify/unit';
 
 import {
   answerFor,
-  decideFromResponse,
   decideFromView,
   escapeMnemonic,
   initialFocusResponseId,
@@ -45,7 +44,7 @@ function request(overrides: Partial<RequestPermissionRequest['toolCall']> = {}):
       title: 'Write src/hello.ts',
       kind: 'edit',
       locations: [{ path: 'src/hello.ts', line: 12 }],
-      rawInput: { path: 'src/hello.ts', content: "export const hello = 1;\n" },
+      rawInput: { path: 'src/hello.ts', content: 'export const hello = 1;\n' },
       ...overrides,
     },
     options: ALL_FOUR,
@@ -123,7 +122,10 @@ export default async () => {
     });
 
     await it('a rejecting option id is a decline', async () => {
-      expect(decideFromView(view, 'reject_once')).toStrictEqual({ type: 'declined', optionId: 'reject_once' });
+      expect(decideFromView(view, 'reject_once')).toStrictEqual({
+        type: 'declined',
+        optionId: 'reject_once',
+      });
     });
 
     for (const id of ['close', 'cancel', 'allow_always', 'reject_always', '', null, undefined]) {
@@ -140,7 +142,7 @@ export default async () => {
   });
 
   await describe('answerFor — what goes back over the wire', async () => {
-    await it('an allow is `selected` with the agent\'s own id', async () => {
+    await it("an allow is `selected` with the agent's own id", async () => {
       // There is no `allowed_once` in ACP v1. The outcome is `selected` plus the id, and what that id
       // means is the agent's business — which is exactly why only a `*_once` id can be in the view.
       expect(answerFor({ type: 'allowed', optionId: 'allow_once' })).toStrictEqual({
@@ -354,7 +356,7 @@ export default async () => {
       expect(desk.busy).toBe(false);
     });
 
-    await it('the question carries the view the widget renders, and the agent\'s ids unchanged', async () => {
+    await it("the question carries the view the widget renders, and the agent's ids unchanged", async () => {
       const desk = bareDesk();
       const shown: PermissionQuestion[] = [];
       desk.bind({
@@ -363,7 +365,10 @@ export default async () => {
       desk.ask(request());
       expect(shown.length).toBe(1);
       expect(shown[0]?.view.tool).toBe('Write src/hello.ts');
-      expect(shown[0]?.view.options.map((option) => option.optionId)).toStrictEqual(['allow_once', 'reject_once']);
+      expect(shown[0]?.view.options.map((option) => option.optionId)).toStrictEqual([
+        'allow_once',
+        'reject_once',
+      ]);
       desk.cancel('dismissed');
     });
   });
@@ -420,7 +425,7 @@ export default async () => {
     });
   });
 
-  await describe('optionLabel — kurier\'s voice, not the agent\'s', async () => {
+  await describe("optionLabel — kurier's voice, not the agent's", async () => {
     const allow: PermissionOption = { optionId: 'a', name: 'Yes', kind: 'allow_once' };
     const reject: PermissionOption = { optionId: 'r', name: 'No', kind: 'reject_once' };
 
@@ -433,7 +438,7 @@ export default async () => {
       expect(optionLabel({ optionId: 'x', name: 'Decline', kind: 'allow_once' })).toBe('Allow once: Decline');
     });
 
-    await it('the agent\'s name is dropped when it only repeats what the kind already says', async () => {
+    await it("the agent's name is dropped when it only repeats what the kind already says", async () => {
       // "Allow once: Allow once" is noise in a 360 px dialog, and every real agent's first option is
       // called exactly that.
       expect(optionLabel({ optionId: 'a', name: 'Allow once', kind: 'allow_once' })).toBe('Allow once');
@@ -473,15 +478,25 @@ export default async () => {
       ['a null toolCall', { sessionId: 's1', toolCall: null, options: ALL_FOUR }],
       ['a toolCall that is a string', { sessionId: 's1', toolCall: 'edit src/hello.ts', options: ALL_FOUR }],
       ['no options array', { sessionId: 's1', toolCall: { toolCallId: 't1' } }],
-      ['options that are not an array', { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: 'allow' }],
-      ['options that are not objects', { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: ['allow'] }],
+      [
+        'options that are not an array',
+        { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: 'allow' },
+      ],
+      [
+        'options that are not objects',
+        { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: ['allow'] },
+      ],
       [
         'an option with no kind',
         { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: [{ optionId: 'a', name: 'Yes' }] },
       ],
       [
         'an option whose kind is a number',
-        { sessionId: 's1', toolCall: { toolCallId: 't1' }, options: [{ optionId: 'a', name: 'Yes', kind: 1 }] },
+        {
+          sessionId: 's1',
+          toolCall: { toolCallId: 't1' },
+          options: [{ optionId: 'a', name: 'Yes', kind: 1 }],
+        },
       ],
       [
         'an option whose kind is a word the schema does not define',
@@ -499,7 +514,10 @@ export default async () => {
           options: ALL_FOUR,
         },
       ],
-      ['locations that are not an array', { sessionId: 's1', toolCall: { toolCallId: 't1', locations: 'x' }, options: ALL_FOUR }],
+      [
+        'locations that are not an array',
+        { sessionId: 's1', toolCall: { toolCallId: 't1', locations: 'x' }, options: ALL_FOUR },
+      ],
     ] as const) {
       await it(`${name} projects to a view with nothing to press`, async () => {
         const view = permissionView(malformed(payload));
@@ -507,7 +525,11 @@ export default async () => {
         expect(view.kind.length).toBeGreaterThan(0);
         // The only parts that can be wrong in a way that matters: options that could allow, and
         // locations that would render as garbage.
-        if (name.includes('no kind') || name.includes('kind is a number') || name.includes('does not define')) {
+        if (
+          name.includes('no kind') ||
+          name.includes('kind is a number') ||
+          name.includes('does not define')
+        ) {
           expect(view.options).toStrictEqual([]);
         }
         if (name.includes('locations that are not objects')) expect(view.locations).toStrictEqual([]);
@@ -523,12 +545,16 @@ export default async () => {
       expect(desk.busy).toBe(false);
     });
 
-    await it('an option whose kind is not the schema\'s is dropped, and never guessed at', async () => {
+    await it("an option whose kind is not the schema's is dropped, and never guessed at", async () => {
       // `allow_whenever` is not one of the four kinds, and `decideFromView` decides by `startsWith('allow')`.
       // Letting it through would make an unknown word mean "allow", which is the same class of mistake
       // as mapping an unknown response id to an allow.
       const view = permissionView(
-        malformed({ sessionId: 's1', toolCall: { toolCallId: 't1' }, options: [{ optionId: 'a', name: 'Yes', kind: 'allow_whenever' }] }),
+        malformed({
+          sessionId: 's1',
+          toolCall: { toolCallId: 't1' },
+          options: [{ optionId: 'a', name: 'Yes', kind: 'allow_whenever' }],
+        }),
       );
       expect(view.options).toStrictEqual([]);
       expect(decideFromView(view, 'a')).toStrictEqual({ type: 'not-answered', reason: 'dismissed' });
@@ -565,13 +591,25 @@ export default async () => {
     });
   });
 
-  await describe('decideFromResponse — the entry the controller uses', async () => {
-    await it('projects and decides in one step', async () => {
-      expect(decideFromResponse(request(), 'allow_once')).toStrictEqual({
-        type: 'allowed',
-        optionId: 'allow_once',
+  await describe('one door into the decision', async () => {
+    await it('is decideFromView, and it is reachable with the view the desk already holds', async () => {
+      // This is the test that replaced `decideFromResponse`'s. It asserts the same two answers through
+      // the one function that exists, so the coverage is not lost — only the second door is gone. The
+      // `permissionView` in the middle is the whole desk does anyway, in the same order.
+      const view = permissionView(request());
+      expect(decideFromView(view, 'allow_once')).toStrictEqual({ type: 'allowed', optionId: 'allow_once' });
+      expect(decideFromView(view, 'close')).toStrictEqual({ type: 'not-answered', reason: 'dismissed' });
+    });
+
+    await it('is fail-closed through that one door for an id the view never offered', async () => {
+      // The case a raw-request door would have got wrong: `allow_always` is filtered out of the view, so
+      // an agent that offers only it is refusing to be given a promise kurier keeps nothing for.
+      const onlyAlways = permissionView({
+        sessionId: 's1',
+        toolCall: { toolCallId: 't1', title: 'Write' },
+        options: [{ optionId: 'always', name: 'Always', kind: 'allow_always' }],
       });
-      expect(decideFromResponse(request(), 'close')).toStrictEqual({
+      expect(decideFromView(onlyAlways, 'always')).toStrictEqual({
         type: 'not-answered',
         reason: 'dismissed',
       });

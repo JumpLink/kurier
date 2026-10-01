@@ -21,6 +21,7 @@ import {
 import { classifyAuthMethods } from '@kurier/acp/gate';
 
 import { stdioTransport, type AgentCommand } from './agents/stdio.ts';
+import { AUTH_COMMAND, AuthRequiredError } from './failure.ts';
 
 export interface AgentHandle {
   client: AcpClient;
@@ -89,14 +90,23 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
   }
 }
 
-/** Re-thrown with the `kurier auth` hint attached, so a caller does not have to know the code. */
+/**
+ * Re-thrown with the `kurier auth` hint attached, so a caller does not have to know the code.
+ *
+ * **`AuthRequiredError` and not a plain `Error`, and the message alone is why.** The hint turns
+ * ACP's `-32000` into a sentence a person can act on, and a sentence is not a classification: a
+ * surface that can only see the text cannot tell "run this in a terminal" from "the binary is not on
+ * PATH", so plan §6's auth dialog would have to be guessed at from wording. The class carries the kind
+ * across the hint, and `failureKind` reads it — see `core/failure.ts`. The message still leads with
+ * the command, so the CLI and the log read the same as before.
+ */
 export async function withAuthHint<T>(what: string, run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
     if (isAuthRequired(error)) {
-      throw new Error(
-        `${what} failed: the agent wants a human to log in first. Run \`kurier auth\`, then try again.`,
+      throw new AuthRequiredError(
+        `${what} failed: the agent wants a human to log in first. Run \`${AUTH_COMMAND}\`, then try again.`,
         { cause: error },
       );
     }

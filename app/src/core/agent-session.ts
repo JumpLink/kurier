@@ -50,6 +50,7 @@ import {
   type ConfigRowView,
 } from './config-row.ts';
 import { findControl, projectConfigOptions, type ConfigControl } from './config.ts';
+import { failureKind } from './failure.ts';
 import {
   answerFor,
   PermissionDesk,
@@ -1064,7 +1065,7 @@ export class AgentSession {
       // Nothing ever left for the agent, so there is no turn to report as gone. `idle` rather than
       // `thinking`, because a turn that never started must not leave the window looking busy — and
       // `thinking` would show a Stop button with nothing to stop.
-      this.#setAttachment({ status: 'failed', message });
+      this.#setAttachment({ status: 'failed', kind: failureKind(error), message });
       this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'none' });
       return;
     }

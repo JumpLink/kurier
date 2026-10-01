@@ -28,7 +28,7 @@
  * | Variable                   | Default | What it does                                                         |
  * | -------------------------- | ------- | -------------------------------------------------------------------- |
  * | `KU_STANDIN_DELAY_MS`      | `350`   | Pause between streamed notifications. `0` makes a turn instant.       |
- * | `KU_STANDIN_CHUNKS`        | `5`     | How many `agent_message_chunk`s to stream (the answer's tail).        |
+ * | `KU_STANDIN_CHUNKS`        | `4`     | How many of the answer's 4 sentences to stream. More is not more.     |
  * | `KU_STANDIN_ECHO`          | `1`     | Echo the prompt as `user_message_chunk`, as every real agent does.     |
  * | `KU_STANDIN_HANG`          | unset   | **Never** end the turn on its own — Stop has something to stop.       |
  * | `KU_STANDIN_EXIT_MID_TURN` | unset   | **Exit the process** partway through, answering nothing.               |
@@ -37,6 +37,9 @@
  * | `KU_STANDIN_CONFIG_MODELS` | `3`     | How many models the list holds. `400` is the real size, and needs search.  |
  * | `KU_STANDIN_CONFIG_REFUSE`  | unset   | Refuse every configuration change — the fail-closed state.                  |
  * | `KU_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
+ * | `KU_STANDIN_USAGE`          | unset   | Push a `usage_update` after the answer, cost and all.                     |
+ * | `KU_STANDIN_AUTH`           | unset   | Refuse `session/load` with `-32000` — trap 1, the auth dialog.        |
+ * | `KU_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
  *
  * ```sh
  * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
@@ -54,7 +57,16 @@
 import { createInterface } from 'node:readline';
 
 const DELAY_MS = number('KU_STANDIN_DELAY_MS', 350);
-const CHUNKS = number('KU_STANDIN_CHUNKS', 5);
+/**
+ * How many of the answer's four sentences to stream. Default 4, i.e. all of them.
+ *
+ * **A prefix, so it can only ever shorten.** `ANSWER` below is a list of four fixed sentences and
+ * `runTurn` takes `ANSWER.slice(0, max(1, CHUNKS))` — a value above 4 is the same four sentences, not a
+ * longer answer, which is why the default is the list's own length and not a round number above it.
+ * The knob is for a *shorter* reply: a turn that is still arriving, where the newest bubble is below
+ * the fold. It was 5 against a list of four, which read as a knob that grew and could not.
+ */
+const CHUNKS = number('KU_STANDIN_CHUNKS', 4);
 const HANG = flag('KU_STANDIN_HANG');
 const EXIT_MID_TURN = flag('KU_STANDIN_EXIT_MID_TURN');
 const PERMISSION = flag('KU_STANDIN_PERMISSION');
@@ -63,6 +75,9 @@ const CONFIG = flag('KU_STANDIN_CONFIG');
 const CONFIG_MODELS = number('KU_STANDIN_CONFIG_MODELS', 3);
 const CONFIG_REFUSE = flag('KU_STANDIN_CONFIG_REFUSE');
 const CONFIG_PUSH = flag('KU_STANDIN_CONFIG_PUSH', true);
+const USAGE = flag('KU_STANDIN_USAGE');
+const AUTH = flag('KU_STANDIN_AUTH');
+const NO_RESUME = flag('KU_STANDIN_NO_RESUME');
 
 /**
  * The configuration this script offers, built once here and then rewritten by every set.
@@ -91,7 +106,11 @@ const AGENT_INFO = {
     loadSession: true,
     promptCapabilities: { image: false, audio: false, embeddedContext: false },
     mcpCapabilities: { http: false, sse: false },
-    sessionCapabilities: { close: {}, delete: {}, fork: {}, list: {}, resume: {} },
+    // **Trap 2's shape, behind a knob.** `loadSession: false` *and* no `resume` capability is what
+    // `AcpClient.reattach` rejects with `UnsupportedCapabilityError`, and it is the case plan §6 asks
+    // to be shown as a refusal rather than as an empty transcript.
+    ...(NO_RESUME ? {} : { sessionCapabilities: { close: {}, delete: {}, fork: {}, list: {}, resume: {} } }),
+    ...(NO_RESUME ? { loadSession: false } : {}),
     auth: {},
   },
   // No `authMethods`: this fixture never demands a login, because a turn that just works is the point.
@@ -224,6 +243,11 @@ input.on('line', (line) => {
       return reply(id, sessionState(SESSION_ID));
     case 'session/load':
     case 'session/resume':
+      // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code kurier's
+      // `isAuthRequired` matches and `withAuthHint` turns into a `kurier auth` sentence, and it is
+      // refused *after* `initialize` succeeded — which is the point: the handshake works and the
+      // session does not, so the failure cannot be caught anywhere earlier than the reattach.
+      if (AUTH) return replyError(id, -32_000, 'Authentication required: run `opencode auth login`');
       // The id the client asked for: kurier prompts the session its store holds, not this script's.
       // No history is replayed — a real agent does, and kurier deliberately does not record that
       // replay; see `AgentSession.#bindAgent`.
@@ -300,6 +324,19 @@ async function runTurn(id, sessionId, prompt) {
       // Stop and a screenshot of a running turn reachable without racing a model.
       await new Promise((resolve) => {
         token.released = resolve;
+      });
+    }
+
+    if (USAGE && !token.cancelled) {
+      // **A cost with the float an agent really sends.** `0.0014555100000000001` is not a typo: it is
+      // what a double looks like after a division, and it is the value kurier's transcript used to
+      // print verbatim. Sending it here is what makes the rounded line photographable rather than
+      // asserted.
+      notify(sessionId, {
+        sessionUpdate: 'usage_update',
+        inputTokens: 1204,
+        outputTokens: 268,
+        cost: { amount: 0.0014555100000000001, currency: 'USD' },
       });
     }
 

@@ -11,6 +11,7 @@ import type { SessionNotification } from '@kurier/acp/types';
 import { labelOf, type SessionRecord } from '@kurier/session';
 
 import { chunkToText } from '../../core/policy.ts';
+import { describeUsage } from '../../core/usage.ts';
 
 export function out(line = ''): void {
   process.stdout.write(`${line}\n`);
@@ -65,10 +66,11 @@ export function showUpdate(notification: SessionNotification, onText: (text: str
       err(`  mode: ${update.currentModeId}`);
       return;
     case 'usage_update': {
-      const parts: string[] = [];
-      if (update.inputTokens !== undefined) parts.push(`in ${update.inputTokens}`);
-      if (update.outputTokens !== undefined) parts.push(`out ${update.outputTokens}`);
-      if (parts.length) err(`  usage: ${parts.join(', ')}`);
+      // **The same clause the transcript gets, out of `core/usage.ts`.** This file used to build its
+      // own two-field version — input and output tokens and *no cost* — which is how a terminal and a
+      // window end up disagreeing about what an agent reported, and it is the version that had no
+      // float to round because it never printed the number that has one. One formatter, both surfaces.
+      err(`  usage: ${describeUsage(update)}`);
       return;
     }
     case 'available_commands_update':

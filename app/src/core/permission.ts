@@ -26,7 +26,12 @@
  * not offer it — the same reason `core/policy.ts` keeps the terminal path separate, and the same
  * reason a session stays a scope rather than becoming a permission (guardrail 1).
  */
-import type { PermissionOption, RequestPermissionRequest, RequestPermissionResponse, ToolCallUpdate } from '@kurier/acp/types';
+import type {
+  PermissionOption,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  ToolCallUpdate,
+} from '@kurier/acp/types';
 
 /** Where a request points, flattened into renderable lines. */
 export type PermissionView = {
@@ -223,7 +228,11 @@ export function optionLabel(option: PermissionOption): string {
 /** Whether the agent's name already states what the kind states, so repeating it adds nothing. */
 function saysTheSame(ours: string, theirs: string): boolean {
   if (theirs.length === 0) return true;
-  const normalise = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const normalise = (text: string): string =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
   return normalise(ours) === normalise(theirs);
 }
 
@@ -254,7 +263,9 @@ function rawInputOf(raw: unknown): string | null {
 }
 
 /**
- * Map a response id to a decision.
+ * The view, not the request — see the note above: the `*_always` ids are already gone from `view`, and
+ * that is what makes an `allow_always` response a dismissal rather than a decision kurier forgot to
+ * filter.
  *
  * **The fail-closed rule is the whole point of this function.** `Adw.AlertDialog` reports its own
  * `close_response` when it is dismissed, and that id is not necessarily one of the agent's — the
@@ -264,24 +275,20 @@ function rawInputOf(raw: unknown): string | null {
  * `not-answered`. Anything that maps an unknown id to `allowed` is a bug a person finds out about by
  * watching their files change.
  *
- * **The view, not the request**, because the view is the filtered list — an `allow_always` id is gone
- * from it, and so a response carrying one is not "an id kurier forgot" but "an id kurier never
- * offered". Reading the raw request here would put the filtering back in the decision.
+ * **It takes a `PermissionView` and not a `RequestPermissionRequest`, and that is the whole reason
+ * there is no second entry point here.** There used to be a `decideFromResponse(request, id)` that
+ * projected first and called this — and it was exercised by its own test and by nothing else, because
+ * every caller in the app already holds a view: `PermissionDesk.ask` projects once and puts the view
+ * in the `PermissionQuestion`, and `AgentSession` answers through `desk.answer(id, responseId)`, which
+ * reads that same view. A wrapper over the raw request is a second door into the one decision this
+ * file says nothing else may make, and a second door is a second opinion: the day its projection and
+ * `permissionView`'s drifted, the fail-closed rule would hold on one path and not the other. One
+ * function, one input shape, no way to reach it with an unfiltered list.
  */
-export function decideFromResponse(
-  request: RequestPermissionRequest,
+export function decideFromView(
+  view: PermissionView,
   responseId: string | null | undefined,
 ): PermissionDecision {
-  const view = permissionView(request);
-  return decideFromView(view, responseId);
-}
-
-/**
- * The view, not the request — see the note above: the `*_always` ids are already gone from `view`, and
- * that is what makes an `allow_always` response a dismissal rather than a decision kurier forgot to
- * filter.
- */
-export function decideFromView(view: PermissionView, responseId: string | null | undefined): PermissionDecision {
   if (typeof responseId !== 'string' || responseId.length === 0) {
     return { type: 'not-answered', reason: 'dismissed' };
   }

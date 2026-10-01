@@ -15,6 +15,7 @@ import type { SessionNotification, SessionUpdate } from '@kurier/acp/types';
 import type { TranscriptEntry } from '@kurier/session';
 
 import { chunkToText } from './policy.ts';
+import { describeUsage } from './usage.ts';
 
 /** One notification becomes zero or more lines; a `plan` update is several. */
 export function toTranscript(notification: SessionNotification, at: string): TranscriptEntry[] {
@@ -53,6 +54,9 @@ export function toTranscript(notification: SessionNotification, at: string): Tra
     case 'session_info_update':
       return update.title ? [{ ...base, kind: 'system', text: `title: ${update.title}` }] : [];
     case 'usage_update':
+      // **The clause is `core/usage.ts`'s, not a template literal here.** A cost arrives as an IEEE
+      // double and printing it raw put `0.0014555100000000001 USD` into a person's transcript — a
+      // rounding artefact recorded as a price. See that file for the digits and the `<0.0001` case.
       return [{ ...base, kind: 'system', text: `usage: ${describeUsage(update)}` }];
     case 'available_commands_update':
     case 'config_option_update':
@@ -72,15 +76,6 @@ function textEntry(
   base: { at: string; sessionId: string },
 ): TranscriptEntry[] {
   return text ? [{ ...base, kind, text }] : [];
-}
-
-function describeUsage(update: { inputTokens?: number; outputTokens?: number; cost?: unknown }): string {
-  const parts: string[] = [];
-  if (update.inputTokens !== undefined) parts.push(`in ${update.inputTokens}`);
-  if (update.outputTokens !== undefined) parts.push(`out ${update.outputTokens}`);
-  const cost = update.cost as { amount?: number; currency?: string } | null | undefined;
-  if (cost?.amount !== undefined) parts.push(`${cost.amount} ${cost.currency ?? ''}`.trim());
-  return parts.join(', ') || 'reported';
 }
 
 function describeUnknown(update: SessionUpdate): string {
