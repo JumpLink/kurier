@@ -29,21 +29,25 @@
  * and the note where the responses are added. `kind` decides both the words and the appearance, so an
  * agent cannot ship a button that reads "Decline" and allows.
  *
- * **Every option the agent sent is a button, including the two `*_always` kinds**, in the order
- * `orderOptions` gives rather than the order the agent listed them. The rest of what this dialog does
- * — the fail-closed answer for a dismissal, the empty option set answered `cancelled` — is
- * `core/permission.ts`, and so is the decision that `allow_once` is the only SUGGESTED response.
- *
  * **The `rawInput` body is a `Gtk.TextView` in a `Gtk.ScrolledWindow`, not a label.** A label ellipsizes
  * or grows without bound, and a tool's raw input is unbounded — a diff can be thousands of lines. The
  * scroller's `max-content-height` is the cap (verified as a real property by
  * `scripts/probes/alert-dialog-close.mjs`, which sets and reads it back), the view is non-editable and
  * cursorless because this is something to read and copy, not something to change before answering, and
  * it is selectable because the natural reaction to a surprising diff is to select a line of it.
+ *
+ * **The body's tree is in `permission-body.blp`; this file fills it.** The rows, their order, the wrap,
+ * the margins and the scroller's cap are markup. What stays here is what a question changes — every
+ * string, the `CSS.*` class names `css.ts` owns, the hidden-or-shown locations row, and the buffer.
+ * The widget the template produces is a `Gtk.Box` subclass of its own, because a template needs a
+ * `GType` to hang on: this dialog is not one (`PermissionDialog` below is a plain class that owns an
+ * `Adw.AlertDialog` and a promise), and pretending otherwise would put a GObject on a thing that has
+ * no signal, no property and no lifetime of its own.
  */
 
 import Adw from '@girs/adw-1';
 import GLib from '@girs/glib-2.0';
+import GObject from '@girs/gobject-2.0';
 import Gtk from '@girs/gtk-4.0';
 
 import {
@@ -54,9 +58,7 @@ import {
   type PermissionView,
 } from '../../core/permission.ts';
 import { CSS } from './css.ts';
-
-/** The cap on the raw-input body. A dialog taller than its content pushes its own buttons off screen. */
-const BODY_MAX_HEIGHT_PX = 240;
+import BodyTemplate from './permission-body.blp';
 
 /** What kurier says when the agent reported no raw input at all. */
 const NO_RAW_INPUT = 'The agent did not say what it wanted to do with this.';
@@ -80,6 +82,50 @@ const NO_LOCATIONS = 'The agent did not say where.';
  * `allow_*`, which is the whole point.
  */
 const DISMISSAL_ID = 'close';
+
+/**
+ * The body, as a `Gtk.Box` of its own type so `permission-body.blp` has a `GType` to hang on.
+ *
+ * **A subclass rather than an inline child, and that is the shape a template forces.** `Template` is a
+ * property of a registered class, so "the tree in the template" means "a class whose tree is the
+ * template" — and the body was already a `Gtk.Box` with four labelled rows, so promoting it to a type
+ * adds a name rather than a layer.
+ *
+ * **`InternalChildren`, not public fields.** The rows are the template's, and the names mirror its ids
+ * the way `window.ts`'s do: the constructor fills them and `buildDialog` reads them. There is no
+ * accessor surface because nothing outside this file has a reason to reach the body.
+ *
+ * **The `CSS.*` classes are applied here, not declared in the template.** `css.ts` owns those names as
+ * constants; a `.blp` cannot import a TypeScript constant, so spelling them as literals in the markup
+ * would be a second source of truth for the stylesheet's class names, kept in step by hand. The
+ * template owns the tree and the geometry; this owns the words and the classes.
+ */
+const PermissionBody = GObject.registerClass(
+  {
+    GTypeName: 'KurierPermissionBody',
+    Template: BodyTemplate,
+    InternalChildren: ['titleLabel', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'],
+  },
+  class extends Gtk.Box {
+    // Not `private`: `buildDialog` is a module function, not a method, so a private member would not
+    // be reachable from the only place that fills it.
+    declare readonly _titleLabel: Gtk.Label;
+    declare readonly _kindLabel: Gtk.Label;
+    declare readonly _locationsLabel: Gtk.Label;
+    declare readonly _namesLabel: Gtk.Label;
+    declare readonly _rawInput: Gtk.TextView;
+
+    constructor() {
+      super();
+      // The stylesheet's names, applied through the widget rather than written into the markup.
+      this._kindLabel.add_css_class(CSS.dim);
+      this._locationsLabel.add_css_class(CSS.mono);
+      this._locationsLabel.add_css_class(CSS.dim);
+      this._namesLabel.add_css_class(CSS.dim);
+      this._rawInput.add_css_class(CSS.gateInput);
+    }
+  },
+);
 
 /**
  * One question, shown modally over the window.
@@ -160,51 +206,37 @@ export class PermissionDialog {
           return GLib.SOURCE_REMOVE;
         });
       });
-      // **The focus is kurier's decision and it is never an allow button.** Two separate things decide
-      // the focus, and this handler owns both: the *fallback* libadwaita picks when `default_response`
-      // is unset, and the *actual* focus kurier assigns afterwards. See the `default_response` note in
-      // `buildDialog` for the measured numbers; the short version is that the fallback is the **first**
-      // added response, so `orderOptions` makes that slot a decline, and this handler then makes the
-      // real focus the narrowest decline or — with nothing to decline with — the diff body.
+      // **The focus is kurier's decision, made after the dialog is on screen, and it is never an allow
+      // button.** libadwaita's own fallback is the *last added* response, which is whichever option
+      // the agent happened to send last — measured in `scripts/probes/alert-dialog-close.mjs`, case 9:
+      // a bare `Adw.AlertDialog` with `allow_once` added first comes up with the focus on the allow
+      // button. A focused `Gtk.Button` is activated by Enter and by Space, `default_response` or not,
+      // so that is a dialog where a person typing in the composer, pressing Enter as the dialog appears
+      // in that same instant, allows a tool call without reading it.
       //
-      // **Synchronously inside `map`, and an idle afterwards, because that is what the measurement said.**
-      // **Inside `map`, then once more in an idle — and the measurement says a grab is what matters, not
-      // which kind.** Case 10 of `scripts/probes/alert-dialog-close.mjs` builds the same look-alike three
-      // ways with two allows and no `default_response`: grabbing synchronously inside `map`, deferring
-      // the grab to an idle, and not grabbing at all. The first sample of the first two is the body in
-      // both cases; the third is `Allow once`, and it stays there. So a grab is required and either form
-      // delivers it — an earlier version of this comment claimed the synchronous one *beats* the idle,
-      // and the numbers do not say that.
+      // So: the rejecting option's button when the agent sent one (Enter then declines — the answer
+      // that fails closed), and otherwise the diff view, which is focusable, is not activatable and
+      // therefore does nothing on Enter. `initialFocusResponseId` is the pure half of that decision, in
+      // `core/`.
       //
-      // **The synchronous form is kept anyway, for a structural reason rather than a measured one:** an
-      // idle is dispatched in priority order, so one libadwaita queues *after* ours would run after it.
-      // Grabbing inside `map` cannot be beaten that way. The second grab, in the idle, covers `map`
-      // firing before the dialog's final allocation and costs nothing.
-      //
-      // **What each measurement covers, because they do not overlap.** All of the above is a look-alike —
-      // `scripts/probes/`, the half of the split that cannot speak for this widget — and case 10 cannot
-      // be reproduced against `PermissionDialog` itself: `present()` maps synchronously, so by the time
-      // `app/tests/probes/permission-focus.ts` has a timer running, this grab has already happened and
-      // the pre-idle frame is not observable from outside. That probe covers the settled focus and the
-      // turn-by-turn sequence; neither result is stretched to answer the other.
+      // **After `map`, then one idle.** Grabbing focus in the same turn as `present()` is a race with
+      // libadwaita's own focus assignment, and losing it silently puts the allow button back. The
+      // probe measures the result in the real widget, after several frames:
+      // `app/tests/probes/permission-focus.ts`.
       const focusId = initialFocusResponseId(question.view.options);
-      const focusNow = (): void => {
-        // The dialog may already be gone — a Stop in the same frame — and then there is nothing to
-        // focus and nothing to do.
-        if (this.#dialog !== dialog) return;
-        const target = focusId === null ? rawInput : responseButton(dialog, focusId);
-        target?.grab_focus();
-        // A focused selectable widget selects its text, and a selection over the diff reads as a
-        // grey block — it was visible in the first screenshot of this dialog. On a `Gtk.TextView` the
-        // selection belongs to the *buffer*, not to the widget: `GtkTextView.select_region` does not
-        // exist (it is a `Gtk.Label`/`Gtk.Entry` method, and calling it throws), so the empty range
-        // goes through `Gtk.TextBuffer.select_range` with two iters at offset 0.
-        if (target instanceof Gtk.TextView) deselect(target);
-      };
       dialog.connect('map', () => {
-        focusNow();
         GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-          focusNow();
+          // The dialog may already be gone — a Stop in the same frame — and then there is nothing to
+          // focus and nothing to do.
+          if (this.#dialog !== dialog) return GLib.SOURCE_REMOVE;
+          const target = focusId === null ? rawInput : responseButton(dialog, focusId);
+          target?.grab_focus();
+          // A focused selectable widget selects its text, and a selection over the diff reads as a
+          // grey block — it was visible in the first screenshot of this dialog. On a `Gtk.TextView` the
+          // selection belongs to the *buffer*, not to the widget: `GtkTextView.select_region` does not
+          // exist (it is a `Gtk.Label`/`Gtk.Entry` method, and calling it throws), so the empty range
+          // goes through `Gtk.TextBuffer.select_range` with two iters at offset 0.
+          if (target instanceof Gtk.TextView) deselect(target);
           return GLib.SOURCE_REMOVE;
         });
       });
@@ -259,121 +291,29 @@ export class PermissionDialog {
  * "what the focus lands on" and "what the dialog shows" the same object.
  */
 function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput: Gtk.TextView } {
-  // The inset is a *widget* margin, set through the property setter rather than in the constructor
-  // literal, and the names are `margin-start`/`margin-end` — the hyphenated widget properties, not the
-  // camelCase CSS spelling and not `margin-left`. `Gtk.Box`'s constructor props are typed against the
-  // hyphenated names, so the literal would have to spell it `'margin-start': 6`, and the setter is
-  // the same property without the quoting.
-  //
-  // **`margin-start`/`margin-end` exist as widget properties in GTK 4 but not in its CSS**, and the
-  // two are not interchangeable: `css.ts` records that the CSS parser rejects the logical names with
-  // "No property named …" *while still loading the rest of the stylesheet*, so a stylesheet using them
-  // looks like it worked. The property setters below go through GObject, not through the parser, so
-  // this is the one place the logical names are safe.
-  const body = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 10 });
-  body.margin_start = 6;
-  body.margin_end = 6;
+  const body = new PermissionBody();
 
-  const title = new Gtk.Label({
-    label: view.tool,
-    // Agent text. No markup, ever.
-    useMarkup: false,
-    wrap: true,
-    selectable: true,
-    xalign: 0,
-    // `title-4`, not `CSS.title`: that constant is `title-1`, which is the size of a *window* title
-    // (see `window.ts` on why the sidebar bar does not use it). The tool title is the strongest line
-    // in a dialog, not the loudest one in the app.
-    cssClasses: ['title-4'],
-  });
-  body.append(title);
+  // Every string below is text an agent wrote, and every label is `use-markup: false` in the template
+  // — `GtkLabel`'s default is the opposite, which is why the template says so on all four.
+  body._titleLabel.label = view.tool;
+  body._kindLabel.label = view.kind;
+  body._locationsLabel.label = view.locations.length > 0 ? view.locations.join('\n') : NO_LOCATIONS;
+  // "The agent did not say where" rather than an empty row. An empty box reads as *there is nothing
+  // here*, which is a different claim from *the agent did not say*, and the difference is the whole
+  // reason a person can tell a vague request from a complete one.
+  body._locationsLabel.set_visible(true);
 
-  // The kind, as a small dimmed line rather than as a heading: it is metadata about the tool, and a
-  // `read`/`edit`/`execute` word in a heading font would give it the weight of the question itself.
-  body.append(
-    new Gtk.Label({
-      label: view.kind,
-      useMarkup: false,
-      wrap: true,
-      selectable: true,
-      xalign: 0,
-      cssClasses: [CSS.dim],
-    }),
-  );
-
-  if (view.locations.length > 0) {
-    // One label for all of them, newline-separated, so several paths read as one list instead of N
-    // blocks — and so the path does not become the most prominent thing in the dialog.
-    body.append(
-      new Gtk.Label({
-        label: view.locations.join('\n'),
-        useMarkup: false,
-        wrap: true,
-        selectable: true,
-        xalign: 0,
-        cssClasses: [CSS.mono, CSS.dim],
-      }),
-    );
-  } else {
-    // "The agent did not say where" rather than an empty row. An empty box reads as *there is
-    // nothing here*, which is a different claim from *the agent did not say*, and the difference is
-    // the whole reason a person can tell a vague request from a complete one.
-    body.append(
-      new Gtk.Label({
-        label: NO_LOCATIONS,
-        useMarkup: false,
-        wrap: true,
-        selectable: true,
-        xalign: 0,
-        cssClasses: [CSS.dim],
-      }),
-    );
-  }
-
-  // The agent's own names for its options, as one caption line — and only when at least one of them says
-  // something the kurier labels do not. Agent text, so `useMarkup: false` like everything else here; and
-  // dimmed, because it is metadata about the buttons rather than part of the question. This is where the
-  // wording went when it came off the buttons, so nothing the agent told the person is lost.
+  // The agent's own names for its options, as one caption line — and only when at least one of them
+  // says something the kurier labels do not. This is where the wording went when it came off the
+  // buttons, so nothing the agent told the person is lost.
   const names = agentNames(view.options);
   if (names !== null) {
-    body.append(
-      new Gtk.Label({
-        label: names,
-        useMarkup: false,
-        wrap: true,
-        selectable: true,
-        xalign: 0,
-        cssClasses: [CSS.dim],
-      }),
-    );
+    body._namesLabel.label = names;
+    body._namesLabel.set_visible(true);
   }
-
-  // The raw input, verbatim, scrollable and capped. `readOnly` + `cursorVisible: false` because this
-  // is a thing to read; editable text in an approval dialog invites an edit before an approval, and
-  // the answer would be about a request kurier never received.
-  const rawView = new Gtk.TextView({
-    editable: false,
-    cursorVisible: false,
-    monospace: true,
-    wrapMode: Gtk.WrapMode.WORD_CHAR,
-    leftMargin: 8,
-    rightMargin: 8,
-    topMargin: 6,
-    bottomMargin: 6,
-    cssClasses: [CSS.gateInput],
-  });
   // `len: -1` is the binding's way of saying "to the end of the string" — `Gtk.TextBuffer.set_text`
   // takes a length in bytes and a one-argument call is a type error, not a default.
-  rawView.get_buffer()?.set_text(view.rawInput ?? NO_RAW_INPUT, -1);
-  const scroller = new Gtk.ScrolledWindow({
-    child: rawView,
-    // The measured cap. Without it a thousand-line diff makes a dialog whose buttons are below the fold.
-    maxContentHeight: BODY_MAX_HEIGHT_PX,
-    propagateNaturalHeight: true,
-    hscrollbarPolicy: Gtk.PolicyType.NEVER,
-    vscrollbarPolicy: Gtk.PolicyType.AUTOMATIC,
-  });
-  body.append(scroller);
+  body._rawInput.get_buffer()?.set_text(view.rawInput ?? NO_RAW_INPUT, -1);
 
   const dialog = new Adw.AlertDialog({ heading: 'The agent wants permission' });
   // `extra_child` rather than a longer heading: the heading is one kurier sentence and stays that way,
@@ -381,58 +321,37 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   // into the part of the dialog that reads as the app's own voice — and into the one string that is
   // the app's own voice, which is exactly the line not to cross.
   dialog.set_extra_child(body);
-  // **`add_response` per option, in kurier's order, with no extra one.** There is no
+  // **`add_response` per option, in the agent's own order, with no extra one.** There is no
   // `set_choices` on `Adw.AlertDialog` — `add_responses` is the batch form and takes no appearances,
-  // so the loop is where the appearance belongs anyway. The order is `view.options`'s, which
-  // `orderOptions` in `core/` already decided; see its comment for the measured reason.
+  // so the loop is where the appearance belongs anyway. An allowing option is `SUGGESTED`: that is
+  // emphasis, and it is the only emphasis kurier ever applies to a button, because inventing it on a
+  // question kurier does not own is editorialising. A rejecting option keeps the default appearance,
+  // which is what the plan asks for and what libadwaita's own guidance says for a negative response.
   //
-  // **The label is `optionLabel(option)` — kurier's own sentence for the kind, and *only* that.** Both
-  // the words and the appearance come from the same place on purpose: an option's `name` is the
-  // agent's to choose, and ACP lets an agent call its `allow_once` option "Decline". Printing that
-  // verbatim gives a suggested-looking button reading "Decline" that allows, and the person has no way
-  // to tell. *Appending* it — the earlier "Allow once: Allow once" shape — fixed that and cost the
-  // button row its legibility: a screenshot read "Always decline: Always decline in thi…", the words
-  // twice with the ellipsis inside the repeat, and at kurier's own 360 px floor it was unreadable. So
-  // the buttons carry four short sentences and the agent's wording moves into the body as one caption
-  // line (`agentNames`), where it can wrap. `optionLabel` still doubles underscores, because
+  // **The label is `optionLabel(option)`, not `option.name`, and the appearance is keyed on `kind`.**
+  // Both come from the same place on purpose: an option's `name` is the agent's to choose, and ACP
+  // lets an agent call its `allow_once` option "Decline". Printing that verbatim gives a
+  // suggested-looking button reading "Decline" that allows, and the person has no way to tell.
+  // `optionLabel` puts kurier's own word — "Allow once" or "Decline" — in front, derived from `kind`,
+  // and keeps the agent's name only when it adds something; it also doubles underscores, because
   // `add_response` parses mnemonics and an agent must not choose kurier's Alt accelerator. The
-  // decision and the label cannot disagree: they are the same `kind`.
+  // decision and the label therefore cannot disagree: they are the same `kind`.
   //
-  // **`default_response` IS set, to the decline, and that is the fix for the first frame.**
-  //
-  // With it unset, libadwaita focuses the **first** added response — measured, and it is *not* the
-  // "last added" `Adw-1.gir` claims (`scripts/probes/alert-dialog-close.mjs` case 9 prints both
-  // directions). `orderOptions` puts `reject_once` first so that fallback is a decline, and setting
-  // `default_response` to the decline makes the two agree explicitly rather than by coincidence.
-  //
-  // **The interesting case is an agent that offers no decline at all.** Then there is no safe response
-  // to name, libadwaita's fallback lands on `allow_once` — the first allow — and only kurier's own
-  // `grab_focus` stands between that and a stray Enter. Measured (case 10): a look-alike with two allows
-  // and no `default_response` that does *not* grab reads `Allow once` at its first sample and stays
-  // there, while one that grabs — inside `map` or in an idle — reads the body. So the mitigation for
-  // that case is not a different default but the grab in `show()`, which is why that grab is there.
-  // **`allow_once` is SUGGESTED and `allow_always` is not, which is the one styling decision this loop
-  // makes.** SUGGESTED is emphasis, and libadwaita reads "emphasised" as "this is what you want to
-  // press" — so marking the permanent grant as the suggested one would be kurier *recommending* it,
-  // on a question kurier does not own. Two SUGGESTED buttons would be worse than none: the pattern is
-  // for exactly one response, and two of them make it unclear which. So the ordinary allow carries the
-  // emphasis and "Always allow" keeps the default appearance — visible, pressable, unendorsed. Equally
-  // it is **not** `DESTRUCTIVE`: that appearance means "this undoes something", which is a claim about
-  // the tool call rather than about the button, and a permanent *allow* is not a destructive action.
-  // `reject_always` is left plain for the same reason `allow_always` is — the kind is not the damage.
-  //
-  // `view.options` arrives in `orderOptions`' order, so the *first* response added — the one libadwaita
-  // would focus if kurier lost the focus race — is a decline when a decline was offered at all.
+  // **`default_response` is deliberately not set, and that is not the same as leaving focus alone.**
+  // It would decide what the dialog's *default widget* is, and libadwaita's fallback when it is unset
+  // is the last added response — which is whichever option the agent sent last, so an agent that
+  // orders `allow_once` last gets a dialog whose first Enter allows. So kurier sets neither the default
+  // nor the focus implicitly: `show()` puts the focus itself, on the rejecting option's button, from
+  // `initialFocusResponseId` in `core/permission.ts`. The fallback this replaces is measured in
+  // `scripts/probes/alert-dialog-close.mjs` case 9 and the result kurier produces is measured on this
+  // widget by `app/tests/probes/permission-focus.ts`.
   for (const option of view.options) {
     dialog.add_response(option.optionId, optionLabel(option));
-    if (option.kind === 'allow_once') {
+    if (option.kind.startsWith('allow')) {
       dialog.set_response_appearance(option.optionId, Adw.ResponseAppearance.SUGGESTED);
     }
   }
-  // The default is named here rather than left to the add order, so the two agree on purpose.
-  const declineId = initialFocusResponseId(view.options);
-  if (declineId !== null) dialog.set_default_response(declineId);
-  return { dialog, rawInput: rawView };
+  return { dialog, rawInput: body._rawInput };
 }
 
 /** An empty selection on a text view, so focusing it does not grey anything out. */
