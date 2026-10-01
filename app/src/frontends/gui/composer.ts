@@ -130,7 +130,7 @@ export class Composer {
 
     this.#entry = new Gtk.TextView({
       // Word *or* character: a long path or a shell command has no spaces to break on, and an
-      // unwrapped line in a 480 px window is a horizontal scroll nobody asked for.
+      // unwrapped line in a 360 px window is a horizontal scroll nobody asked for.
       wrapMode: Gtk.WrapMode.WORD_CHAR,
       leftMargin: 8,
       rightMargin: 8,
@@ -138,7 +138,7 @@ export class Composer {
       bottomMargin: 8,
       // `acceptsTab` stays at its default `true`: Tab in a text view inserts a tab character and that
       // is correct — the person is writing text, and taking Tab away would strand keyboard
-      // navigation inside the composer on a window whose minimum width is 480 px.
+      // navigation inside the composer, which at the 360 px phone floor has nowhere else to go.
       cssClasses: [CSS.composerEntry],
     });
     // Enter sends, Shift+Enter does not — the convention in every chat surface this window is drawn
@@ -207,7 +207,7 @@ export class Composer {
     // one maximum line width, and the conversation and the thing you type into it are one column: two
     // clamps with two constants that happen to be equal is a coincidence that survives exactly until
     // somebody changes one of them. Below the tightening threshold the clamp hands its child the
-    // pane's full width unchanged, which is the 480 px behaviour; above it, an unconstrained entry
+    // pane's full width unchanged, which is what the 360 px phone floor gets; above it, an unconstrained entry
     // would stretch across an ultrawide and put the cursor nowhere near the answers it is answering.
     this.widget = new Adw.Clamp({
       child: frame,

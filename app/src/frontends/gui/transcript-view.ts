@@ -389,7 +389,8 @@ export class TranscriptView {
     if (this.#scrollSource !== null) GLib.source_remove(this.#scrollSource);
     // Inline first: for a turn's chunk the window has been allocated for seconds, so this lands on the
     // first try and the idle below has nothing left to do. The constructor-time fill takes the idle
-    // and the `size-allocate` path instead, because at that moment neither can succeed.
+    // and the `changed` path instead, because at that moment neither can succeed — `upper` and
+    // `page_size` are 0 until the window exists (`scripts/probes/scroll-settle.mjs` measures it).
     this.#tryFollow();
     if (this.#followPending) {
       this.#scrollSource = GLib.idle_add(GLib.PRIORITY_LOW, () => {

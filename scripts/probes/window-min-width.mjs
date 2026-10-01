@@ -203,11 +203,29 @@ function header() {
 
 // ── report ───────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The floor this run sweeps with, from `ARGV[0]`. `null` means "no floor at all".
+ *
+ * **`widthRequest` is construct-only, so a sweep cannot change it afterwards** — it is written at
+ * construction and GTK reads it when the toplevel first asks for its size. That is why this script
+ * takes the floor as an argument instead of re-sweeping one window: the first version set only
+ * `defaultWidth` and could therefore print a single column, while the table in `constants.ts`
+ * (`WINDOW_MIN_WIDTH_PX`) quotes two and attributes both to this file. A measurement that cannot be
+ * re-run is not a measurement, it is a story — so run it twice:
+ *
+ * ```sh
+ * gjs -m scripts/probes/window-min-width.mjs 480   # the old floor: every sweep clamps back to 480
+ * gjs -m scripts/probes/window-min-width.mjs       # the floor removed: every sweep is granted
+ * ```
+ */
+const FLOOR = ARGV[0] ? Number.parseInt(ARGV[0], 10) : null;
+
 const window = new Adw.ApplicationWindow({
   application: null,
   defaultWidth: 480,
   defaultHeight: 600,
-  title: 'kurier width probe',
+  title: `kurier width probe (floor ${FLOOR === null ? 'none' : String(FLOOR)})`,
+  ...(FLOOR === null ? {} : { widthRequest: FLOOR }),
 });
 
 const content = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL });
@@ -289,7 +307,10 @@ print(
   `  sidebar collapsed (phone)    min=${String(collapsedMin).padStart(4)}  natural=${String(collapsedNat).padStart(4)}`,
 );
 
-print('\nGrants, sweeping narrower (the collapse breakpoint is 720 and stays put):');
+print(
+  '\nGrants, sweeping narrower (the collapse breakpoint is 720 and stays put),' +
+    ` floor ${FLOOR === null ? 'none' : String(FLOOR)}:`,
+);
 for (const width of [480, 420, 360, 320, 280, 240, 200]) {
   window.set_default_size(width, 600);
   await frames(3);

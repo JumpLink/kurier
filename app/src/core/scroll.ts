@@ -29,11 +29,19 @@ const BOTTOM_TOLERANCE_PX = 24;
 /**
  * How many times a scroll-to-end may be retried while the adjustment refuses to be measured.
  *
- * **A cap, because the retry is driven by a frame callback and a frame callback that can fail
- * forever is a busy loop.** Three is not arbitrary: the window is presented, allocated and mapped in
- * that order, and `size-allocate` fires between the first two — so the one path that genuinely needs
- * a retry (a fill that happened before the window existed) is covered by the first attempt after
- * mapping. The rest is belt and braces for a layout that settles later than the window does.
+ * **A cap, because the retry is driven by a notification and a notification that can fail forever is
+ * a busy loop.** Three is not arbitrary, and the reason is the *other* signal: a fill issued from the
+ * window constructor happens before the window exists, so `upper` and `page_size` are both 0 and the
+ * attempt has nothing to work with (`scripts/probes/scroll-settle.mjs` measures exactly that, all
+ * three idles reading 0). The retry exists for that case, and it needs one attempt to be told the
+ * window has been laid out plus one to actually move — three covers it with a spare. The rest is
+ * belt and braces for a layout that settles later than the window does.
+ *
+ * **This comment once justified the cap with `GtkScrolledWindow::size-allocate` firing between the
+ * first two attempts, and that signal does not exist in this binding** — `GObject.signal_lookup` finds
+ * no such signal on `GtkScrolledWindow` and `connect()` throws, though it is there in C and is not
+ * introspectable. The cap's reasoning rested on a path that could not have run. `transcript-view.ts`
+ * records the measurement, and the follow is driven by `GtkAdjustment::changed` instead.
  */
 export const FOLLOW_MAX_ATTEMPTS = 3;
 

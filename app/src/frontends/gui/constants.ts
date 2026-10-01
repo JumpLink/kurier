@@ -47,31 +47,33 @@ export const WINDOW_HEIGHT = 600;
 /**
  * The narrowest width the window claims it can be used at.
  *
- * **360 px, the phone form factor, and the history of the 480 it replaced is worth keeping.** The
- * first version asked for `widthRequest: 480` on the reasoning that the collapsed conversation plus
- * its composer stop being usable below that, and 480 sat "deliberably above the 360×294 a phone app
- * would have to claim". That reasoning was never measured — it was asserted, and it was wrong.
- * `scripts/probes/window-min-width.mjs` is the measurement that replaced it, on GTK 4.22.5 /
- * libadwaita 1.9.3:
+ * **360 px, and the number is not a preference — it is the width the toolkit itself arrives at.**
+ * `scripts/probes/window-min-width.mjs` sweeps the real window on GTK 4.22.5 / libadwaita 1.9.3, and
+ * the first version of this comment quoted the sweep wrongly; both columns are reproducible with the
+ * two commands in the probe's header:
  *
- * | asked | granted, floor 480 | granted, floor removed |
- * | ----- | ----------------- | ---------------------- |
- * | 420   | 480 (clamped)     | 420                    |
- * | 360   | 480 (clamped)     | 360                    |
- * | 320   | 480 (clamped)     | 320                    |
- * | 280   | 480 (clamped)     | 280                    |
+ * ```sh
+ * gjs -m scripts/probes/window-min-width.mjs 480   # the old floor
+ * gjs -m scripts/probes/window-min-width.mjs       # no floor of its own
+ * ```
  *
- * `widthRequest` was the *only* constraint. Asked for its preferred width, no contributing widget —
- * the composer's row, the bubbles, the transcript column, the `Adw.Clamp`, the collapsed header bar —
- * claims a minimum anywhere near 480; the same unmodified tree grants 280 and even 200 with zero
- * Gtk-WARNINGs at each. So 480 was never a property of the layout, only of a number somebody typed.
+ * | asked | granted, `widthRequest: 480` | granted, no floor |
+ * | ----- | --------------------------- | ----------------- |
+ * | 420   | 480 (clamped)               | 420               |
+ * | 360   | 480 (clamped)               | 360               |
+ * | 320   | 480 (clamped)               | 360 (clamped)     |
+ * | 280   | 480 (clamped)               | 360 (clamped)     |
  *
- * **Why 360 and not the 200 the content allows.** The layout survives narrower than any phone, and
- * a floor below the form factor would let a window shrink to a shape nobody asked for and nobody can
- * read. 360 is the narrowest width in common use on a phone, so it is the narrowest width kurier
- * claims; below it the answer is the user's window manager, not this constant. If a real phone form
- * factor later turns out to need less, this is the number to move, and `window-min-width.mjs` is
- * what says whether the content can follow.
+ * **The right-hand column is the finding, and it corrects the left one.** With no floor of its own the
+ * window grants 420 and 360 and then refuses to go narrower, on a tree where the content could not
+ * have been the reason: asked for its minimum, the transcript column wants 126, the composer 153, the
+ * content header bar 98 and the sidebar list 138. Nothing in kurier's own layout asks for 360. The
+ * limit is `Adw.NavigationSplitView` plus the toplevel chrome, and 360 is where they stop.
+ *
+ * So the old `widthRequest: 480` was **not** a measurement of this layout, and neither is this one:
+ * 480 was a typed literal that clamped a window which would otherwise have stopped at 360 on its own.
+ * The number below is the toolkit's, which is why it is also the number to trust when a phone form
+ * factor arrives — it needs no argument, only the `widthRequest` to stop lying above it.
  */
 export const WINDOW_MIN_WIDTH_PX = 360;
 
