@@ -151,9 +151,9 @@ export class MainWindow extends Adw.ApplicationWindow {
       defaultWidth: WINDOW_WIDTH,
       defaultHeight: WINDOW_HEIGHT,
       // The phone form factor, replacing a 480 px floor that was asserted rather than measured.
-      // `WINDOW_MIN_WIDTH_PX` carries the measurement — `scripts/probes/window-min-width.mjs` — and
-      // the finding that no widget in this window wants anything near 480, so the old number was a
-      // property of a literal and not of the layout.
+      // `WINDOW_MIN_WIDTH_PX` carries the sweep — `scripts/probes/window-min-width.mjs` — including the
+      // part that corrects the story: with no floor the window stops at 360 by itself, so 480 was a
+      // typed literal clamping a window the toolkit would have sized correctly on its own.
       widthRequest: WINDOW_MIN_WIDTH_PX,
       heightRequest: 400,
     });
@@ -416,7 +416,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     // turn against whatever agent was selected — no staged fake stream — because a fake one would test
     // the staging code instead of the window. The prompt defaults to a fixture sentence rather than to
     // anything from the session file: a screenshot must not carry a real conversation out of it.
-    if (hooks.thinking !== undefined) {
+    if (hooks.thinking === true) {
       const prompt = hooks.prompt ?? 'Summarise this repository in three sentences.';
       const record = this.#openRecord;
       if (!record) {

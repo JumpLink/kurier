@@ -68,7 +68,7 @@ export interface KurierHooks extends FrameworkHooks {
    * against `opencode` it is a model call — which is exactly why the fixture is the default way to look
    * at this state and why the prompt it sends is a fixture prompt rather than anything of the person's.
    */
-  thinking?: string;
+  thinking?: boolean;
 
   /**
    * `KU_APP_PROMPT` — the text `KU_APP_THINKING` sends. Fixed English, synthetic: a screenshot must
@@ -80,23 +80,38 @@ export interface KurierHooks extends FrameworkHooks {
 /**
  * Read `KU_APP_*` at startup.
  *
- * The framework's own reader is used rather than hand-rolled `process.env` lookups, so the
- * "empty means unset" rule and the truthiness rule are the framework's — a second implementation of
- * "is this set" is how two hooks disagree about `KU_APP_THINKING=0`.
+ * **The framework's reader is spread in, and it does not read these six.** `readAppDevHooks` knows
+ * `VIEW`, `FILE` and `DEBUG` and nothing else, so kurier's hooks are read here — the earlier version
+ * of this comment claimed the framework's "empty means unset" and truthiness rules were being used,
+ * which was false for every key, and it named `KU_APP_THINKING=0` as the disagreement it prevented
+ * while being the disagreement: `trimmed()` returns the **string** `'0'`, which is truthy, so
+ * `KU_APP_THINKING=0` sent a prompt and `KU_APP_PERMISSION=0` staged a dialog. Both spellings of
+ * "off" are now read as off, by `flag` below.
+ *
+ * **`flag` is the same rule the stand-in agent uses** (`scripts/stand-in-agent.mjs`), copied rather
+ * than imported because that script is a standalone program and this is a bundle. It is one rule in
+ * the repo and not two: a value that is unset, empty, `0` or `false` is not set; anything else is.
+ * A dev hook that is read two ways is a hook whose screenshots depend on which reader ran.
  */
 export function readHooks(env: Record<string, string | undefined> = process.env): KurierHooks {
   const framework = readAppDevHooks({ prefix: DEV_HOOK_PREFIX, env });
-  const trimmed = (key: string): string | undefined => {
+  const raw = (key: string): string | undefined => {
     const value = env[`${DEV_HOOK_PREFIX}_${key}`]?.trim();
     return value === undefined || value === '' ? undefined : value;
   };
+  const flag = (key: string): boolean => {
+    const value = raw(key);
+    return value !== undefined && value !== '0' && value.toLowerCase() !== 'false';
+  };
   return {
     ...framework,
-    session: trimmed('SESSION'),
-    agent: trimmed('AGENT'),
-    permission: trimmed('PERMISSION') !== undefined,
-    config: trimmed('CONFIG'),
-    thinking: trimmed('THINKING'),
-    prompt: trimmed('PROMPT'),
+    session: raw('SESSION'),
+    agent: raw('AGENT'),
+    permission: flag('PERMISSION'),
+    config: raw('CONFIG'),
+    // A boolean, not the string, so `KU_APP_THINKING=0` reads as off at the call site too. The old
+    // `!== undefined` in `window.ts` would have accepted the string `'0'` just as happily.
+    thinking: flag('THINKING'),
+    prompt: raw('PROMPT'),
   };
 }
