@@ -10,6 +10,12 @@
  *
  * The inputs are the three numbers `Gtk.Adjustment` exposes (`value`, `upper`, `page_size`) rather
  * than the widget, so nothing here imports `gi://`.
+ *
+ * **The second question in this file is "was that scroll mine or the reader's?", and it belongs here
+ * for the same reason.** Position answers where the view is; the intent behind a position is what an
+ * auto-scroll has to know, and the widget can only learn it by watching two signals and remembering
+ * three pieces of state between them. That is not answerable by looking at a number, and it was
+ * therefore not answerable by a test either.
  */
 
 /**
@@ -129,4 +135,114 @@ export function isAtBottom(
 ): boolean {
   if (upper <= pageSize) return true;
   return upper - pageSize - value <= tolerance;
+}
+
+/**
+ * Which of `GtkAdjustment`'s two scroll signals woke the decision.
+ *
+ * `changed` fires for *any* property — `value`, `upper`, `page_size` — and says which one moved; the
+ * other one fires for a move alone. `transcript-view.ts` carries the measurement behind picking
+ * `changed` at all (`scripts/probes/widget-signals.mjs`: `notify::page_size` never fires, and
+ * `size-allocate` throws in this binding), and this is the same fact seen from the other side: the two
+ * signals are not interchangeable, so the caller says which one it is answering.
+ */
+export type AdjustmentSignal = 'changed' | 'value-changed';
+
+/** One notification from the adjustment, with everything the follow state is remembered from. */
+export interface FollowInput {
+  /** The follow state as the widget remembers it from the previous notification. */
+  readonly following: boolean;
+  /**
+   * True only while the widget is inside its own `set_value` call.
+   *
+   * **The one input no signal carries, and the reason this function takes a flag.** `set_value` *is* a
+   * scroll and `value-changed` fires for it, so "did the view move?" and "did the reader move it?" are
+   * the same question to GTK. Only the widget knows it is the one holding the adjustment, so it
+   * answers it here.
+   */
+  readonly selfScroll: boolean;
+  /** The `value` the widget last saw, from either signal. */
+  readonly lastValue: number;
+  readonly signal: AdjustmentSignal;
+  /** The adjustment as it is at notification time: `value`, `upper`, `page_size`. */
+  readonly value: number;
+  readonly upper: number;
+  readonly pageSize: number;
+}
+
+/**
+ * What the widget has to remember and do, answered together.
+ *
+ * **`rearmFollow` and `attemptFollow` are why this is not just a boolean.** A `changed` while
+ * following both *owes* a scroll to the end and is the moment to try paying it; a `changed` carrying a
+ * moved value is the reader, which owes nothing and is not a moment to scroll. Returning only the state
+ * would force those two back into the widget as the `if`s they were, which is the decision again.
+ */
+export interface FollowUpdate {
+  /** What the widget's follow state becomes. */
+  readonly following: boolean;
+  /** What the widget records as the last value it saw. */
+  readonly lastValue: number;
+  /** Whether the follow is owed again — the end moved under a view that was following. */
+  readonly rearmFollow: boolean;
+  /** Whether the widget should try to pay an owed follow now. */
+  readonly attemptFollow: boolean;
+}
+
+/**
+ * The next follow state after one notification from the adjustment.
+ *
+ * **This is the decision, and it used to be three fields and two `if`s inside the widget.** The widget
+ * remembered the follow state, a flag set around its own `set_value`, and the last value it had seen,
+ * and re-derived the state in its two signal handlers. None of that is checkable from a test: a
+ * `Gtk.Adjustment` only exists under GTK, and a rule that can only be watched on a display is a rule
+ * nobody checks. As numbers it is checked on both runtimes.
+ *
+ * The four rules, each of which is a test in `app/tests/unit/core/scroll.test.ts`:
+ *
+ * - **Our own scroll never turns following off.** The follow computes its target from the `upper` of
+ *   the moment, and a re-wrap before it lands makes that target short of the new end — so re-deriving
+ *   the state from our own `set_value` would switch the follow off by the act of following. Measured at
+ *   360×720 mid-stream: the newest bubble cut off at the composer's edge while the status line still read
+ *   "Working — the agent is answering". We only scroll while following, so a scroll we caused can only
+ *   mean *still following*.
+ * - **A reader who scrolls up turns it off**, which is `isAtBottom` on the position — the plan's §6 rule
+ *   restated as a state change rather than as a position, so it survives the next re-wrap.
+ * - **Reaching the end turns it back on**, and the reader does not have to reach it exactly; the 24 px
+ *   band belongs to a person's scroll position and is reused here unchanged.
+ * - **A column that grows under a following view is not a reader.** A window narrowed mid-turn re-wraps
+ *   every bubble into a taller column, and the end moves without the value moving. Treating that as a
+ *   scroll up would invent a reader who never scrolled and stop the stream mid-turn.
+ *
+ * **`upper` and `pageSize` are read even on the `changed` path, where the answer does not use them.**
+ * One shape for one call is worth more than an input that is only sometimes meaningful, and the widget
+ * has the adjustment in hand either way.
+ */
+export function resolveFollow(input: FollowInput): FollowUpdate {
+  const { following, selfScroll, lastValue, signal, value, upper, pageSize } = input;
+  if (signal === 'value-changed') {
+    return {
+      // Ours means "still following", and the position is deliberately not read for it.
+      following: selfScroll ? following : isAtBottom(value, upper, pageSize),
+      // Recorded either way: the position moved, and the next `changed` is compared against it.
+      lastValue: value,
+      // A move owes nothing, and a scroll nobody asked for is not the moment to answer one — which is
+      // also what keeps a reader who scrolled up from being yanked straight back down.
+      rearmFollow: false,
+      attemptFollow: false,
+    };
+  }
+  // `changed` without a moved value is the layout re-measuring itself. With a moved value it is the same
+  // move the other signal already reported, and this path only has to keep the remembered position
+  // current — the follow state is not re-derived here, because the other signal derives it from a fresh
+  // read of the adjustment and a `changed` can arrive between the notifications that move `upper` and
+  // `page_size` separately.
+  if (value !== lastValue) {
+    return { following, lastValue: value, rearmFollow: false, attemptFollow: false };
+  }
+  // The value did not move, so the end moved. While following, that is exactly when a follow is owed;
+  // while not following the reader has said where they want to be, and the layout gets no vote. The
+  // attempt is asked for on both, and the widget's own "owed" flag decides whether there is anything to
+  // do — a pending follow from before the reader's scroll is still pending.
+  return { following, lastValue, rearmFollow: following, attemptFollow: true };
 }

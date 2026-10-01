@@ -45,7 +45,14 @@ import Pango from '@girs/pango-1.0';
 
 import type { TranscriptEntry } from '@kurier/session';
 
-import { followLanded, followTarget, isAtBottom, shouldRetryFollow } from '../../core/scroll.ts';
+import {
+  followLanded,
+  followTarget,
+  isAtBottom,
+  resolveFollow,
+  shouldRetryFollow,
+  type AdjustmentSignal,
+} from '../../core/scroll.ts';
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
@@ -85,10 +92,18 @@ export class TranscriptView {
   #entries: readonly TranscriptEntry[] = [];
   #items: readonly TranscriptItem[] = [];
   /**
-   * The queued follow-the-end idle, or `null`. One at a time — see `#scrollToEnd`.
+   * The queued follow-the-end idle, or `null`. One at a time — and that is a rule about *ownership*,
+   * not about how many idles are scheduled; see `#scrollToEnd`.
    *
    * `GLib.Source` ids are positive integers and `0` is `GLib.SOURCE_REMOVE`, so `0` is deliberately
    * not the "nothing pending" marker: it is a return value, never a handle.
+   *
+   * **It is cleared as well as cancelled, because the field is the ownership of the idle.** A handle
+   * this class no longer owns is a handle it will hand to `GLib.source_remove` again: `set_value` fires
+   * `changed` synchronously, so a follow that lands short can install its own retry idle from inside the
+   * previous one, and a removal that leaves the number behind is the next `source_remove`'s target. GLib
+   * is loud about that — `Source ID 21 was not found when attempting to remove it`, measured on a
+   * stand-in turn at `KU_STANDIN_DELAY_MS=50`, before `#scrollToEnd` started clearing the field.
    */
   #scrollSource: number | null = null;
   /**
@@ -119,29 +134,34 @@ export class TranscriptView {
    * "were they at the bottom?" from the new numbers would read as *no* — so the stream would stop
    * following, having invented a reader who never scrolled. Tracking the intent from the reader's own
    * scroll events keeps the two cases apart: a deliberate scroll up clears it, a resize does not.
+   *
+   * **The remembered answer, not the rule.** `resolveFollow` in `core/scroll.ts` is what decides what
+   * becomes, from the adjustment's numbers and the two flags below; this file only holds it between
+   * notifications, and sets it directly in the two places that are not notifications at all:
+   * `setEntries` (opening a session *is* a request to see its newest entry) and `appendEntries`
+   * (which samples the position before anything is appended — see its own comment).
    */
   #following = true;
   /**
    * True only while this class is calling `set_value` itself.
    *
-   * **`set_value` is a scroll, and `value-changed` cannot tell whose it is.** The handler below
-   * re-derives `#following` from `isAtBottom`, which is right for a person and wrong for us: our own
-   * scroll is issued against the `upper` of the moment, and if the layout re-wraps before it lands —
-   * which it does at a narrow width, because a bubble becomes several lines taller — the position we
-   * asked for is no longer the end, so `isAtBottom` says no and the follow is switched off **by the
-   * very act of trying to follow**. After that nothing re-arms it, because every later `changed`
-   * finds `#following` false.
+   * **`set_value` is a scroll, and `value-changed` cannot tell whose it is.** Our own scroll is issued
+   * against the `upper` of the moment, and if the layout re-wraps before it lands — which it does at a
+   * narrow width, because a bubble becomes several lines taller — the position we asked for is no longer
+   * the end, so "where are we?" says *not at the bottom* and the follow is switched off **by the very act
+   * of trying to follow**. After that nothing re-arms it, because every later `changed` finds the follow
+   * state false.
    *
-   * The symptom is the one this file was written to kill and it is width-dependent, which is what
-   * made it survive: `isAtBottom` has a 24 px tolerance (`core/scroll.ts`), so at 1024 px the
-   * shortfall of a short bubble stays inside the band and the stream keeps following, while at
-   * 360 px the same shortfall is a full line and the view stops one bubble short and stays there.
-   * Measured at 360×720 mid-stream, with zero warnings: the newest bubble cut off at the composer's
-   * edge while the status line read "Working — the agent is answering".
+   * The symptom is the one this file was written to kill and it is width-dependent, which is what made it
+   * survive: `isAtBottom` has a 24 px tolerance (`core/scroll.ts`), so at 1024 px the shortfall of a short
+   * bubble stays inside the band and the stream keeps following, while at 360 px the same shortfall is a
+   * full line and the view stops one bubble short and stays there. Measured at 360×720 mid-stream, with
+   * zero warnings: the newest bubble cut off at the composer's edge while the status line read "Working —
+   * the agent is answering".
    *
-   * So the flag is set around our own write and the re-derivation is skipped for it. `#following` is
-   * then changed only by a scroll this class did not cause, which is the sentence its own comment
-   * above already claims.
+   * So the flag is set around our own write (`#tryFollow`) and handed to `resolveFollow` as
+   * `selfScroll`, because the widget is the only party that knows it is the one holding the adjustment.
+   * It is wiring, not a rule: nothing in this file reads it.
    */
   #selfScrolling = false;
   /**
@@ -149,8 +169,8 @@ export class TranscriptView {
    *
    * `GtkAdjustment::changed` does not say which property moved, and the two cases must be answered
    * oppositely: the layout re-measuring means a follow is owed, a person scrolling means it is not.
-   * Comparing against this is the whole discriminator — see the `changed` connection in the
-   * constructor.
+   * Comparing against this is the whole discriminator — see `resolveFollow`, and the `changed` connection
+   * in the constructor.
    */
   #lastValue = 0;
 
@@ -204,38 +224,62 @@ export class TranscriptView {
     // both events (1 -> 2 across that resize).
     //
     // **A `changed` handler that re-armed unconditionally would yank a reader who scrolled up**, since
-    // scrolling moves the value and that is a `changed` too. So the value is compared against the last
-    // one this class saw: a change in `value` is a person reading and is left strictly alone, and a
-    // `changed` with the value unmoved is the layout re-measuring itself. That is the whole
-    // distinction, and it is what keeps the plan's section 6 rule intact — the follow only ever fires
-    // for `#following`, and `#following` is only cleared by a real scroll.
+    // scrolling moves the value and that is a `changed` too. Which case this is — and whether the move
+    // was ours or the reader's — is `resolveFollow`'s to answer from the adjustment's numbers; this file
+    // only connects the two signals and applies what comes back. That is what keeps the plan's section 6
+    // rule intact: the follow only ever fires for the follow state, and that state is only cleared by a
+    // position that is not the end.
     this.#scroller.get_vadjustment()?.connect('changed', () => {
-      const value = this.#scroller.get_vadjustment()?.get_value() ?? 0;
-      if (value !== this.#lastValue) {
-        this.#lastValue = value;
-        return; // The reader moved; `value-changed` below records that they are no longer following.
-      }
-      if (this.#following) {
-        this.#followPending = true;
-        this.#followAttempts = 0;
-      }
-      this.#tryFollow();
+      this.#onAdjustment('changed');
     });
 
-    // The reader's own scrolling, recorded as it happens. `#atBottom` is still sampled before every
-    // append — this is not the only place the answer comes from, it is the place that knows about a
+    // The reader's own scrolling, recorded as it happens. `appendEntries` samples `#atBottom` before
+    // every append — this is not the only place the answer comes from, it is the place that knows about a
     // scroll with **no** append behind it, which is exactly what a person reading does. Without it a
     // reader who scrolled up and then a resize that made the content taller would look like one
     // continuous "following" state, and the next chunk would yank them back down.
     this.#scroller.get_vadjustment()?.connect('value-changed', () => {
-      const value = this.#scroller.get_vadjustment()?.get_value() ?? 0;
-      this.#lastValue = value;
-      // Our own scroll lands here too, and re-deriving from it is how a follow switched itself off.
-      // See `#selfScrolling` for the measurement; the short version is that we only scroll while
-      // following, so a scroll we caused can only ever mean "still following".
-      if (this.#selfScrolling) return;
-      this.#following = this.#atBottom();
+      this.#onAdjustment('value-changed');
     });
+  }
+
+  /**
+   * Hand one notification from the adjustment to the decision, then apply what it says.
+   *
+   * **This method is the whole of the wiring, and it is deliberately that short.** The adjustment's three
+   * numbers plus the state this class carries between notifications are the entire input; whether that
+   * means "the reader scrolled up" or "the layout grew" or "we scrolled ourselves" is decided in
+   * `core/scroll.ts`, where a test can reach it — under Node there is no adjustment at all, and the rules
+   * that keep a following view following through a re-wrap would otherwise only ever be checked on a
+   * display.
+   *
+   * The order of the assignments is the contract: the decision is computed from the state *before* this
+   * notification, so `lastValue` is written from the result rather than from the adjustment directly.
+   *
+   * **A missing adjustment reads as `0`/`0`/`0`.** A scrolled window with no vertical adjustment cannot
+   * have been scrolled anywhere, and `isAtBottom(0, 0, 0)` is the same "following" answer `#atBottom`
+   * gives for one — so the two paths cannot disagree about a window that does not exist yet.
+   */
+  #onAdjustment(signal: AdjustmentSignal): void {
+    const adjustment = this.#scroller.get_vadjustment();
+    const update = resolveFollow({
+      following: this.#following,
+      selfScroll: this.#selfScrolling,
+      lastValue: this.#lastValue,
+      signal,
+      value: adjustment?.get_value() ?? 0,
+      upper: adjustment?.get_upper() ?? 0,
+      pageSize: adjustment?.get_page_size() ?? 0,
+    });
+    this.#following = update.following;
+    this.#lastValue = update.lastValue;
+    // Re-arm before the attempt, and reset the retry count with it: a layout that has just moved the end
+    // is a fresh reason to pay an owed scroll, not a continuation of whatever ran out before it.
+    if (update.rearmFollow) {
+      this.#followPending = true;
+      this.#followAttempts = 0;
+    }
+    if (update.attemptFollow) this.#tryFollow();
   }
 
   /**
@@ -386,13 +430,24 @@ export class TranscriptView {
   #scrollToEnd(): void {
     this.#followPending = true;
     this.#followAttempts = 0;
-    if (this.#scrollSource !== null) GLib.source_remove(this.#scrollSource);
+    // Cancelled *and* forgotten. A fast stream calls this once per chunk, so the pending idle of the
+    // previous chunk is still queued here — and the number has to go with it, or `#tryFollow`'s own
+    // `source_remove` (reached whenever a follow lands short) removes the same id a second time, which
+    // GLib answers on stderr: six `Source ID … was not found when attempting to remove it` messages on
+    // one stand-in turn, before this line cleared the field.
+    if (this.#scrollSource !== null) {
+      GLib.source_remove(this.#scrollSource);
+      this.#scrollSource = null;
+    }
     // Inline first: for a turn's chunk the window has been allocated for seconds, so this lands on the
     // first try and the idle below has nothing left to do. The constructor-time fill takes the idle
     // and the `changed` path instead, because at that moment neither can succeed — `upper` and
     // `page_size` are 0 until the window exists (`scripts/probes/scroll-settle.mjs` measures it).
     this.#tryFollow();
-    if (this.#followPending) {
+    // **`#scrollSource === null`, not just "still owed":** the call above may have queued its own
+    // retry from inside `set_value`'s synchronous `changed`, and queuing a second idle would leave the
+    // first one running with nobody holding its handle.
+    if (this.#followPending && this.#scrollSource === null) {
       this.#scrollSource = GLib.idle_add(GLib.PRIORITY_LOW, () => {
         this.#scrollSource = null;
         this.#tryFollow();

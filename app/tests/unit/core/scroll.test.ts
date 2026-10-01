@@ -5,7 +5,9 @@ import {
   followLanded,
   followTarget,
   isAtBottom,
+  resolveFollow,
   shouldRetryFollow,
+  type AdjustmentSignal,
 } from '../../../src/core/scroll.ts';
 
 export default async () => {
@@ -123,6 +125,260 @@ export default async () => {
     await it('takes the cap as an argument, so the bound is testable without the default', async () => {
       expect(shouldRetryFollow(1, 1)).toBe(false);
       expect(shouldRetryFollow(0, 1)).toBe(true);
+    });
+  });
+
+  await describe('scroll — was this scroll ours or the reader’s', async () => {
+    await it('keeps following through its own scroll, even where the end has moved away', async () => {
+      // **The 360 px defect, as a value.** Our own `set_value` asked for 800 against a `page_size` of
+      // 400; the column then re-wrapped into a taller one, so the end is now 1100 and the position we
+      // are sitting at is 300 px short of it — far outside `isAtBottom`'s band. Re-deriving the state
+      // from our own scroll is what switched the follow off by the act of following, and nothing would
+      // re-arm it afterwards.
+      const update = resolveFollow({
+        following: true,
+        selfScroll: true,
+        lastValue: 700,
+        signal: 'value-changed',
+        value: 700,
+        upper: 1500,
+        pageSize: 400,
+      });
+      expect(isAtBottom(700, 1500, 400)).toBe(false); // The answer this path must NOT take.
+      expect(update.following).toBe(true);
+      expect(update.lastValue).toBe(700);
+      // A scroll nobody asked for owes nothing, so there is nothing to re-arm and nothing to attempt.
+      expect(update.rearmFollow).toBe(false);
+      expect(update.attemptFollow).toBe(false);
+    });
+
+    await it('leaves the state exactly as it was on its own scroll, in either direction', async () => {
+      // "Unchanged" and "true" are different answers, and the widget only ever sets this field to one
+      // of them — so a scroll of ours can neither start nor stop a follow.
+      const stopped = resolveFollow({
+        following: false,
+        selfScroll: true,
+        lastValue: 1200,
+        signal: 'value-changed',
+        value: 2400,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(stopped.following).toBe(false);
+      // The position is still recorded, or the next `changed` would compare against a stale one and
+      // read the reader's own scroll as a layout change.
+      expect(stopped.lastValue).toBe(2400);
+    });
+
+    await it('turns following off when the reader scrolls up', async () => {
+      const update = resolveFollow({
+        following: true,
+        selfScroll: false,
+        lastValue: 2400,
+        signal: 'value-changed',
+        value: 2000,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(update.following).toBe(false);
+      expect(update.lastValue).toBe(2000);
+      // Plan §6: a jump while somebody is reading is hostile, so a reader's scroll is not the moment
+      // to answer an owed scroll either.
+      expect(update.rearmFollow).toBe(false);
+      expect(update.attemptFollow).toBe(false);
+    });
+
+    await it('turns following back on when the reader reaches the end again', async () => {
+      const back = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 2000,
+        signal: 'value-changed',
+        value: 2400,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(back.following).toBe(true);
+      // The same 24 px band a person's position gets, reused unchanged: a reader who drags to the end
+      // and lands a fraction short of it is still at the end.
+      const withinBand = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 2000,
+        signal: 'value-changed',
+        value: 2380,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(withinBand.following).toBe(true);
+    });
+
+    await it('counts a position exactly on the band edge, and not a tenth of a pixel past it', async () => {
+      // The edge of `isAtBottom`'s tolerance is the difference between a reader who reached the end and
+      // one who stopped a hair short of it, so the comparison itself has to be pinned down.
+      const onEdge = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 0,
+        signal: 'value-changed',
+        value: 2400 - 24,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(onEdge.following).toBe(true);
+      const pastEdge = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 0,
+        signal: 'value-changed',
+        value: 2400 - 24.1,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(pastEdge.following).toBe(false);
+    });
+
+    await it('reads a column that grew under a following view as the layout, not as a reader', async () => {
+      // A window narrowed mid-turn re-wraps every bubble, so `upper` moves while the value stays
+      // exactly where it was — and `changed` does not say which property moved, so the remembered value
+      // is the whole discriminator.
+      const update = resolveFollow({
+        following: true,
+        selfScroll: false,
+        lastValue: 2400,
+        signal: 'changed',
+        value: 2400,
+        upper: 4000,
+        pageSize: 600,
+      });
+      expect(isAtBottom(2400, 4000, 600)).toBe(false); // The answer this path must NOT take either.
+      expect(update.following).toBe(true);
+      // The end moved and the view has to go with it, so the follow is owed again and paid now.
+      expect(update.rearmFollow).toBe(true);
+      expect(update.attemptFollow).toBe(true);
+      expect(update.lastValue).toBe(2400);
+    });
+
+    await it('leaves a `changed` that carries the reader’s own move to the other signal', async () => {
+      // Same notification as the re-wrap, but the value is not the remembered one — so this is a
+      // reader's scroll, which `value-changed` reports from a fresh read. This path only keeps the
+      // remembered position current, and answers nothing.
+      const update = resolveFollow({
+        following: true,
+        selfScroll: false,
+        lastValue: 2400,
+        signal: 'changed',
+        value: 1800,
+        upper: 3000,
+        pageSize: 600,
+      });
+      expect(update.following).toBe(true);
+      expect(update.lastValue).toBe(1800);
+      expect(update.rearmFollow).toBe(false);
+      expect(update.attemptFollow).toBe(false);
+    });
+
+    await it('re-arms nothing for a layout change while the reader is scrolled up', async () => {
+      // The reader has said where they want to be and the layout gets no vote — this is the case that
+      // would otherwise be read as "they came back". The attempt is still asked for, and the widget's
+      // own owed-follow flag decides whether there is anything to do about it.
+      const update = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 1200,
+        signal: 'changed',
+        value: 1200,
+        upper: 4400,
+        pageSize: 600,
+      });
+      expect(update.following).toBe(false);
+      expect(update.rearmFollow).toBe(false);
+      expect(update.attemptFollow).toBe(true);
+    });
+
+    await it('counts a conversation shorter than the pane as the end, whichever way it arrived', async () => {
+      // Nothing to scroll to, so there is nothing to have scrolled away from. A fresh window with
+      // three bubbles is "following", and `upper <= pageSize` is where `isAtBottom` already draws that
+      // line for a position; a move has to be answered with the same rule.
+      const shorter = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 0,
+        signal: 'value-changed',
+        value: 0,
+        upper: 200,
+        pageSize: 600,
+      });
+      expect(shorter.following).toBe(true);
+      const exactly = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 0,
+        signal: 'value-changed',
+        value: 0,
+        upper: 600,
+        pageSize: 600,
+      });
+      expect(exactly.following).toBe(true);
+    });
+
+    await it('counts an unmeasured adjustment as following, as a widget with no adjustment does', async () => {
+      // Before the first allocation `upper` and `page_size` are both 0 (measured,
+      // `scripts/probes/scroll-settle.mjs`), and `isAtBottom(0, 0, 0)` says "at the end". A widget with
+      // no adjustment at all has to answer the same thing or the two paths would disagree about a
+      // window that does not exist yet. The *scroll* is a separate question and is still owed:
+      // `followTarget(0, 0)` is null.
+      const update = resolveFollow({
+        following: false,
+        selfScroll: false,
+        lastValue: 0,
+        signal: 'value-changed',
+        value: 0,
+        upper: 0,
+        pageSize: 0,
+      });
+      expect(update.following).toBe(true);
+      expect(followTarget(0, 0)).toBe(null);
+    });
+
+    await it('plays a whole turn through, and only the reader’s moves change the state', async () => {
+      // The widget’s side of the contract, as a state machine: hold the two fields, ask, write back
+      // what came out. A turn that streams, re-wraps, is scrolled up by a reader and then scrolled down
+      // again — the answer after the reader returns to the end has to be "following", or the next chunk
+      // after that never follows.
+      let following = true;
+      let lastValue = 0;
+      const feed = (input: {
+        signal: AdjustmentSignal;
+        value: number;
+        selfScroll?: boolean;
+        upper?: number;
+        pageSize?: number;
+      }): void => {
+        const update = resolveFollow({
+          following,
+          selfScroll: input.selfScroll ?? false,
+          lastValue,
+          signal: input.signal,
+          value: input.value,
+          upper: input.upper ?? 3000,
+          pageSize: input.pageSize ?? 600,
+        });
+        following = update.following;
+        lastValue = update.lastValue;
+      };
+
+      feed({ signal: 'value-changed', value: 2400, selfScroll: true }); // Our own follow to the end.
+      expect(following).toBe(true);
+      feed({ signal: 'changed', value: 2400, upper: 4200 }); // A bubble re-wraps the column taller.
+      expect(following).toBe(true);
+      feed({ signal: 'value-changed', value: 1200 }); // A reader scrolls up to read.
+      expect(following).toBe(false);
+      feed({ signal: 'changed', value: 1200, upper: 4400 }); // …and the column grows again.
+      expect(following).toBe(false);
+      feed({ signal: 'value-changed', value: 3800 }); // They scroll down to the new end themselves.
+      expect(following).toBe(true);
+      expect(lastValue).toBe(3800);
     });
   });
 };
