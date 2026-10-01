@@ -160,6 +160,33 @@ so no real conversation ends up in a screenshot, and `KU_APP_SESSION=<id>` to op
 a pointer. GTK behaviour a comment relies on gets a probe in `scripts/probes/` that prints the
 numbers the comment quotes.
 
+### Watching a turn without a model
+
+`scripts/stand-in-agent.mjs` is a real ACP peer over stdio — real framing, real method names, the
+`fork` marker `opencode acp` sends and the v1 schema does not define. It answers without a model, a
+network or a quota, so a turn can be streamed, stopped and killed as often as needed and looks the
+same twice. `KU_APP_AGENT=stand-in` selects it; it is reachable through the dev hooks and **not** in
+`LAUNCHERS`, which is the table of programs a person installs.
+
+```bash
+# a turn that streams and then ends on its own
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# the two states that are unreachable against a real agent: mid-stream, and a dying agent
+KU_STANDIN_HANG=1             # never answers end_turn — the running state, and what Stop is for
+KU_STANDIN_EXIT_MID_TURN=1    # exits with code 3 during the turn — the gone state
+KU_STANDIN_DELAY_MS=900 KU_STANDIN_CHUNKS=8   # a longer, slower stream to shoot mid-answer
+```
+
+`KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. A hook set to `0` or `false`
+is **off** — unset, empty, `0` and `false` all mean not set, in kurier and in the stand-in alike, so
+there is one rule for "is this on" in the repo.
+
+The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
+`Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is
+unusable, and `gjs -m scripts/probes/window-min-width.mjs [floor]` prints the sweep that says so;
+pass a number to reproduce a different floor, or nothing to see what the window does without one.
+
 **GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
 question. Both runtimes, as in postbote and beifahrer:
 
