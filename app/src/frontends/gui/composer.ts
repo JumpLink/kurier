@@ -56,7 +56,7 @@ import Adw from '@girs/adw-1';
 import Gdk from '@girs/gdk-4.0';
 import Gtk from '@girs/gtk-4.0';
 
-import { composerView, type ComposerInput, type TurnState } from '../../core/composer-state.ts';
+import { composerView, type ComposerInput } from '../../core/composer-state.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
