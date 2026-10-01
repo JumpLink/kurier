@@ -17,17 +17,20 @@
  * needs (`attached`) and what may be said (`note`), and it is the *smallest* shape that carries
  * `openAgent` failing, because a boolean cannot carry a sentence a person has to act on.
  *
- * **`waiting-for-you` exists in this machine and the GUI cannot reach it yet.** The event is here,
- * tested, and unreachable from the window until the permission dialog of plan §7 step 6 exists. It is
- * written out anyway rather than deleted, because the alternative is a state invented by the first
- * dialog's author, who would then have to decide what puts the window *into* it — and the answer has
- * to be the same one the composer already renders as "the turn is not finished".
+ * **`waiting-for-you` is reachable, and what reaches it is a person.** The event pair is here, the
+ * composer renders the state, and plan §7 step 6 wired them to the permission dialog: an
+ * `onPermission` surface puts the question up and moves the state, so the window shows Stop next to a
+ * dialog rather than a Send that cannot work. It is written as a transition rather than as a
+ * special case because the alternative is a state invented by the dialog's author, who would then have
+ * to decide what puts the window *into* it — and the answer has to be the one the composer already
+ * renders as "the turn is not finished".
  */
 
 import type { RequestPermissionRequest, SessionId, StopReason } from '@kurier/acp/types';
 import type { TranscriptEntry } from '@kurier/session';
 
 import type { TurnState } from './composer-state.ts';
+import type { PermissionDecision } from './permission.ts';
 
 export type { TurnState };
 
@@ -230,26 +233,45 @@ export function agentExitedEntry(sessionId: SessionId, at: string, reason: strin
 }
 
 /**
- * The system line for a permission request kurier refused.
+ * The system line for a permission decision that was made, or not made.
  *
- * **A refusal nobody can see is a policy in the wrong place.** Until the dialog of step 6 exists this
- * window answers every request with `null` (`DENY_EVERYTHING`, guardrail 2 — never "allow because the
- * agent asked"), which is correct and completely silent: against a real agent a turn would just stop
- * with a `refusal` and nothing on screen would say a person was asked and said no. One line turns that
- * into a record. It names what the agent wanted to do, because a tool title is the only thing here a
- * person can recognise; it does not pretend the request was a decision somebody made.
+ * **A decision nobody can see is a decision in the wrong place.** This window used to answer every
+ * request with `null` (`DENY_EVERYTHING`, guardrail 2 — never "allow because the agent asked"), which
+ * is correct and completely silent: against a real agent a turn would just stop with a `refusal` and
+ * nothing on screen would say a person was asked. One line turns that into a record.
+ *
+ * Three outcomes, and the wording keeps them apart, because they are not the same thing to the person
+ * who reads the transcript afterwards:
+ *
+ * - **allowed once** — a person pressed one of the agent's own allow buttons. The id is recorded,
+ *   because "allow" without the option that was chosen does not say *what* was allowed.
+ * - **declined** — a person pressed the agent's own rejecting option. A decision.
+ * - **not answered** — nobody chose: Escape, the window closed, Stop, the agent died, the turn was
+ *   cancelled. Failing closed is correct, and calling it a refusal would put a decision in a person's
+ *   mouth that they never made — hence the third wording, which names the *reason* instead.
+ *
+ * The tool title is named because it is the only thing here a person can recognise.
  */
-export function permissionRefusedEntry(
+export function permissionDecisionEntry(
   request: RequestPermissionRequest,
   sessionId: SessionId,
   at: string,
+  outcome: PermissionDecision,
 ): TranscriptEntry {
   const call = request.toolCall;
   const what = call.title || (call.kind ? `a ${call.kind} tool call` : 'a tool call');
+  let text: string;
+  if (outcome.type === 'allowed') {
+    text = `allowed once: ${what} (${outcome.optionId})`;
+  } else if (outcome.type === 'declined') {
+    text = `declined: ${what} (${outcome.optionId})`;
+  } else {
+    text = `not answered: ${what} — ${outcome.reason}`;
+  }
   return {
     kind: 'system',
     at,
     sessionId,
-    text: `refused: ${what} — this window has no approval dialog yet, so every request is declined`,
+    text,
   };
 }

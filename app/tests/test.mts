@@ -25,6 +25,7 @@ import scroll from './unit/core/scroll.test.ts';
 import sessionGroups from './unit/core/session-groups.test.ts';
 import transcriptItems from './unit/core/transcript-items.test.ts';
 import turn from './unit/core/turn.test.ts';
+import permission from './unit/core/permission.test.ts';
 import agentSession from './unit/core/agent-session.test.ts';
 
 import smoke from './unit/smoke.test.ts';
@@ -50,6 +51,7 @@ run({
   sessionGroups,
   transcriptItems,
   turn,
+  permission,
   agentSession,
   smoke,
 });

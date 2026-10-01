@@ -88,8 +88,12 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
    `assertScopeIsNotAuthority` (`gate.ts`) is the runtime canary: it throws if a persisted record
    ever grows an `allow`/`permissions`/`grants`/`capabilities`/`policy` key, because a TypeScript
    type alone cannot stop a later `{ ...session, grants: [...] }` from type-checking.
-2. **Fail closed on `request_permission`.** `denyAll` is the default `PermissionGate`. Never
-   "auto-allow because the agent asked".
+2. **Fail closed on `request_permission`.** `denyAll` remains the default `PermissionGate`; the Adwaita
+   surface passes its own, which asks a person and answers `cancelled` on every path where nobody chose
+   — Escape, Stop, a closing window, an agent that died, a closed dialog. Never "auto-allow because the
+   agent asked", and **never "always allow"**: `allow_always`/`reject_always` are filtered out in the
+   projection (`core/permission.ts`), so kurier is never offered a promise it keeps nothing for.
+   There is no timeout on a question — a diff takes longer than any deadline kurier could pick.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
    access through that channel at all. File access is a decision, not a default.
@@ -176,11 +180,52 @@ KU_APP_AGENT=stand-in KU_APP_THINKING=1 ./node_modules/.bin/gjsify run app/dist/
 KU_STANDIN_HANG=1             # never answers end_turn — the running state, and what Stop is for
 KU_STANDIN_EXIT_MID_TURN=1    # exits with code 3 during the turn — the gone state
 KU_STANDIN_DELAY_MS=900 KU_STANDIN_CHUNKS=8   # a longer, slower stream to shoot mid-answer
+KU_STANDIN_PERMISSION=1       # asks session/request_permission mid-turn and waits for the answer
 ```
 
 `KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. A hook set to `0` or `false`
 is **off** — unset, empty, `0` and `false` all mean not set, in kurier and in the stand-in alike, so
 there is one rule for "is this on" in the repo.
+
+**The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
+`session/request_permission`, carried over the real stdio chain, with all four option kinds on the wire
+so the `*_always` filtering has something to filter. `KU_APP_PERMISSION=1` is kurier's side: it puts a
+fixture request through **the same gate** the agent's requests go through, so a screenshot shows the
+gate's behaviour rather than a dialog built for the screenshot.
+
+**`KU_APP_PERMISSION` is a fallback, not a competitor**, and the wait is a poll rather than a fixed
+delay (`window.ts`): with `KU_STANDIN_PERMISSION=1` the agent's question is the better thing to
+photograph and it arrives an unpredictable moment after the prompt goes out, so a fixed delay would
+either beat it or lose to it. It stages only once the gate has not been asked; with no turn running
+that is the first tick, because there is no agent that could ask.
+
+```bash
+# the agent's own question, mid-turn, over the real chain
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# just the dialog, with no agent at all
+KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+What the dialog does and does not do is decided in `app/src/core/permission.ts` and tested on both
+runtimes; the widget only renders.
+
+**Two kinds of GTK probe, and which is which.** `scripts/probes/` measures *libadwaita* with
+look-alikes (`gjs -m scripts/probes/<name>.mjs`); `app/tests/probes/` measures *kurier's own widget*,
+so it is a TypeScript entry that imports the widget and has to be bundled first:
+
+```sh
+./node_modules/.bin/gjsify build app/tests/probes/permission-focus.ts --app gjs --outfile /tmp/focus.gjs.mjs
+DISPLAY=:0 ./node_modules/.bin/gjsify run /tmp/focus.gjs.mjs
+```
+
+The split exists because a look-alike cannot answer a question about our widget — the first version of
+the permission dialog left libadwaita's focus fallback in place, and the plain probe said the focus was
+on the allow button while the app's own screenshot showed a highlighted label instead. Three GTK facts
+behind the dialog are measured rather than read from the signal docs: `Adw.Dialog` emits `closed`
+**before** `response` (so a dialog that settles on `closed` can never allow anything), `force_close()`
+emits neither signal (so it would hang the turn), and with no `default_response` set libadwaita focuses
+the **last added** response — which is the allow button whenever the agent sends it last.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
 `Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is

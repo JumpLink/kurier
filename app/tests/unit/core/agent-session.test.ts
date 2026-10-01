@@ -4,6 +4,7 @@ import { AcpClient } from '@kurier/acp/client';
 import type { TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../../src/core/agent-session.ts';
+import type { PermissionQuestion } from '../../../src/core/permission.ts';
 import { OPENCODE_COMMAND } from '../../../src/core/agents/opencode.ts';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
 
@@ -21,6 +22,16 @@ interface Harness {
   spawnCloserUsed(): boolean;
   /** One tick of the microtask queue, which is where the fixture's turn replies land. */
   flush(): Promise<void>;
+  /**
+   * Wait until something the fixture only does asynchronously has happened.
+   *
+   * **`flush` cannot express this.** A gate question is put to the surface after the handshake, the
+   * `session/load` and the prompt — several awaits deep — so "the question is on screen" has no fixed
+   * tick count, and a fixed count is a number that happens to work today. A one-millisecond timer with
+   * a bound fails loudly instead: it is the difference between waiting for the event and guessing when
+   * it happens.
+   */
+  waitUntil(seen: () => boolean): Promise<void>;
 }
 
 interface HarnessOptions extends FixtureAgentOptions {
@@ -31,6 +42,11 @@ interface HarnessOptions extends FixtureAgentOptions {
    * has happened to it — which is the only way to assert what the constructor does and does not do.
    */
   bind?: boolean;
+  /**
+   * Stand in for the surface's dialog. Absent means "no surface can ask", which is the CLI and is
+   * guardrail 2 — the same path, not a special case.
+   */
+  onPermission?: (question: PermissionQuestion) => Promise<string | null | undefined>;
 }
 
 /**
@@ -62,6 +78,9 @@ function harness(options: HarnessOptions = {}): Harness {
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       onEntries: (batch) => entries.push(...batch),
       onNotice: (message) => notices.push(message),
+      // Spread so an absent hook stays absent: `onPermission: undefined` would be a hook that exists
+      // and cannot ask, which is not the same thing the CLI has.
+      ...(options.onPermission ? { onPermission: options.onPermission } : {}),
     },
     append: (sessionId, batch) => persisted.push({ sessionId, entries: batch }),
     // The gate kurier passes is the gate the client answers with, so the refusal assertions are about
@@ -90,6 +109,12 @@ function harness(options: HarnessOptions = {}): Harness {
       // The fixture's turn runs on the microtask queue, so a fixed number of ticks is what "the turn has
       // progressed" means here. A real timer would make the suite slow and no more correct.
       for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    },
+    waitUntil: async (seen) => {
+      for (let i = 0; i < 2_000 && !seen(); i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      if (!seen()) throw new Error('the fixture never got there within two seconds');
     },
   };
 }
@@ -228,15 +253,15 @@ export default async () => {
     });
   });
 
-  await describe('agent-session — the gate', async () => {
+  await describe('agent-session — the gate, with no surface that can ask', async () => {
     const PERMISSION = [
       { optionId: 'allow', name: 'Allow once', kind: 'allow_once' as const },
       { optionId: 'reject', name: 'Reject', kind: 'reject_once' as const },
     ];
 
     await it('refuses a permission request rather than allowing it', async () => {
-      // Guardrail 2. The stand-in GUI has no dialog yet (plan §7 step 6), and "no dialog" must not
-      // become "allowed".
+      // Guardrail 2, still true where there is nobody to ask: the CLI and any surface that does not
+      // implement `onPermission` get `cancelled`, and "no dialog" must never become "allowed".
       const h = harness({ permissionOptions: PERMISSION });
       await h.session.prompt('do a thing');
       expect(h.agent.permissionAsked.length).toBe(1);
@@ -252,11 +277,11 @@ export default async () => {
       expect(outcome).toStrictEqual({ outcome: 'cancelled' });
     });
 
-    await it('writes the refusal into the transcript, so it is not a silent denial', async () => {
+    await it('writes the decision into the transcript, so it is not a silent denial', async () => {
       const h = harness({ permissionOptions: PERMISSION });
       await h.session.prompt('do a thing');
-      const refusal = h.entries.find((entry) => entry.text.startsWith('refused:'));
-      expect(refusal?.text).toContain('write a file');
+      const line = h.entries.find((entry) => entry.text.startsWith('not answered:'));
+      expect(line?.text).toContain('write a file');
     });
 
     await it('does not hang the turn — the agent is answered while its request is fresh', async () => {
@@ -265,6 +290,226 @@ export default async () => {
       // The turn settled rather than waiting for a dialog nobody will show.
       expect(h.session.turnRunning).toBe(false);
       expect(h.snapshots[h.snapshots.length - 1]?.state).toBe('idle');
+    });
+  });
+
+  await describe('agent-session — the gate, with a surface that asks', async () => {
+    const PERMISSION = [
+      { optionId: 'allow', name: 'Allow once', kind: 'allow_once' as const },
+      { optionId: 'reject', name: 'Reject', kind: 'reject_once' as const },
+    ];
+
+    await it('asks the surface, and answers the agent with the option that was pressed', async () => {
+      const asked: string[] = [];
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: async (question) => {
+          asked.push(question.view.tool);
+          return 'allow';
+        },
+      });
+      await h.session.prompt('do a thing');
+      expect(asked.length).toBe(1);
+      expect(asked[0]).toContain('write a file');
+      expect(h.agent.permissionOutcomes[0]?.outcome).toStrictEqual({
+        outcome: 'selected',
+        optionId: 'allow',
+      });
+    });
+
+    await it('a surface that never offered that id cannot get it allowed', async () => {
+      // The fail-closed rule, end to end and over the wire: a dialog resolving with `"close"` — its
+      // dismissal id — must not come back as an allow. This is the assertion that would break first if
+      // `decideFromView` ever mapped an unknown id to `allowed`.
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: async () => 'close',
+      });
+      await h.session.prompt('do a thing');
+      expect(h.agent.permissionOutcomes[0]?.outcome).toStrictEqual({ outcome: 'cancelled' });
+    });
+
+    await it('a dismissing surface is recorded as "not answered", not as a refusal', async () => {
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: async () => 'close',
+      });
+      await h.session.prompt('do a thing');
+      const line = h.entries.find((entry) => entry.text.startsWith('not answered:'));
+      expect(line?.text).toContain('dismissed');
+    });
+
+    await it('the turn goes into waiting-for-you while the question is up', async () => {
+      // `composer-state.ts` already renders this state; the dialog is what makes it reachable, so
+      // without this the state would still be dead code with a widget pointing at it.
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: async () => {
+          expect(h.session.snapshot.state).toBe('waiting-for-you');
+          return 'reject';
+        },
+      });
+      await h.session.prompt('do a thing');
+      // …and leaves it when the answer arrives.
+      expect(h.snapshots.map((snapshot) => snapshot.state)).toContain('waiting-for-you');
+      expect(h.session.snapshot.state).toBe('idle');
+    });
+
+    await it('a second request while one is up waits its turn instead of stacking', async () => {
+      // **What this measures, precisely.** The fixture's burst asks twice without waiting, which is
+      // how an agent doing parallel tool calls behaves — but the serialisation that makes them arrive
+      // one at a time happens in `AcpClient.#enqueuePermission` (`packages/acp/src/client.ts`), not in
+      // this controller, and `permission-queue.test.ts` measures that layer's concurrency peak. So this
+      // is an end-to-end test, not a desk test: it says the whole chain (fixture → client queue →
+      // controller gate → desk → surface) shows the person two questions, in order, and answers both.
+      // The desk's own queue is tested directly in `permission.test.ts`, where nothing upstream can
+      // make it pass by luck.
+      const shown: string[] = [];
+      const h = harness({
+        permissionOptions: PERMISSION,
+        permissionBurst: 2,
+        onPermission: async (question) => {
+          shown.push(question.id);
+          return 'reject';
+        },
+      });
+      await h.session.prompt('do a thing');
+      expect(shown.length).toBe(2);
+      expect(new Set(shown).size).toBe(2);
+      // Both answered, both refused, and the turn ended rather than hanging.
+      expect(h.agent.permissionOutcomes.length).toBe(2);
+      expect(h.agent.permissionOutcomes.every((outcome) => outcome?.outcome.outcome === 'selected')).toBe(true);
+      expect(h.session.turnRunning).toBe(false);
+    });
+
+    await it('Stop with a dialog up answers it cancelled rather than leaving the turn waiting', async () => {
+      // The surface never answers, which is what a dialog a person walked away from looks like from
+      // here. Stop has to settle it — otherwise the turn is waiting on a question nobody will ever see.
+      const states: string[] = [];
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: () => {
+          states.push(h.session.snapshot.state);
+          return new Promise<string | null>(() => {});
+        },
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.waitUntil(() => states.length > 0);
+      // The state is read from inside the hook, which is the moment the question is actually up: a
+      // fixed number of microtask ticks is only an approximation of when the fixture got there.
+      expect(states).toStrictEqual(['waiting-for-you']);
+      h.session.stop();
+      await turn;
+      // `cancelled` and not `refusal`: the request was answered, and the answer was that nobody
+      // chose. The fixture's own turn then ends, which is what makes `await turn` return.
+      expect(h.agent.permissionOutcomes[0]?.outcome).toStrictEqual({ outcome: 'cancelled' });
+      expect(h.session.turnRunning).toBe(false);
+    });
+
+    await it('an answer that arrives after the Stop cannot turn cancelled into an allow', async () => {
+      // The dialog's promise resolves *after* the Stop, with the allowing id. A surface that does that
+      // is not misbehaving — GTK settles a dialog in either order while it is being torn down — so the
+      // question is whether the answer kurier already gave can still be an allow. It cannot: the desk
+      // holds no open question, so the late id lands on nothing and the outcome is already `cancelled`.
+      let release: (id: string) => void = () => {};
+      const asked = new Promise<void>((resolve) => {
+        release = () => resolve();
+      });
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: () =>
+          new Promise<string>((resolve) => {
+            void asked.then(() => resolve('allow'));
+          }),
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.waitUntil(() => h.snapshots.some((snapshot) => snapshot.state === 'waiting-for-you'));
+      h.session.stop();
+      // Only now, with the turn already over, does the surface offer the allowing id.
+      release('allow');
+      await turn;
+      expect(h.agent.permissionOutcomes[0]?.outcome).toStrictEqual({ outcome: 'cancelled' });
+      // And only one answer ever reached the wire: the late one had nothing to attach to.
+      expect(h.agent.permissionOutcomes.length).toBe(1);
+    });
+
+    await it('an agent that dies mid-question settles it, and says why', async () => {
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: () => new Promise<string | null>(() => {}),
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.flush();
+      // The transport ends with the question still up: `#reportFailure` is the path that settles it.
+      h.agent.vanish();
+      await turn;
+      // Nothing goes back over a dead wire — the agent is gone — so the assertion is on kurier's own
+      // record: the question is settled, and the line says `agent-gone` rather than claiming a person
+      // refused anything.
+      expect(h.session.snapshot.attachment.status).toBe('gone');
+      const line = h.entries.find((entry) => entry.text.startsWith('not answered:'));
+      expect(line?.text).toContain('agent-gone');
+    });
+
+    await it('the staged request for KU_APP_PERMISSION goes through the same gate', async () => {
+      // Not a dialog built for a screenshot: the real ask, with all four option kinds on the wire, so
+      // what a screenshot shows is the gate's filtering rather than a fixture's convenience.
+      const shown: string[] = [];
+      const h = harness({
+        onPermission: async (question) => {
+          shown.push(...question.view.options.map((option) => option.optionId));
+          return 'reject-once';
+        },
+      });
+      const answer = await h.session.stagePermissionRequest();
+      expect(shown).toStrictEqual(['allow-once', 'reject-once']);
+      expect(answer).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'reject-once' } });
+    });
+
+    await it('the staged request records nothing — a question no agent asked is not history', async () => {
+      // The staged request is a fixture, and `AGENTS.md` is explicit that the transcript is a *record
+      // of what happened*. Writing "declined: Write src/hello.ts" into a real session file because a dev
+      // hook was set would put a decision nobody made into somebody's conversation history — and it
+      // would land in whichever session happens to be open.
+      const h = harness({ bind: false });
+      h.session.bind(SESSION);
+      h.session.dismissPermission('dismissed');
+      await h.session.stagePermissionRequest();
+      expect(h.entries.filter((entry) => entry.text.includes('src/hello.ts'))).toStrictEqual([]);
+      expect(h.persisted).toStrictEqual([]);
+    });
+
+    await it('the window can name its own ending, so a Stop and a close read differently', async () => {
+      // Both are `cancelled` over the wire and they are not the same sentence: `dismissPermission`
+      // is how the surface says *which* one, and without it every window-closed question would be
+      // recorded as the vaguer `dismissed` that the dialog's own close produces.
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: () => new Promise<string | null>(() => {}),
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.waitUntil(() => h.snapshots.some((snapshot) => snapshot.state === 'waiting-for-you'));
+      h.session.dismissPermission('window-closed');
+      await turn;
+      expect(h.agent.permissionOutcomes[0]?.outcome).toStrictEqual({ outcome: 'cancelled' });
+      const line = h.entries.find((entry) => entry.text.startsWith('not answered:'));
+      expect(line?.text).toContain('window-closed');
+      // A second call is a no-op rather than an error: the window's close handler and
+      // `shutdown()` both ask, and only the first has a question to settle.
+      expect(() => h.session.dismissPermission('turn-cancelled')).not.toThrow();
+    });
+
+    await it('a Stop names turn-cancelled rather than the vaguer dismissed', async () => {
+      const h = harness({
+        permissionOptions: PERMISSION,
+        onPermission: () => new Promise<string | null>(() => {}),
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.waitUntil(() => h.snapshots.some((snapshot) => snapshot.state === 'waiting-for-you'));
+      h.session.stop();
+      await turn;
+      const line = h.entries.find((entry) => entry.text.startsWith('not answered:'));
+      expect(line?.text).toContain('turn-cancelled');
     });
   });
 

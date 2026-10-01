@@ -44,11 +44,17 @@ export interface KurierHooks extends FrameworkHooks {
   agent?: string;
 
   /**
-   * `KU_APP_PERMISSION` — stage an open `session/request_permission` at startup.
+   * `KU_APP_PERMISSION` — put a `session/request_permission` in front of the real gate at startup.
    *
    * The dialog is the **reason this project exists**: a modal that must appear, must show what the
    * agent wants to do, and must fail closed on Escape. None of that is observable from outside
-   * without a staged request, and none of it works in a build-only CI run.
+   * without a request to answer, and none of it works in a build-only CI run.
+   *
+   * **It goes through the real path, not around it.** The staged request is handed to the same gate
+   * that answers the agent, so what a screenshot shows is the dialog the gate produces — including
+   * the fail-closed behaviour, which a dialog built only for the screenshot would not have. It waits
+   * briefly for a *real* request first (see `window.ts`), so `KU_APP_PERMISSION=1` next to a stand-in
+   * that asks permission itself shows the agent's question rather than this fixture.
    */
   permission?: boolean;
 

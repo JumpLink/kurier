@@ -7,7 +7,7 @@ import {
   agentName,
   agentStatus,
   isEchoOf,
-  permissionRefusedEntry,
+  permissionDecisionEntry,
   transition,
   type AgentAttachment,
   type CancelledBy,
@@ -238,8 +238,8 @@ export default async () => {
       expect(text).toContain('never answered');
     });
 
-    await it('a refused permission is recorded, with the tool the agent named', async () => {
-      const entry = permissionRefusedEntry(
+    await it('an allowed permission names what was allowed, and the option that did it', async () => {
+      const entry = permissionDecisionEntry(
         {
           sessionId: 's1',
           toolCall: { toolCallId: 'c1', title: 'write src/index.ts', kind: 'edit' },
@@ -247,19 +247,50 @@ export default async () => {
         },
         's1',
         '2026-10-01T10:00:00.000Z',
+        { type: 'allowed', optionId: 'allow_once' },
       );
       expect(entry.kind).toBe('system');
-      expect(entry.text).toContain('refused');
+      expect(entry.text).toContain('allowed once');
       expect(entry.text).toContain('write src/index.ts');
+      // The id is in the line because "allowed" alone does not say *what* was allowed.
+      expect(entry.text).toContain('allow_once');
     });
 
-    await it('a permission with no title still says a tool call was refused', async () => {
+    await it('a declined permission reads as a decision, not as a failure', async () => {
+      const entry = permissionDecisionEntry(
+        { sessionId: 's1', toolCall: { toolCallId: 'c1', title: 'write src/index.ts' }, options: [] },
+        's1',
+        '2026-10-01T10:00:00.000Z',
+        { type: 'declined', optionId: 'reject_once' },
+      );
+      expect(entry.text).toContain('declined');
+    });
+
+    await it('nobody answering is "not answered", and it names why rather than calling it a refusal', async () => {
+      // **The wording is the point.** Every one of these four reasons ends in `cancelled`, but a
+      // transcript that said "refused" four times would put a decision in a person's mouth for three
+      // of them — they pressed Stop, or closed the window, or watched the agent die.
+      for (const reason of ['dismissed', 'window-closed', 'turn-cancelled', 'agent-gone'] as const) {
+        const entry = permissionDecisionEntry(
+          { sessionId: 's1', toolCall: { toolCallId: 'c1', title: 'write src/index.ts' }, options: [] },
+          's1',
+          '2026-10-01T10:00:00.000Z',
+          { type: 'not-answered', reason },
+        );
+        expect(entry.text).toContain('not answered');
+        expect(entry.text).toContain(reason);
+        expect(entry.text).not.toContain('refused');
+      }
+    });
+
+    await it('a permission with no title still says a tool call was involved', async () => {
       // Every field of a tool call is optional in the schema but the id is not, so there is always
-      // something to name — and a line that read "refused: " would name nothing.
-      const entry = permissionRefusedEntry(
+      // something to name — and a line that read "allowed once: " would name nothing.
+      const entry = permissionDecisionEntry(
         { sessionId: 's1', toolCall: { toolCallId: 'c1', kind: 'execute' }, options: [] },
         's1',
         '2026-10-01T10:00:00.000Z',
+        { type: 'not-answered', reason: 'dismissed' },
       );
       expect(entry.text).toContain('execute');
     });

@@ -58,6 +58,7 @@
  */
 
 import Adw from '@girs/adw-1';
+import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
 import Gtk from '@girs/gtk-4.0';
 
@@ -76,8 +77,29 @@ import {
 } from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
+import { PermissionDialog } from './permission-dialog.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
+
+/**
+ * How often `KU_APP_PERMISSION` reconsiders, and how long it waits for a real request before it
+ * stages one of its own.
+ *
+ * **A poll, not a single timeout, because "has a real request arrived yet" is not knowable in
+ * advance.** The agent's own question lands somewhere after the prompt goes out, and where depends on
+ * the agent: against the stand-in it is `KU_STANDIN_DELAY_MS × (chunks + the opening beats)` — over
+ * three seconds at the defaults, and longer the moment somebody sets `KU_STANDIN_DELAY_MS=900`. A
+ * fixed delay either fires before the real question (and the fixture is what gets photographed) or
+ * far after it. Polling is what makes "the agent's question wins" true rather than approximately true,
+ * and the cost is one timer that says nothing.
+ *
+ * **Two different waits, because there are two different situations.** With no turn running there is
+ * no agent that could ask, so the fixture is staged at the first tick — a screenshot run does not sit
+ * through a deadline to get its dialog. With a turn running, the wait is the deadline, and it exists
+ * so the hook cannot hang forever against an agent that never asks.
+ */
+const PERMISSION_STAGE_POLL_MS = 250;
+const PERMISSION_STAGE_DEADLINE_MS = 8_000;
 
 /**
  * What the window needs in order to own a turn.
@@ -115,6 +137,11 @@ export class MainWindow extends Adw.ApplicationWindow {
   readonly #transcript: TranscriptView;
   /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
   readonly #composer: Composer;
+  /**
+   * The approval dialog. One per window, because one question is ever shown at a time — `core/permission.ts`
+   * queues the rest, and `PermissionDialog.show` replaces rather than stacks.
+   */
+  readonly #permissions: PermissionDialog;
   readonly #contentPage: Adw.NavigationPage;
   readonly #contentHeader: Adw.HeaderBar;
   /**
@@ -143,6 +170,10 @@ export class MainWindow extends Adw.ApplicationWindow {
   #closing = false;
   /** Lines from the agent that are not transcript entries. Nowhere to put them yet — see `#onNotice`. */
   readonly #notices: string[] = [];
+  /** The `KU_APP_PERMISSION` staging timer, so a close cannot fire it into a window that is gone. */
+  #permissionSource: number | null = null;
+  /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
+  #permissionTicks = 0;
 
   constructor(app: Adw.Application, options: MainWindowOptions) {
     super({
@@ -160,6 +191,7 @@ export class MainWindow extends Adw.ApplicationWindow {
 
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#placeholder = buildPlaceholder();
+    this.#permissions = new PermissionDialog(this);
     // **One transcript view for the whole window, refilled — not a stack child per session.**
     // Plan §7 step 4 asks for exactly that, and the review's F5 names the same reason: thirty sessions
     // means thirty `NavigationPage`s, thirty scrollers, and a composer whose entry and scroll position
@@ -181,6 +213,11 @@ export class MainWindow extends Adw.ApplicationWindow {
         onCloser: (close) => {
           this.#agentClose = close;
         },
+        // **The dialog, through the controller's gate.** `onPermission` is the whole of what the
+        // window contributes to an approval: it shows the question and resolves with the id that was
+        // pressed. It does not decide anything about that id — a dismissal arrives here as an id the
+        // agent never offered, and what it means is `core/permission.ts`'s to say, not this file's.
+        onPermission: (question) => this.#permissions.show(question),
       },
     });
     // `attached: false` in step 4 became a real render input in step 5: the controller reports the
@@ -193,7 +230,16 @@ export class MainWindow extends Adw.ApplicationWindow {
       // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
       input: composerInput(this.#agent.snapshot),
       onSend: (text) => this.#onSend(text),
-      onStop: () => this.#agent.stop(),
+      // **Stop takes the dialog down with it, and names the reason before it does.** The window
+      // contributes only the ordering — `agent.stop()` settles the question itself — so the two calls
+      // cannot disagree about the answer, only about who asked first. `turn-cancelled` rather than the
+      // vaguer `dismissed`: the person did not walk away from this question, they ended the turn it
+      // belonged to, and a transcript that says otherwise puts a decision in their mouth.
+      onStop: () => {
+        this.#agent.dismissPermission('turn-cancelled');
+        this.#permissions.close();
+        this.#agent.stop();
+      },
     });
     this.#contentStack = new Gtk.Stack({ vexpand: true });
     const panes = buildSplitView(
@@ -315,13 +361,24 @@ export class MainWindow extends Adw.ApplicationWindow {
     void this.#agent.prompt(text);
   }
 
-  /** A new snapshot: hand it to the composer, and act on a state that changed the draft's fate. */
+  /**
+   * A new snapshot: hand it to the composer, and act on a state that changed the draft's fate.
+   *
+   * **A `gone` snapshot also takes the dialog down**, and it is the only place that does. The agent
+   * dying mid-question is a state the controller settles (`#reportFailure` cancels the desk with
+   * `agent-gone`, so the answer is `cancelled` rather than a hang), but the *widget* is this window's,
+   * and a modal left up over an agent that has exited is a question about work that can no longer
+   * happen. Plan §6 asks for exactly this — "any open permission dialog closes". Reading it off the
+   * snapshot rather than off a separate callback is what keeps the window from having two sources of
+   * truth about whether the app is alive.
+   */
   #onSnapshot(snapshot: AgentSnapshot): void {
     this.#composer.setInput(composerInput(snapshot));
     // `keepsDraft` is the decision and it lives in core; the window only carries it out. An agent that
     // exited can never receive what is in the entry, and leaving it there collects words that go
     // nowhere — so `gone` is the one state that discards it.
     if (!keepsDraft(snapshot.state)) this.#composer.clearDraft();
+    if (snapshot.attachment.status === 'gone') this.#permissions.close();
   }
 
   /**
@@ -347,9 +404,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    * a `SIGTERM` from a killed tool, a cancellation that could not be sent: all real, all things a
    * person wants to know, none of them belonging in the conversation. There is nowhere in this layout
    * to put them — a notice area is a control, and a control that is a text box nobody can act on is the
-   * control-this-window-forbids. Plan §7 step 6's permission dialog is where a real notice area arrives.
-   * Until then they are on stderr with a count, which is honest: they are reported, and nothing claims
-   * they are on screen.
+   * control-this-window-forbids. Until there is one they go to stderr with a count, which is honest:
+   * they are reported, and nothing claims they are on screen.
    */
   #onNotice(message: string): void {
     this.#notices.push(message);
@@ -372,6 +428,23 @@ export class MainWindow extends Adw.ApplicationWindow {
   #watchCloseRequest(): void {
     this.connect('close-request', () => {
       if (this.#closing) return false;
+      // **A dialog is a reason to run the close path, even with nothing running.** It is modal, so it
+      // blocks the window — and a close-request it swallows would leave a window that cannot be
+      // closed.
+      //
+      // The reason is named **before** the widget goes down, and that order is the point:
+      // `dismissPermission` settles the question, and only then does `close()` make the dialog report
+      // a dismissal — which would land on nothing, because there is no longer an open question. Both
+      // answers are `cancelled` over the wire, and only one of them says which ending this was.
+      this.#agent.dismissPermission('window-closed');
+      this.#permissions.close();
+      // The staging timer dies with the window. `source_remove` is only reached for a timer that has
+      // not fired yet — the callback clears the field before it returns, so an already-fired id is
+      // never removed twice.
+      if (this.#permissionSource !== null) {
+        GLib.source_remove(this.#permissionSource);
+        this.#permissionSource = null;
+      }
       if (!this.#agent.turnRunning && !this.#agent.agentRunning) return false;
       this.#closing = true;
       void (async () => {
@@ -404,12 +477,38 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (record) this.#open(record);
       else console.log(`kurier: KU_APP_SESSION=${hooks.session} — no such session in the list`);
     }
-    for (const [name, value] of [
-      ['CONFIG', hooks.config],
-      ['PERMISSION', hooks.permission],
-    ] as const) {
-      if (value === undefined || value === false) continue;
-      console.log(`kurier: KU_APP_${name}=${String(value)} — read, not yet acted on`);
+    if (hooks.config !== undefined) {
+      console.log(`kurier: KU_APP_CONFIG=${hooks.config} — read, not yet acted on`);
+    }
+    if (hooks.permission === true) {
+      // **A poll, not a straight call, and the wait is the point.** A real request — the stand-in
+      // agent's own mid-turn question, or a real agent's — is the better thing to photograph, and it
+      // arrives a moment after the prompt goes out. So this asks again every
+      // `PERMISSION_STAGE_POLL_MS` and only stages its fixture request if the gate has not been asked
+      // by then; with `KU_STANDIN_PERMISSION=1` the agent's question wins and this one never appears.
+      // Staging straight away would mean the fixture always won, which would make `KU_APP_PERMISSION`
+      // untestable against a real agent.
+      // A GLib timeout rather than `setTimeout`: the staging must happen on the GTK main loop, and a
+      // pending timer must die with the window instead of firing into a window that is gone.
+      this.#permissionSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, PERMISSION_STAGE_POLL_MS, () => {
+        this.#permissionTicks += 1;
+        const waitedMs = this.#permissionTicks * PERMISSION_STAGE_POLL_MS;
+        // The agent asked: its own question is on screen, which is what this run wanted to photograph.
+        // Waiting for the deadline after that would put a second dialog in the queue behind it.
+        const asked = this.#agent.permissionAsked;
+        // Nothing is running and the first tick has passed: there is no agent that could ask, so
+        // waiting buys nothing and a screenshot run should not sit through a deadline for its dialog.
+        const idle = !this.#agent.turnRunning && this.#permissionTicks > 1;
+        const outwaited = waitedMs >= PERMISSION_STAGE_DEADLINE_MS;
+        if (asked || idle || outwaited) {
+          this.#permissionSource = null;
+          // `asked` is the one case where this hook has nothing left to do. The other two are the
+          // fallback firing, and it goes through the same gate either way.
+          if (!asked) this.#stagePermission();
+          return GLib.SOURCE_REMOVE;
+        }
+        return GLib.SOURCE_CONTINUE;
+      });
     }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
     // `KU_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
@@ -427,6 +526,35 @@ export class MainWindow extends Adw.ApplicationWindow {
         void this.#agent.prompt(prompt);
       }
     }
+  }
+
+  /**
+   * Put a fixture permission request through the **real** gate, for `KU_APP_PERMISSION`.
+   *
+   * **Nothing here builds a dialog.** It asks the same `AgentSession` the agent's own requests go
+   * through, which means what a screenshot shows is the gate's behaviour and not a picture of one: the
+   * buttons are the options this request offers, the body is what `permissionView` projects, and an
+   * Escape on it produces the same `cancelled` the agent would get. A hook that constructed its own
+   * dialog would photograph a widget and prove nothing about the gate.
+   *
+   * **The answer is logged, never recorded.** `stagePermissionRequest` does not write a transcript
+   * line, and this hook deliberately does not invent one: a decision nobody made, filed in a session's
+   * history, is a fabricated event — and `AGENTS.md` is explicit that the transcript is a record of
+   * what happened. The line goes to stderr instead, where a dev run can see it and a session file
+   * cannot.
+   *
+   * Only reached as the fallback the poll above decides on, so the "a real request is already up"
+   * case is settled there rather than guessed at again here.
+   */
+  #stagePermission(): void {
+    if (!this.#openRecord) {
+      console.log('kurier: KU_APP_PERMISSION — no session is open, so there is nothing to ask about');
+      return;
+    }
+    console.log('kurier: KU_APP_PERMISSION — staging a fixture request through the real gate');
+    void this.#agent.stagePermissionRequest().then((answer) => {
+      console.log(`kurier: KU_APP_PERMISSION — the staged question was answered ${JSON.stringify(answer)}`);
+    });
   }
 }
 

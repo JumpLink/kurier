@@ -32,6 +32,7 @@
  * | `KU_STANDIN_ECHO`          | `1`     | Echo the prompt as `user_message_chunk`, as every real agent does.     |
  * | `KU_STANDIN_HANG`          | unset   | **Never** end the turn on its own — Stop has something to stop.       |
  * | `KU_STANDIN_EXIT_MID_TURN` | unset   | **Exit the process** partway through, answering nothing.               |
+ * | `KU_STANDIN_PERMISSION`    | unset   | **Ask** `session/request_permission` mid-turn, and wait for the answer. |
  *
  * ```sh
  * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
@@ -47,6 +48,7 @@ const DELAY_MS = number('KU_STANDIN_DELAY_MS', 350);
 const CHUNKS = number('KU_STANDIN_CHUNKS', 5);
 const HANG = flag('KU_STANDIN_HANG');
 const EXIT_MID_TURN = flag('KU_STANDIN_EXIT_MID_TURN');
+const PERMISSION = flag('KU_STANDIN_PERMISSION');
 const ECHO = flag('KU_STANDIN_ECHO', true);
 
 /** Fixed, so two screenshots are comparable. `session/load` keeps whatever id it was asked for. */
@@ -104,6 +106,67 @@ const input = createInterface({ input: process.stdin, crlfDelay: Number.POSITIVE
 /** The turn in flight, so `session/cancel` can end it and nothing else has to. */
 let turn = null;
 
+/** The client's answer to a request this script sent, keyed by the id it sent. */
+const pending = new Map();
+
+/** Ids for requests the *agent* sends. The client's own ids are its business; these are ours. */
+let nextRequestId = 1_000_000;
+
+/**
+ * Ask the client to run a tool, and wait for what it says.
+ *
+ * **A request the agent makes of the client, in the direction the schema has it.** The options are
+ * all four `session/request_permission` kinds, deliberately: the dialog is supposed to show two of
+ * them, and a fixture that only offered `allow_once`/`reject_once` would let a dialog that renders
+ * `allow_always` pass against a stand-in that never sent one. Every option the real path has to
+ * filter, this sends.
+ *
+ * Resolves with whatever came back, `null` for an error answer — **including a `cancelled` outcome,
+ * which is a real answer and not a failure here.** That is the point: `KU_STANDIN_PERMISSION=1` plus
+ * an Escape on the dialog must end the turn cleanly, and a fixture that treated `cancelled` as an
+ * error would hide exactly the behaviour this exists to look at.
+ */
+function askPermission(sessionId) {
+  const id = nextRequestId++;
+  const answer = new Promise((resolve) => {
+    pending.set(id, resolve);
+  });
+  send({
+    jsonrpc: '2.0',
+    id,
+    method: 'session/request_permission',
+    params: {
+      sessionId,
+      toolCall: {
+        toolCallId: `${TOOL_CALL_ID}_write`,
+        status: 'pending',
+        title: 'Write src/greeting.ts',
+        kind: 'edit',
+        locations: [{ path: 'src/greeting.ts', line: 3 }],
+        rawInput: {
+          path: 'src/greeting.ts',
+          content: "export const greeting = 'hello from the stand-in agent';\n",
+        },
+      },
+      options: [
+        { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+        { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
+        { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
+        { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
+      ],
+    },
+  });
+  return answer;
+}
+
+/** Match an incoming answer to the request that is waiting for it. */
+function settlePending(message) {
+  const resolve = pending.get(message.id);
+  if (resolve === undefined) return;
+  pending.delete(message.id);
+  resolve(message.error ? null : (message.result ?? null));
+}
+
 input.on('line', (line) => {
   let message;
   try {
@@ -112,6 +175,13 @@ input.on('line', (line) => {
     // A line we cannot read is not answered. Guessing an id would be worse than silence, and silence is
     // what a real peer gives on garbage.
     return;
+  }
+  // **A response, not a request.** `session/request_permission` goes the other way — the agent asks
+  // the client — so its answer arrives here as a message with an `id`, a `result` and no `method`.
+  // Answering it with "method not found" would be the wrong half of the protocol handled backwards,
+  // and the gate would hang forever instead of failing closed.
+  if (typeof message === 'object' && message !== null && message.method === undefined && message.id !== undefined) {
+    return settlePending(message);
   }
   if (typeof message !== 'object' || message === null || message.method === undefined) return;
   if (message.id === undefined && !CLIENT_NOTIFICATIONS.has(message.method)) return;
@@ -180,6 +250,16 @@ async function runTurn(id, sessionId, prompt) {
         process.exit(3);
       }
       notify(sessionId, updateFor(step));
+    }
+
+    if (PERMISSION && !token.cancelled) {
+      // **Mid-turn, after some work has streamed, and before the answer.** Where the question lands in
+      // the turn is the part that matters: a dialog over an empty transcript is a different screen
+      // from one over a half-finished answer, and the second is the one a person meets. The turn is
+      // genuinely open while this waits — the `end_turn` below has not been sent — so a Stop pressed
+      // with the dialog up is a real cancellation of a real turn, not a staged imitation of one.
+      const answer = await askPermission(sessionId);
+      process.stderr.write(`stand-in: permission answered with ${JSON.stringify(answer?.outcome ?? null)}\n`);
     }
 
     if (HANG && !token.cancelled) {
