@@ -36,6 +36,29 @@
     <content_attribute id="social-info">none</content_attribute>
     <content_attribute id="language-humor">none</content_attribute>
   </content_rating>
+  <releases>
+    <release version="0.1.0" date="2026-10-01">
+      <description>
+        <!-- TRANSLATORS: Release notes for version 0.1.0 - what Kurier is, and that the agent is a separate program the user installs -->
+        <p>The first release of Kurier, a desktop client for the Agent Client Protocol — the open standard a coding agent speaks over. Kurier starts an agent such as OpenCode as a program on your own computer, keeps the conversation, and shows you what the agent says while it works. The agent and the model behind it are not part of Kurier: you install and log in to those yourself.</p>
+        <!-- TRANSLATORS: Release notes for version 0.1.0 - lead-in to the list of what the first version does -->
+        <p>This first version does the following:</p>
+        <!-- TRANSLATORS: Release notes for version 0.1.0 - the list of what the first version does -->
+        <ul>
+          <!-- TRANSLATORS: Release notes for version 0.1.0 - the session list -->
+          <li>A list of your sessions on the left, so you can pick up an earlier conversation instead of starting over.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.0 - a real agent turn, streaming and Stop. Keep "Stop" as it is, it is a button name. -->
+          <li>One real turn with the agent: the answer arrives piece by piece while the agent works, and Stop ends the turn without closing the session.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.0 - the allow-once permission dialog. Keep "always allow" as it is, it names a button that is absent. -->
+          <li>When the agent asks permission to do something, a dialog asks you, and you can allow it once or refuse it. There is deliberately no &quot;always allow&quot; button: a permission nobody sees again is a permission nobody revoked.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.0 - the phone-width layout. Keep "360" as it is. -->
+          <li>A layout that fits a phone as well as a desktop, down to a window width of 360 pixels.</li>
+        </ul>
+        <!-- TRANSLATORS: Release notes for version 0.1.0 - what is not there yet, plus an honest note that the Flatpak grants broad access -->
+        <p>Not in this release: several agents side by side, a web version, and a Telegram bot. The command line client is here already. And the Flatpak is an installer rather than a sandbox — an agent has to run on your computer, so Kurier asks for access to your files and to the session bus.</p>
+      </description>
+    </release>
+  </releases>
   <categories>
     <category>Development</category>
     <category>GTK</category>

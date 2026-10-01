@@ -24,9 +24,12 @@
       "name": "kurier",
       "buildsystem": "simple",
       "build-commands": [
-        "gjs -m build-aux/gjsify.gjs.mjs install --immutable",
-        "gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build:app",
-        "install -Dm755 app/dist/kurier-app.gjs.mjs /app/bin/kurier-app",
+        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs install --immutable",
+        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build:app",
+        "install -d /app/bin",
+        "printf '#!/usr/bin/gjs -m\\n' > /app/bin/kurier-app",
+        "cat app/dist/kurier-app.gjs.mjs >> /app/bin/kurier-app",
+        "chmod 0755 /app/bin/kurier-app",
         "install -Dm644 data/eu.jumplink.Kurier.desktop /app/share/applications/eu.jumplink.Kurier.desktop",
         "install -Dm644 data/eu.jumplink.Kurier.metainfo.xml /app/share/metainfo/eu.jumplink.Kurier.metainfo.xml",
         "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
@@ -47,10 +50,7 @@
           "type": "file",
           "path": "build-aux/gjsify.gjs.mjs"
         },
-        {
-          "type": "file",
-          "path": "gjsify-sources.json"
-        }
+        "gjsify-sources.json"
       ]
     }
   ]
