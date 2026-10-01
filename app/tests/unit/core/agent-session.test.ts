@@ -325,6 +325,25 @@ export default async () => {
       expect(h.agent.calls('session/prompt').length).toBe(0);
       expect(h.agent.calls('session/cancel').length).toBe(0);
     });
+
+    await it('a stop while the history is still loading sends no prompt either', async () => {
+      // The window the handshake test above cannot reach, and where the defect lived. `session/load`
+      // replays a cold session's whole history, and prompting is what causes the load — so this is the
+      // first prompt of every session, not an edge case. A Stop here arrives with no turn in flight,
+      // and the one that mattered was dropped: the prompt went out anyway, the agent answered in full,
+      // and the surface sat in `thinking` after the person had pressed Stop.
+      const h = harness({ holdLoad: true });
+      const sent = h.session.prompt('hello');
+      await h.flush();
+      // The load is parked, so the turn is between "handshake done" and "prompt sent" right now.
+      h.session.stop();
+      h.agent.releaseLoad();
+      await sent;
+      expect(h.agent.calls('session/prompt').length).toBe(0);
+      // And the surface must have left `thinking` rather than waiting for an answer that is not coming.
+      expect(h.session.snapshot.state).not.toBe('thinking');
+      expect(h.session.snapshot.state).toBe('stopped');
+    });
   });
 
   await describe('agent-session — an agent that dies', async () => {

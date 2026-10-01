@@ -187,6 +187,20 @@ export interface FixtureAgentOptions {
    * reproducible in a unit test.
    */
   holdTurn?: boolean;
+  /**
+   * Park the `session/load` reply until `releaseLoad()` is called.
+   *
+   * **This is the cold-agent shape, and it is the one a fast fixture otherwise cannot produce.**
+   * `session/load` replays a session's whole history, so on a real agent it takes seconds — and it is
+   * the *first* thing that happens after the handshake on the first prompt of a session, because
+   * prompting is what causes the load. Without this option every test sees `bindAgent` resolve inside
+   * the same microtask batch, so a Stop pressed while it is in flight is unreachable: the window
+   * between "the handshake is done" and "the prompt is sent" has no width to be tested in. A defect
+   * lived exactly there and survived every other test in this file — a Stop during the load was
+   * dropped, the prompt went out anyway, and the agent answered in full while the surface believed
+   * the person had cancelled.
+   */
+  holdLoad?: boolean;
   /** Ask for a file the client refused to answer, mid-turn. */
   requestFileSystem?: 'read' | 'write';
   /** Send a method the client has never heard of, right after the handshake. */
@@ -224,6 +238,8 @@ export class FixtureAgent {
   #cancelRequested = false;
   /** Releases a held turn. See `FixtureAgentOptions.holdTurn`. */
   #releaseTurn: (() => void) | null = null;
+  /** The parked `session/load` reply, or `null`. See `FixtureAgentOptions.holdLoad`. */
+  #releaseLoad: (() => void) | null = null;
   #nextRequestId = 10_000;
   #pendingPermissions = new Map<RequestId, (outcome: PermissionOutcome) => void>();
   #sessions = new Map<string, { cwd: string; mcpServers: McpServer[] }>();
@@ -335,6 +351,17 @@ export class FixtureAgent {
         if (!this.#authenticated) return this.#authRequired(id);
         if (this.#options.omitLoadSession) return this.#methodNotFound(id, message.method);
         const sessionId = String(params?.['sessionId'] ?? SESSION_ID);
+        if (this.#options.holdLoad) {
+          // Park the reply, so the caller can act in the window a real load spends replaying history.
+          this.#releaseLoad = () => {
+            this.#releaseLoad = null;
+            this.#reply(id, { ...this.#sessionState(), ...this.#meta() });
+            for (const chunk of this.#options.chunks ?? ['replayed']) {
+              this.#update({ sessionId, update: this.#agentChunk(chunk) });
+            }
+          };
+          return;
+        }
         this.#reply(id, { ...this.#sessionState(), ...this.#meta() });
         // A load replays the history as notifications. That is its whole purpose.
         for (const chunk of this.#options.chunks ?? ['replayed']) {
@@ -725,5 +752,13 @@ export class FixtureAgent {
    */
   releaseTurn(): void {
     this.#releaseTurn?.();
+  }
+
+  /**
+   * Let a parked `session/load` answer. Only meaningful with `holdLoad`; it opens the window between
+   * the handshake and the prompt, which is where a Stop can be pressed and lost.
+   */
+  releaseLoad(): void {
+    this.#releaseLoad?.();
   }
 }

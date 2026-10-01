@@ -339,6 +339,18 @@ export class AgentSession {
         return;
       }
       await this.#bindAgent(handle, session);
+      // **The same check again, and it is not a duplicate.** The one above guards the handshake, which
+      // is quick; `bindAgent` then awaits `session/load`, and on a cold agent that is the *replay of
+      // the whole history* — seconds, not milliseconds. A Stop pressed in that window sets
+      // `#cancelRequested` and sends `session/cancel`, which arrives with no turn to cancel, and then
+      // the code below would set `#promptSent` and send the prompt anyway: the agent gets
+      // cancel-then-prompt, answers in full, and the window sits in `thinking` after the person
+      // pressed Stop. Since prompting a session is what *causes* the load, this is the first prompt of
+      // every session rather than an edge case.
+      if (this.#cancelRequested) {
+        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'window' });
+        return;
+      }
       // From here a turn exists: if the promise below rejects, the agent went away *during* it, and the
       // transcript line the plan asks for is the honest record. See `#reportFailure`.
       this.#promptSent = true;
