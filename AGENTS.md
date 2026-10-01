@@ -187,6 +187,68 @@ KU_STANDIN_PERMISSION=1       # asks session/request_permission mid-turn and wai
 is **off** — unset, empty, `0` and `false` all mean not set, in kurier and in the stand-in alike, so
 there is one rule for "is this on" in the repo.
 
+**The config row, in the same spirit: one flag, and the values it carries.** `KU_STANDIN_CONFIG=1`
+makes the stand-in report a model / effort / mode row and answer `session/set_config_option` with the
+**full** option list, the way `opencode acp` does — a bare `[]` would empty the row on every pick, which
+is a different state ("this agent has no configuration") dressed up as an answer.
+
+| Variable                   | Default | What it does                                                              |
+| -------------------------- | ------- | ------------------------------------------------------------------------- |
+| `KU_STANDIN_CONFIG`        | unset   | Report `model` / `effort` / `mode` and answer a config-option set.          |
+| `KU_STANDIN_CONFIG_MODELS` | `3`     | How many models the list holds. `400` is opencode's real size, and the one the dropdown's search field is for. |
+| `KU_STANDIN_CONFIG_REFUSE` | unset   | Refuse **every** configuration change — the fail-closed state, which no real agent in reach produces. |
+| `KU_STANDIN_CONFIG_PUSH`   | `1`     | Push `config_option_update` after a *model* change. `0` leaves only the answer, so both doors can be exercised. |
+
+**`KU_APP_CONFIG` sets an option through the real path, and its format is `configId=valueId`** — both
+halves, because a control id says which option and not to what, and a value id cannot be resolved on
+its own (`parseConfigOptionSpec`, and a half-spec is refused with a line in the log rather than quietly
+picking something). It **sends the prompt itself when no turn has run**, because the agent is started on
+the first prompt and an option can only be set on a live agent: so `KU_APP_PROMPT` (or a fixture
+sentence) goes out, `session/load` answers with the options, and only then is
+`session/set_config_option` sent. It is therefore applied **before** `KU_APP_THINKING` — one prompt, one
+turn, one set. What a screenshot shows is the row in the state a person's click produces.
+
+```bash
+# a real set, over the real chain, with the stand-in's 400-model list
+KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_MODELS=400 \
+  KU_APP_SESSION=fixture-2 KU_APP_CONFIG=model=openrouter/vendor/model-012 KU_APP_PROMPT=hi \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# the refusal: the agent says no, the row stays on what the agent last answered
+KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 \
+  KU_APP_SESSION=fixture-2 KU_APP_CONFIG=mode=plan KU_APP_PROMPT=hi \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+**One control per line, at every width, and the row raises no floor.** The three controls sit in a
+`Gtk.FlowBox` with `max-children-per-line: 1`: at 360 px a shared line leaves each dropdown about 90 px,
+which is an ellipsis rather than a model name. Measured with the row on screen, the real window still
+stops at 360 — asked for 320, granted 360 — so the floor is still `Adw.NavigationSplitView`'s and not
+kurier's content's (`scripts/probes/window-min-width.mjs` prints the sweep).
+
+What the row may show and when is decided in `app/src/core/config-row.ts` and tested on both runtimes;
+the widget only renders.
+
+**Two known limits of the row, written down rather than discovered later.**
+
+- **Every answer rebuilds every dropdown.** A whole-row rebuild (`Composer` and `SessionList` do the same)
+  is what keeps a half-updated row from existing, and it costs a rebuilt `Gtk.StringList` — 400 rows for
+  the model control — on each agent answer. Cheap enough today; if a future agent pushes
+  `config_option_update` on every keystroke of a thinking level, that is where it will show.
+- **A notification that lands while a set is in flight is discarded, not merged.** The set's answer wins,
+  because the answer is the state *after* the change and both carry the whole list. The cost is that an
+  agent-side change to a *different* option arriving in that window is not shown until the next answer or
+  the next `session/load` (`#takeConfigUpdate`). Reached from a real agent? Unmeasured — see
+  `config-row.ts` and the fixture knob `holdConfigAnswer`, which is what makes the race testable at all.
+
+**One agent session's options at a time, kept for the sessions this window has prompted.** The last
+list the agent reported is cached per session id, in memory only, up to eight (`CONFIG_MEMORY_LIMIT`) —
+nothing is written to disk, and nothing is merged or re-interpreted: the agent's `currentValue` still
+wins on every answer. The cache exists because `bind(A) → bind(B) → bind(A)` with no prompt in between
+re-binds nothing (selecting a session starts nothing, plan §6), so there is nothing to re-ask. An agent
+that dies takes the cache with it, because live dropdowns over a process that has exited are controls
+pointing at nothing.
+
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with all four option kinds on the wire
 so the `*_always` filtering has something to filter. `KU_APP_PERMISSION=1` is kurier's side: it puts a

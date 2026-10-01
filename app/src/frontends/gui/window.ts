@@ -67,6 +67,7 @@ import { labelOf, type SessionRecord, type TranscriptEntry } from '@kurier/sessi
 import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
+import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
 import { agentStatus } from '../../core/turn.ts';
 import {
   APP_NAME,
@@ -77,6 +78,7 @@ import {
 } from './constants.ts';
 import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
+import { ConfigRow } from './config-row.ts';
 import { PermissionDialog } from './permission-dialog.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
@@ -138,6 +140,15 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
   readonly #composer: Composer;
   /**
+   * The agent's own configuration, directly above the composer. Plan §7 step 7.
+   *
+   * **Its own field rather than a part of the composer, because the two have different clocks.** The
+   * composer re-renders on every turn state move; this re-renders when the agent answers about its
+   * options. A combined widget would mean every streamed update rebuilt the model dropdown, and every
+   * model change rebuilt the composer's status line.
+   */
+  readonly #config: ConfigRow;
+  /**
    * The approval dialog. One per window, because one question is ever shown at a time — `core/permission.ts`
    * queues the rest, and `PermissionDialog.show` replaces rather than stacks.
    */
@@ -198,6 +209,19 @@ export class MainWindow extends Adw.ApplicationWindow {
     // are rebuilt on every click. One view, `setEntries` on each open, is also the reason a session
     // switch cannot leak a row from the previous transcript — the rebuild is total, not a diff.
     this.#transcript = new TranscriptView();
+    // **Before the controller, and that order is deliberate.** `onConfig` is a closure over this
+    // field, so a controller that emitted a config view from its own constructor would reach a
+    // `#config` that does not exist yet — the crash `AgentSession`'s constructor comment describes for
+    // `#composer`, and the same trap twice is a rule rather than a coincidence. Building it first makes
+    // the window's construction order match the data flow: widgets, then the controller that fills them.
+    this.#config = new ConfigRow({
+      // One path out of the row and into the protocol. The window does not check the value, does not
+      // look the control up, and does not decide whether this is a change — the controller does all of
+      // that (`setConfigOption`), and a widget-level check would be a second opinion with no tests.
+      onSelect: (controlId, value) => {
+        void this.#agent.setConfigOption(controlId, value);
+      },
+    });
     this.#agent = new AgentSession({
       command: options.agent,
       ...(options.appendTurns ? { append: options.appendTurns } : {}),
@@ -218,6 +242,11 @@ export class MainWindow extends Adw.ApplicationWindow {
         // pressed. It does not decide anything about that id — a dismissal arrives here as an id the
         // agent never offered, and what it means is `core/permission.ts`'s to say, not this file's.
         onPermission: (question) => this.#permissions.show(question),
+        // **The row, through the controller's decided view.** The window passes it through and does
+        // not decide anything about it — `core/config-row.ts` has already decided which controls may
+        // exist, what is selected, and what a refusal says. The window's own contribution is one
+        // callback, so `notify::selected` goes to `setConfigOption` and nothing else.
+        onConfig: (view) => this.#config.setView(view),
       },
     });
     // `attached: false` in step 4 became a real render input in step 5: the controller reports the
@@ -247,6 +276,12 @@ export class MainWindow extends Adw.ApplicationWindow {
       this.#placeholder,
       this.#transcript.widget,
       this.#composer.widget,
+      // **The config row goes inside the composer's bottom bar, not into `Adw.ToolbarView`'s own.**
+      // `Adw.ToolbarView` has exactly one bottom bar, and that one belongs to the composer. Putting the
+      // row above the entry inside that same bar is what makes it "directly above the composer" in the
+      // plan's sense (§7 step 7) rather than a sibling that could be reordered or, worse, given its own
+      // raised border and read as a second pane.
+      this.#config.widget,
       this.#contentStack,
     );
     this.#split = panes.split;
@@ -478,7 +513,28 @@ export class MainWindow extends Adw.ApplicationWindow {
       else console.log(`kurier: KU_APP_SESSION=${hooks.session} — no such session in the list`);
     }
     if (hooks.config !== undefined) {
-      console.log(`kurier: KU_APP_CONFIG=${hooks.config} — read, not yet acted on`);
+      const spec = parseConfigOptionSpec(hooks.config);
+      if (!spec) {
+        // A hook that cannot be parsed is a typo, and a typo that silently did nothing is how a surface
+        // ends up with a screenshot nobody can account for. Named loudly, with the format.
+        console.log(`kurier: KU_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`);
+      } else if (!this.#openRecord) {
+        console.log('kurier: KU_APP_CONFIG — no session is open, so there is no agent to ask');
+      } else {
+        console.log(
+          `kurier: KU_APP_CONFIG — setting ${spec.controlId} to ${spec.value} through the real path`,
+        );
+        // Through `stageConfigOption`, so the prompt that starts the agent, the `session/load` that
+        // binds it and the `session/set_config_option` that sets the value are all the real ones. A hook
+        // that set the option itself would photograph a state the window cannot reach.
+        //
+        // **Applied before `KU_APP_THINKING`, and that order decides what happens when both are set.**
+        // `stageConfigOption` starts the agent itself when there is none — an option can only be set on
+        // a live agent, and the agent starts on the first prompt (plan §6). So this hook sends the
+        // prompt, and the `thinking` hook below finds a turn already in flight and does nothing. That is
+        // the wanted outcome rather than a collision: one prompt, one turn, one set.
+        void this.#agent.stageConfigOption(spec.controlId, spec.value, hooks.prompt);
+      }
     }
     if (hooks.permission === true) {
       // **A poll, not a straight call, and the wait is the point.** A real request — the stand-in
@@ -646,6 +702,7 @@ function buildContent(
   placeholder: Adw.StatusPage,
   transcript: Gtk.Widget,
   composer: Gtk.Widget,
+  configRow: Gtk.Widget,
   stack: Gtk.Stack,
 ): Adw.NavigationPage {
   const box = new Adw.ToolbarView({ vexpand: true });
@@ -680,7 +737,15 @@ function buildContent(
   // background plus a persistent border, which is the one shape that reads correctly in both light and
   // dark without a shadow that then has to be explained.
   box.set_bottom_bar_style(Adw.ToolbarStyle.RAISED_BORDER);
-  box.add_bottom_bar(composer);
+  // **The bar is a vertical box of [config row, composer], in that order.** One bottom bar, two things
+  // in it, and the order is the plan's: what you pick here applies to what you are about to send in
+  // the entry below it. A `Gtk.Box` rather than a second `Adw.ToolbarView` bottom bar because there is
+  // only one bottom bar, and because a second raised surface would read as two panes stacked rather
+  // than as one control area.
+  const bottom = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 0 });
+  bottom.append(configRow);
+  bottom.append(composer);
+  box.add_bottom_bar(bottom);
   return new Adw.NavigationPage({ title: APP_NAME, child: box });
 }
 
@@ -702,10 +767,11 @@ function buildSplitView(
   placeholder: Adw.StatusPage,
   transcript: Gtk.Widget,
   composer: Gtk.Widget,
+  configRow: Gtk.Widget,
   stack: Gtk.Stack,
 ): Panes {
   const contentHeader = buildContentHeader();
-  const contentPage = buildContent(contentHeader, placeholder, transcript, composer, stack);
+  const contentPage = buildContent(contentHeader, placeholder, transcript, composer, configRow, stack);
   const split = new Adw.NavigationSplitView({
     sidebar: buildSidebar(sidebar),
     content: contentPage,

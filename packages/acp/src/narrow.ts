@@ -70,6 +70,16 @@ export interface UsableConfigValue {
   value: string;
   name: string;
   description: string | null;
+  /**
+   * The group this value arrived under, or `null` for a flat list.
+   *
+   * **Carried, not rendered.** `SessionConfigSelectOptions` is an `anyOf` on the wire — flat or
+   * grouped — and a grouped list has to become the *same* list of values, because a `select` has one
+   * `currentValue` and therefore one flat answer. What a surface does with the group (in kurier's
+   * case: nothing, it puts the group in front of the name) is a presentation decision and lives in
+   * `app/src/core/config.ts`; what belongs here is only the fact that there was a group.
+   */
+  group: string | null;
 }
 
 /**
@@ -80,25 +90,62 @@ export interface UsableConfigValue {
  * opens on an entry that cannot be chosen. An entry is usable when it has a non-empty string `value`
  * — that is the field `session/set_config_option` sends — and it keeps its position, because an
  * agent that puts its recommended model first knows something about its user.
+ *
+ * **Both arms of the `anyOf`, which is the point.** `SessionConfigSelectOptions` is either a list of
+ * options or a list of groups of options, and an agent is free to send either. Reading only the flat
+ * arm meant a grouped list narrowed to *no* values — so `narrowConfigSelect` refused the option and a
+ * model selector an agent had grouped simply did not exist. The group is flattened into its values,
+ * each tagged with the group it came from, and the dedup stays on `value` so a value listed twice
+ * (once in a group, once flat) is still one value.
  */
 export function usableConfigValues(options: unknown): UsableConfigValue[] {
   if (!Array.isArray(options)) return [];
   const values: UsableConfigValue[] = [];
   const seen = new Set<string>();
-  for (const entry of options) {
-    if (!entry || typeof entry !== 'object') continue;
-    const value = (entry as { value?: unknown }).value;
+  // Grouped first, so the flat arm below can be written without knowing about groups: a group is
+  // `options`-shaped itself, and a flat entry has no `options` property, so one loop covers both.
+  for (const entry of options.flatMap((entry) => flattenGroup(entry))) {
+    const value = entry.value;
     if (typeof value !== 'string' || value === '' || seen.has(value)) continue;
     seen.add(value);
-    const name = (entry as { name?: unknown }).name;
-    const description = (entry as { description?: unknown }).description;
+    const { name, description, group } = entry;
     values.push({
       value,
       name: typeof name === 'string' && name !== '' ? name : value,
       description: typeof description === 'string' ? description : null,
+      group,
     });
   }
   return values;
+}
+
+/** One wire entry, widened to `unknown` once so this function needs no casts to read it. */
+interface RawConfigValue {
+  value?: unknown;
+  name?: unknown;
+  description?: unknown;
+  group: string | null;
+}
+
+/**
+ * One wire entry as the values it contributes: itself if it is an option, its options if it is a group.
+ *
+ * A group is recognised by its own `options` array rather than by anything a schema says is
+ * required, because a group whose `options` is missing has no values to contribute either way — so
+ * there is nothing to get wrong here. The group's `name` is the label; a group that has none
+ * contributes its values ungrouped rather than dropping them.
+ */
+function flattenGroup(entry: unknown): RawConfigValue[] {
+  if (!entry || typeof entry !== 'object') return [];
+  const wire = entry as { value?: unknown; name?: unknown; description?: unknown; options?: unknown };
+  if (!Array.isArray(wire.options)) {
+    return [{ value: wire.value, name: wire.name, description: wire.description, group: null }];
+  }
+  const group = typeof wire.name === 'string' && wire.name !== '' ? wire.name : null;
+  return (wire.options as unknown[]).map((option) => {
+    const value = option && typeof option === 'object' ? (option as RawConfigValue) : ({} as RawConfigValue);
+    return { value: value.value, name: value.name, description: value.description, group };
+  });
 }
 
 /**

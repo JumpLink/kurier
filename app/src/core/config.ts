@@ -170,9 +170,25 @@ function projectOne(option: SessionConfigOption): ConfigControl | null {
     kind: 'select',
     ...common,
     currentValue: select.currentValue,
-    values,
+    values: values.map(labelWithGroup),
     searchable: values.length > SEARCH_THRESHOLD,
   };
+}
+
+/**
+ * A grouped value reads as `group: name`, and that is the whole of the grouping decision.
+ *
+ * **One dropdown, not one per group and not a second level of menu.** `SessionConfigSelectOptions`
+ * is an `anyOf` on the wire — a flat list or a list of groups — and both arms describe the *same*
+ * single-value selector: one `currentValue` for the whole option. So the groups are information
+ * about where a value lives, not separate controls, and the one place a person can see a value has to
+ * hold all of them. `Gtk.DropDown` has no section headers, so the group goes in front of the name:
+ * a value keeps its own identity, a duplicate name in two groups stops being ambiguous, and a surface
+ * that wanted real sections would have to build a second widget for one option.
+ */
+function labelWithGroup(value: ConfigValue): ConfigValue {
+  if (value.group === null) return value;
+  return { ...value, name: `${value.group}: ${value.name}` };
 }
 
 /** Known categories in `CATEGORY_ORDER`; everything else keeps its arrival order, after them. */

@@ -33,10 +33,19 @@
  * | `KU_STANDIN_HANG`          | unset   | **Never** end the turn on its own — Stop has something to stop.       |
  * | `KU_STANDIN_EXIT_MID_TURN` | unset   | **Exit the process** partway through, answering nothing.               |
  * | `KU_STANDIN_PERMISSION`    | unset   | **Ask** `session/request_permission` mid-turn, and wait for the answer. |
+ * | `KU_STANDIN_CONFIG`        | unset   | Report a model / effort / mode row and answer `session/set_config_option`. |
+ * | `KU_STANDIN_CONFIG_MODELS` | `3`     | How many models the list holds. `400` is the real size, and needs search.  |
+ * | `KU_STANDIN_CONFIG_REFUSE`  | unset   | Refuse every configuration change — the fail-closed state.                  |
+ * | `KU_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
  *
  * ```sh
  * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
  *   ./node_modules/.bin/gjsify workspace kurier-cli start:app
+ *
+ * # the configuration row, and the three states only this fixture can produce
+ * KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_MODELS=400 KU_APP_CONFIG=model=openrouter/vendor/model-012
+ * KU_STANDIN_CONFIG=1 KU_APP_CONFIG=effort=high        # the push arm: no update, the answer carries it
+ * KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 KU_APP_CONFIG=mode=plan   # the refusal
  * ```
  *
  * Exit code 0 on a normal shutdown, 3 for the deliberate mid-turn exit, so a test can tell them apart.
@@ -50,6 +59,20 @@ const HANG = flag('KU_STANDIN_HANG');
 const EXIT_MID_TURN = flag('KU_STANDIN_EXIT_MID_TURN');
 const PERMISSION = flag('KU_STANDIN_PERMISSION');
 const ECHO = flag('KU_STANDIN_ECHO', true);
+const CONFIG = flag('KU_STANDIN_CONFIG');
+const CONFIG_MODELS = number('KU_STANDIN_CONFIG_MODELS', 3);
+const CONFIG_REFUSE = flag('KU_STANDIN_CONFIG_REFUSE');
+const CONFIG_PUSH = flag('KU_STANDIN_CONFIG_PUSH', true);
+
+/**
+ * The configuration this script offers, built once here and then rewritten by every set.
+ *
+ * **`null` when `KU_STANDIN_CONFIG` is unset, and that is a state worth having.** An agent with no
+ * configuration answers `session/new` with `configOptions: null` rather than an empty list, and the row
+ * has to draw nothing for both. Assigned at the top rather than in a handler: `let` has a temporal dead
+ * zone, and building it further down meant the first `session/new` could land before it existed.
+ */
+let configOptions = CONFIG ? buildConfigOptions() : null;
 
 /** Fixed, so two screenshots are comparable. `session/load` keeps whatever id it was asked for. */
 const SESSION_ID = 'ses_standin_0001';
@@ -180,7 +203,12 @@ input.on('line', (line) => {
   // the client — so its answer arrives here as a message with an `id`, a `result` and no `method`.
   // Answering it with "method not found" would be the wrong half of the protocol handled backwards,
   // and the gate would hang forever instead of failing closed.
-  if (typeof message === 'object' && message !== null && message.method === undefined && message.id !== undefined) {
+  if (
+    typeof message === 'object' &&
+    message !== null &&
+    message.method === undefined &&
+    message.id !== undefined
+  ) {
     return settlePending(message);
   }
   if (typeof message !== 'object' || message === null || message.method === undefined) return;
@@ -201,8 +229,13 @@ input.on('line', (line) => {
       // replay; see `AgentSession.#bindAgent`.
       return reply(id, sessionState(String(params.sessionId ?? SESSION_ID)));
     case 'session/set_mode':
+      // `session/set_mode` is the *other* door to the mode, and kurier does not use it (the config row
+      // sets `mode` as a config option, see `core/config-row.ts`). It is answered by moving the mode
+      // option anyway, so the two doors a real agent keeps in step stay in step here too — otherwise a
+      // future caller of this door would see a mode that never changed.
+      return setMode(String(params.sessionId ?? SESSION_ID), String(params.modeId ?? 'build'), id);
     case 'session/set_config_option':
-      return reply(id, { configOptions: [] });
+      return setConfigOption(String(params.sessionId ?? SESSION_ID), params, id);
     case 'session/cancel':
       // A notification, so nothing comes back: the schema says a client that sends it must answer the
       // turn itself, and this script does that in `runTurn` when it wakes up. That is also why kurier's
@@ -298,13 +331,144 @@ function updateFor(step) {
   return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: step.text } };
 }
 
+/**
+ * The three options this script offers: a model, a thought level, a mode.
+ *
+ * **The measured three, because a fixture that offered one option would leave the row's hard cases
+ * untested.** `KU_STANDIN_CONFIG_MODELS` sets how many models the list holds: 3 keeps a screenshot
+ * readable, and 400 is the size `opencode acp` 2.0.19 actually reports and the one the dropdown's
+ * search field exists for.
+ */
+function buildConfigOptions() {
+  const models = Array.from({ length: Math.max(1, CONFIG_MODELS) }, (_, index) => ({
+    value: `openrouter/vendor/model-${String(index).padStart(3, '0')}`,
+    name: `model-${String(index).padStart(3, '0')}`,
+  }));
+  return [
+    {
+      id: 'model',
+      name: 'Model',
+      description: 'Which model answers the next prompt',
+      type: 'select',
+      category: 'model',
+      currentValue: models[0].value,
+      options: models,
+    },
+    {
+      id: 'effort',
+      name: 'Effort',
+      description: 'Available effort levels for this model',
+      type: 'select',
+      category: 'thought_level',
+      currentValue: 'default',
+      options: [
+        { value: 'low', name: 'Low' },
+        { value: 'medium', name: 'Medium' },
+        { value: 'high', name: 'High' },
+        { value: 'default', name: 'Default' },
+      ],
+    },
+    {
+      id: 'mode',
+      name: 'Session Mode',
+      type: 'select',
+      category: 'mode',
+      currentValue: 'build',
+      options: [
+        { value: 'build', name: 'Build', description: 'Make the change' },
+        { value: 'plan', name: 'Plan', description: 'Propose before changing' },
+      ],
+    },
+  ];
+}
+
 /** `session/new` and the reopen calls answer with the session's configuration, as opencode does. */
 function sessionState(sessionId) {
   return {
     sessionId,
-    modes: { currentModeId: 'build', availableModes: [{ id: 'build', name: 'Build' }] },
-    configOptions: [],
+    modes: { currentModeId: modeId(), availableModes: modes() },
+    configOptions: configOptions,
   };
+}
+
+function modes() {
+  return [
+    { id: 'build', name: 'Build', description: 'Make the change' },
+    { id: 'plan', name: 'Plan', description: 'Propose before changing' },
+  ];
+}
+
+/** The current mode, read out of the option list so the two doors cannot drift. */
+function modeId() {
+  const mode = (configOptions ?? []).find((option) => option.id === 'mode');
+  return mode ? mode.currentValue : 'build';
+}
+
+/**
+ * `session/set_config_option`: rewrite one option's `currentValue` and answer with the **full** list.
+ *
+ * **The full list, and that is the whole point of the case.** The schema's answer carries every option,
+ * and `core/config-row.ts` takes it as the truth rather than keeping the local guess. The bare
+ * `configOptions: []` this used to answer would have emptied the row on every pick — a real state
+ * ("this agent has no configuration") dressed up as the answer to a successful set, and exactly the
+ * kind of fixture that makes a surface look like it works.
+ *
+ * **Three refusals, all of them real behaviours an agent has:**
+ *
+ * - `KU_STANDIN_CONFIG_REFUSE=1` answers an error for every set, which is the state that is otherwise
+ *   unreachable against a real agent and the one the "a refusal does not move the row" rule is about;
+ * - an unknown `configId` or a value outside the option's list is an error, as `opencode` 2.0.19 does;
+ * - a non-string value is refused, because `opencode` implements no boolean options — which is why
+ *   kurier does not announce the capability (see `KURIER_CLIENT_CAPABILITIES`).
+ */
+function setConfigOption(sessionId, params, id) {
+  if (CONFIG_REFUSE) {
+    return replyError(id, -326_02, `this agent refuses every configuration change: ${params.configId}`);
+  }
+  const configId = String(params.configId ?? '');
+  const value = params.value;
+  if (typeof value !== 'string') {
+    return replyError(id, -326_02, 'this agent takes a value id, not a tagged value');
+  }
+  if (configOptions === null) configOptions = buildConfigOptions();
+  const index = configOptions.findIndex((option) => option.id === configId);
+  if (index === -1) return replyError(id, -326_02, `no such config option: ${configId}`);
+  const option = configOptions[index];
+  if (option.type === 'select' && !option.options.some((entry) => entry.value === value)) {
+    return replyError(id, -326_02, `that value is not one of the offered ones: ${value}`);
+  }
+  configOptions = [
+    ...configOptions.slice(0, index),
+    { ...option, currentValue: value },
+    ...configOptions.slice(index + 1),
+  ];
+  reply(id, { configOptions });
+  // The push is the same split the real agent makes: opencode announces a *model* change with a
+  // `config_option_update` and answers the rest with the list. `KU_STANDIN_CONFIG_PUSH=0` turns it off,
+  // so a surface that only listened for the answer and one that only listened for the notification can
+  // both be exercised — the row must work either way, because which one an agent sends is not ours to
+  // choose.
+  if (CONFIG_PUSH && configId === 'model') {
+    notify(sessionId, { sessionUpdate: 'config_option_update', configOptions });
+  }
+}
+
+/** `session/set_mode`: move the mode and answer with the full list, as `opencode` does. */
+function setMode(sessionId, mode, id) {
+  if (CONFIG_REFUSE) {
+    return replyError(id, -326_02, `this agent refuses every configuration change: ${mode}`);
+  }
+  if (!modes().some((available) => available.id === mode)) {
+    return replyError(id, -326_02, `no such mode: ${mode}`);
+  }
+  if (configOptions === null) configOptions = buildConfigOptions();
+  configOptions = configOptions.map((option) =>
+    option.id === 'mode' ? { ...option, currentValue: mode } : option,
+  );
+  reply(id, { configOptions });
+  // `current_mode_update`, not `config_option_update`: the schema has a door for exactly this, and a
+  // fixture that used the other one would never exercise the narrow arm of `applyConfigUpdate`.
+  notify(sessionId, { sessionUpdate: 'current_mode_update', currentModeId: mode });
 }
 
 function cancelTurn() {

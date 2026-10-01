@@ -189,6 +189,13 @@ export const APP_CSS = `
   margin-left: 18px;
   margin-right: 18px;
 }
+/* The config row's control. Nothing visual either — this is a marker like \`.kurier-composer-entry\`,
+   so the row's dropdowns can be found by class rather than by walking the tree. It exists because a
+   probe (and a screenshot script) has to be able to name "the dropdowns of the config row" without
+   knowing how the box below them was assembled. */
+.kurier-config-control {
+  background-color: transparent;
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
@@ -209,6 +216,7 @@ export const CSS = {
   composerFrame: 'kurier-composer-frame',
   composerEntry: 'kurier-composer-entry',
   composerStatus: 'kurier-composer-status',
+  configControl: 'kurier-config-control',
   openRow: 'kurier-open-row',
   dim: DIM,
   title: TITLE,

@@ -59,10 +59,23 @@ export interface KurierHooks extends FrameworkHooks {
   permission?: boolean;
 
   /**
-   * `KU_APP_CONFIG` — open with a config option set to this value id, as if it had been picked.
+   * `KU_APP_CONFIG` — set a session config option at startup, **as `configId=valueId`**.
    *
-   * For the same reason: a `Gtk.DropDown` is exactly the widget the devtools plane cannot operate,
-   * and the config row is the surface's most-used control.
+   * For the same reason: a `Gtk.DropDown` is exactly the widget the devtools plane cannot operate —
+   * `ActivateWidget` on a combo row reports `true` and changes no selection — and the config row is the
+   * surface's most-used control.
+   *
+   * **Both halves are required, and neither is guessed** (`parseConfigOptionSpec` decides it): a
+   * control id says which option and not to what, and a value id cannot be resolved on its own. So
+   * `KU_APP_CONFIG=effort=high` sets the effort level to high, and `KU_APP_CONFIG=effort` is refused
+   * with a line in the log rather than quietly picking a value.
+   *
+   * **It goes through the real path and sends a prompt if none has run**, because an option can only be
+   * set on a live agent and kurier starts the agent on the first prompt (plan §6). So the hook sends
+   * `KU_APP_PROMPT` (or a fixture sentence), waits for `session/load` to answer with the options, and
+   * then calls `session/set_config_option` — which is also why it is applied before `KU_APP_THINKING`:
+   * one prompt, one turn, one set. What a screenshot then shows is the row in the state a person's
+   * click produces, not a picture of one.
    */
   config?: string;
 

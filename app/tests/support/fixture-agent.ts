@@ -104,6 +104,58 @@ export function opencodeConfigOptions(): SessionConfigOption[] {
   ];
 }
 
+/**
+ * The same three options with the model list **grouped** — the other arm of
+ * `SessionConfigSelectOptions`' `anyOf` (`refs/acp/schema.v1.json`), which an agent is free to send and
+ * `opencode` does not.
+ *
+ * **The one cast in this file, and it is the schema's shape rather than a convenience.**
+ * `SessionConfigSelectOption` is the *flat* arm, so a `SessionConfigSelectGroup` has no home in the
+ * typed wire type — a client that types the grouped arm away has no way to notice it arriving, and a
+ * fixture that cannot express it cannot test that it is handled. `narrow.ts`'s `usableConfigValues` is
+ * the single filter both arms go through, and this is what it is tested with.
+ */
+export function groupedConfigOptions(): SessionConfigOption[] {
+  return [
+    {
+      id: 'model',
+      name: 'Model',
+      type: 'select',
+      category: 'model',
+      currentValue: 'local/llama',
+      options: [
+        {
+          group: 'local',
+          name: 'Local',
+          options: [
+            { value: 'local/llama', name: 'llama' },
+            { value: 'local/qwen', name: 'qwen' },
+          ],
+        },
+        {
+          group: 'hosted',
+          name: 'Hosted',
+          options: [
+            { value: 'hosted/gpt-5.5', name: 'gpt-5.5' },
+            { value: 'hosted/claude-sonnet-5.5', name: 'claude-sonnet-5.5' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'effort',
+      name: 'Effort',
+      type: 'select',
+      category: 'thought_level',
+      currentValue: 'default',
+      options: [
+        { value: 'low', name: 'Low' },
+        { value: 'default', name: 'Default' },
+      ],
+    },
+  ] as unknown as SessionConfigOption[];
+}
+
 /** The modes behind the `mode` config option. opencode keeps the two in step; so does this. */
 export const OPENCODE_MODES: SessionMode[] = [
   { id: 'build', name: 'Build', description: 'Make the change' },
@@ -170,6 +222,16 @@ export interface FixtureAgentOptions {
   /** Reject a config option the fixture does not know, and a value outside the option's list. */
   strictConfigOptions?: boolean;
   /**
+   * Refuse every set of these `configId`s, with the protocol's own error.
+   *
+   * **The only way to reach a refusal from a client, and that is why it exists.** Every *other*
+   * refusal is the client's own doing — an unknown id or an unoffered value, both refused before the
+   * request goes out — so without this a client could pass its whole suite and still have the failure
+   * path untested. An agent that will not let a session's model change mid-conversation is a real
+   * agent, and `opencode` 2.0.19 already refuses anything it does not recognise.
+   */
+  refuseConfigOptions?: string[];
+  /**
    * Push a `config_option_update` after a successful set, the way opencode does when the **model**
    * changes (it does not for `effort` or `mode`). Defaults to true.
    */
@@ -201,6 +263,18 @@ export interface FixtureAgentOptions {
    * the person had cancelled.
    */
   holdLoad?: boolean;
+  /**
+   * Park the `session/set_config_option` answer until `releaseConfigAnswer()` is called, **capturing the
+   * option list at the moment the request arrived**.
+   *
+   * **The "capturing" is the half that makes it useful.** A held reply whose body is assembled at
+   * release time would carry the agent's *latest* state, and every assertion about it would pass whether
+   * the client applied a notification that arrived meanwhile or ignored it. Snapshotting at arrival makes
+   * the answer older than anything that lands while it waits — which is the state a client is really in
+   * when an agent pushes a change and answers a request at the same time, and the only state in which
+   * "the answer wins" and "the notification wins" are different answers.
+   */
+  holdConfigAnswer?: boolean;
   /** Ask for a file the client refused to answer, mid-turn. */
   requestFileSystem?: 'read' | 'write';
   /** Send a method the client has never heard of, right after the handshake. */
@@ -240,6 +314,8 @@ export class FixtureAgent {
   #releaseTurn: (() => void) | null = null;
   /** The parked `session/load` reply, or `null`. See `FixtureAgentOptions.holdLoad`. */
   #releaseLoad: (() => void) | null = null;
+  /** The parked `session/set_config_option` reply, or `null`. See `FixtureAgentOptions.holdConfigAnswer`. */
+  #releaseConfigAnswer: (() => void) | null = null;
   #nextRequestId = 10_000;
   #pendingPermissions = new Map<RequestId, (outcome: PermissionOutcome) => void>();
   #sessions = new Map<string, { cwd: string; mcpServers: McpServer[] }>();
@@ -257,6 +333,24 @@ export class FixtureAgent {
   /** Every config-option refusal the fixture sent, in order. */
   get configErrors(): ConfigRefusal[] {
     return this.#configErrors;
+  }
+
+  /**
+   * Push a `config_option_update` for any session, with one option moved first.
+   *
+   * **A named session, not "the current one", because that is what the test needs to ask.** opencode
+   * announces child sessions, so an update for another session is a real thing on the wire; a fixture
+   * that could only push its own would make "this update names somebody else's session" unreachable,
+   * and a client that applied it would be showing a model picker with another conversation's model on it.
+   */
+  pushConfigOptionUpdate(sessionId: string, configId: string, value: string): void {
+    this.#configOptions = this.#configOptions.map((option) =>
+      option.id === configId ? { ...option, currentValue: value } : option,
+    );
+    this.#update({
+      sessionId,
+      update: { sessionUpdate: 'config_option_update', configOptions: this.#configOptions },
+    });
   }
 
   /** The options as the fixture currently stands — what a surface would have to re-read. */
@@ -632,6 +726,9 @@ export class FixtureAgent {
     if (typeof value !== 'string') {
       return this.#configInvalid(id, 'this agent takes a value id, not a tagged value', { configId });
     }
+    if (this.#options.refuseConfigOptions?.includes(configId) === true) {
+      return this.#configInvalid(id, 'this session cannot change this option', { configId });
+    }
     this.configSets.push({ configId, value });
 
     if (configId === 'mode') {
@@ -670,7 +767,18 @@ export class FixtureAgent {
     params: Record<string, unknown> | undefined,
     push: boolean,
   ): void {
-    this.#reply(id, { configOptions: this.#configOptions, ...this.#meta() });
+    // **Snapshot before parking.** `holdConfigAnswer` exists so a caller can decide what to do with a
+    // notification that lands while a set is in flight, and that decision is only observable if the
+    // parked answer is older than the notification — see `FixtureAgentOptions.holdConfigAnswer`.
+    const snapshot = this.#configOptions.map((option) => ({ ...option }));
+    if (this.#options.holdConfigAnswer === true) {
+      this.#releaseConfigAnswer = () => {
+        this.#releaseConfigAnswer = null;
+        this.#reply(id, { configOptions: snapshot, ...this.#meta() });
+      };
+      return;
+    }
+    this.#reply(id, { configOptions: snapshot, ...this.#meta() });
     if (push && this.#options.pushConfigOptionUpdate !== false) {
       this.#update({
         sessionId: String(params?.['sessionId'] ?? SESSION_ID),
@@ -760,5 +868,13 @@ export class FixtureAgent {
    */
   releaseLoad(): void {
     this.#releaseLoad?.();
+  }
+
+  /**
+   * Let a parked `session/set_config_option` answer, with the option list as it was when the request
+   * arrived. Only meaningful with `holdConfigAnswer`.
+   */
+  releaseConfigAnswer(): void {
+    this.#releaseConfigAnswer?.();
   }
 }

@@ -31,11 +31,25 @@
 
 import type { AcpClient, RequestPermissionRequest } from '@kurier/acp';
 import type { ClientGate } from '@kurier/acp/gate';
-import type { RequestPermissionResponse, SessionId } from '@kurier/acp/types';
+import type {
+  RequestPermissionResponse,
+  SessionConfigOption,
+  SessionId,
+  SessionUpdate,
+} from '@kurier/acp/types';
 import type { TranscriptEntry } from '@kurier/session';
 
 import type { AgentCommand } from './agents/stdio.ts';
 import type { TurnState } from './composer-state.ts';
+import {
+  applyConfigUpdate,
+  configAfterSet,
+  configRequest,
+  configRowInput,
+  isConfigChange,
+  type ConfigRowView,
+} from './config-row.ts';
+import { findControl, projectConfigOptions, type ConfigControl } from './config.ts';
 import {
   answerFor,
   PermissionDesk,
@@ -98,6 +112,19 @@ export interface AgentSessionEvents {
    * ends in `cancel`.
    */
   onPermission?(question: PermissionQuestion): Promise<string | null | undefined>;
+  /**
+   * The agent's configuration row changed: new options, a set in flight, or a refusal.
+   *
+   * **A separate callback from `onSnapshot`, and the reason is the frequency.** The snapshot is the
+   * turn state — it changes on every state move and nothing else, and the composer reads all of it.
+   * The config row changes on a different clock (an agent answer, a set, an update notification that
+   * arrives whenever the agent feels like it), and folding it in would mean a session answer re-rendered
+   * the composer and a permission question re-read the model dropdown.
+   *
+   * **The row's rules are in `core/config-row.ts`; this callback carries a decided view.** A surface
+   * that reassembled it from raw options would be a second opinion about what may be drawn.
+   */
+  onConfig?(view: ConfigRowView): void;
 }
 
 export interface AgentSnapshot {
@@ -125,6 +152,16 @@ export interface BoundSession {
  * `session/prompt` reject, so the turn still settles instead of hanging.
  */
 const CLOSE_GRACE_MS = 5_000;
+
+/**
+ * How many sessions' option lists one window keeps in memory, oldest dropped first.
+ *
+ * **A handful, and the number is a bound rather than a policy.** A window owns one agent and prompts
+ * the sessions a person clicks, so the working set is a few; the memory is not (400 models is not a
+ * small array), and a bound nobody can see is how a window open all day ends up holding every model
+ * list it ever saw. The oldest goes first because the newest is the one the row can be showing.
+ */
+const CONFIG_MEMORY_LIMIT = 8;
 
 export interface AgentSessionOptions {
   readonly command: AgentCommand;
@@ -203,6 +240,48 @@ export class AgentSession {
    */
   #turnSession: SessionId | null = null;
   /**
+   * The agent's own configuration answer, as last reported **for `#agentSession`**.
+   *
+   * **Held, never derived and never persisted.** `session/new`, `session/load` / `session/resume`, a
+   * `config_option_update` and the answer to a set all carry the **full** list, so the last one wins
+   * and there is never a merge to get wrong. Nothing about it is written to disk: a model kurier
+   * remembered across a restart would be a preference kurier invented, and the agent's `currentValue`
+   * is the truth on every reattach. Before the agent has answered this is `null`, not `[]`, because
+   * "nothing yet" and "nothing to offer" must not draw the same thing.
+   */
+  #configOptions: SessionConfigOption[] | null = null;
+  /**
+   * The same list, kept per session the agent has been asked about, **in memory only**.
+   *
+   * **Why this exists: `bind(A) → bind(B) → bind(A)` with no prompt in between.** Selecting a session
+   * starts nothing (plan §6), so the second `bind(B)` must empty the row — but the *agent* is still
+   * holding A, so `bind(A)` again has nothing to re-request: `#bindAgent` returns early because the
+   * agent's own session never changed. Clearing on the way out and nothing on the way back leaves the
+   * row empty for the rest of the window's life, for a session kurier already knows everything about.
+   *
+   * **A cache of what the agent last said, not configuration authority.** Nothing is written down, the
+   * values are never merged or reinterpreted, and the agent's `currentValue` still wins on every answer —
+   * which is what makes showing them again honest. `CONFIG_MEMORY_LIMIT` bounds it, because a model
+   * list is ~400 entries and a window that prompts fifty sessions would otherwise hold fifty of them
+   * to show one.
+   */
+  readonly #configBySession = new Map<SessionId, SessionConfigOption[]>();
+  /** True while a `session/set_config_option` is in flight, so the row goes insensitive. */
+  #configBusy = false;
+  /**
+   * Which session the in-flight set was sent for, and the token that says "still mine".
+   *
+   * **A set outlives the binding that started it.** `session/set_config_option` is a round trip, and
+   * the person can click another session row while it is in the air — so the answer has to be able to
+   * ask "was this sent for the session on screen?" and get an answer that is not "it was sent". With
+   * `null` when nothing is in flight, one field answers both questions: *whose* set is this, and *is it
+   * still the one that matters*.
+   */
+  #configSetSession: SessionId | null = null;
+  /** The refusal sentence from the last failed set, cleared by the next set and by any new answer. */
+  #configError: string | null = null;
+
+  /**
    * Set by *this* controller's Stop, cleared when a turn starts.
    *
    * **The only evidence there ever was that a Stop was ours.** `session/cancel` is a notification and
@@ -266,6 +345,26 @@ export class AgentSession {
   }
 
   /**
+   * The config row, as decided in `core/config-row.ts`.
+   *
+   * **The getter a surface asks, next to `agent` and `snapshot`, for the same reason they exist:** the
+   * controller holds the agent's last answer, so a surface that rendered its own copy would be a
+   * second truth about what the agent offers.
+   */
+  get configRow(): ConfigRowView {
+    return configRowInput({
+      options: this.#configOptions,
+      busy: this.#configBusy,
+      error: this.#configError,
+    });
+  }
+
+  /** The config row as last reported, without the per-call projection. For a test that asserts on it. */
+  get configOptions(): SessionConfigOption[] | null {
+    return this.#configOptions;
+  }
+
+  /**
    * Point the window at a stored session. **Starts nothing.**
    *
    * Called by `#open` for every row the person clicks, which is the reason it must stay free of a
@@ -275,7 +374,39 @@ export class AgentSession {
    */
   bind(session: BoundSession | null): void {
     this.#session = session;
+    // **The row follows the agent, and the cache makes coming back possible.** The options on screen
+    // are what *the agent* reported about *the session it holds*, so a row over another session's
+    // conversation is a control pointing at the wrong thing — and the row is emptied when the window
+    // points at anything but that session. The empty half of the rule is the half that is easy to get
+    // wrong: emptying it is only honest if coming back can fill it, and `bind(A) → bind(B) → bind(A)`
+    // with no prompt between re-binds nothing (the agent still holds A), so the answer comes from
+    // `#configBySession`. Never from a re-request: that would be a `session/load` on a click, which is
+    // the spawn this method exists to avoid.
+    if (session !== null && session.id === this.#rowSession()) {
+      this.#configOptions = this.#configBySession.get(session.id) ?? null;
+      this.#configError = null;
+    } else {
+      this.#clearConfigRow();
+    }
     this.#emit();
+    this.#emitConfig();
+  }
+
+  /**
+   * Empty the row and cancel the bookkeeping a set in flight is holding.
+   *
+   * **`#configBusy` goes too, and that is not a detail.** A set is a round trip, so the person can
+   * click another session while one is in the air; leaving the new row insensitive until an answer
+   * arrives for the *old* session would lock the row for as long as that agent takes — or for ever, if
+   * the answer is the thing that never arrives. Clearing it here is what lets the new session's row be
+   * used at all; the token (`#configSetSession = null`) is what lets the abandoned answer recognise
+   * itself as abandoned.
+   */
+  #clearConfigRow(): void {
+    this.#configOptions = null;
+    this.#configError = null;
+    this.#configBusy = false;
+    this.#configSetSession = null;
   }
 
   /**
@@ -444,6 +575,16 @@ export class AgentSession {
   }
 
   #onUpdate(notification: Parameters<typeof toTranscript>[0], body: string, sessionId: SessionId): void {
+    // **The config row moves on its own notification, before the transcript filter below.** A
+    // `config_option_update` is the agent saying what its options now are, and it is the *only* way
+    // the row learns about a change it did not ask for: opencode pushes one when the model changes and
+    // answers the list for the rest, so waiting for a set answer would leave the row stale after an
+    // agent-side change. It carries no transcript text — `toTranscript` returns nothing for it, which
+    // is why wiring it here does not add a line to anybody's history.
+    // …and only for the session the agent holds: a `config_option_update` naming another session is
+    // another conversation's configuration (opencode announces child sessions), and applying it would
+    // put a model picker showing somebody else's model over this one.
+    if (notification.sessionId === sessionId) this.#takeConfigUpdate(notification.update);
     const entries = toTranscript(notification, this.#now()).filter((entry) => {
       // Not ours: an update for another session is another conversation (opencode announces child
       // sessions), and filing it in this record would make the file disagree with the agent.
@@ -691,10 +832,212 @@ export class AgentSession {
    */
   async #bindAgent(handle: AgentClientHandle, session: BoundSession): Promise<void> {
     if (this.#agentSession === session.id) return;
-    await withAuthHint('attaching to the session', () =>
+    // Cleared *before* the request, not after: the agent is between sessions while the load is in
+    // flight (that replay takes seconds on a cold agent), and the old row must not sit there through
+    // it. An answer that never arrives leaves the row empty, which is the honest state — there is no
+    // agent answer to show. The old session's list is not lost, though: `#configBySession` still has it.
+    this.#clearConfigRow();
+    this.#emitConfig();
+    const answer = await withAuthHint('attaching to the session', () =>
       handle.client.reattach(session.id, { cwd: session.cwd }),
     );
     this.#agentSession = session.id;
+    this.#takeConfigOptions(answer.configOptions, session.id);
+  }
+
+  /**
+   * Take one `session/update` and apply it to the options, if it is one of the two that mean
+   * something to the row. `applyConfigUpdate` returns `undefined` for every other update, which is
+   * what makes this safe to call for each of them without filtering first.
+   *
+   * **An update arriving while a set is in flight is dropped, and the set's answer wins.** Both carry
+   * the same thing — the agent's options — and the answer is the one the schema says is the state
+   * *after* the change, so it is the later word on the wire about the value the person just picked.
+   * Applying the update first would put the row on an intermediate state and then move it again a
+   * moment later, which is a dropdown that changes under the pointer twice for one click.
+   *
+   * The cost, stated rather than hidden: an agent-side change to a *different* option that lands in
+   * that window is not shown until the next answer or the next `session/load`. Correcting it would
+   * need a merge between a notification and an answer about a list neither of them is authoritative
+   * for, and the whole rule in this file is that the agent's full list is the truth — so the whole
+   * list wins, and it is the later one.
+   */
+  #takeConfigUpdate(update: SessionUpdate): void {
+    if (this.#configBusy) return;
+    const next = applyConfigUpdate(this.#configOptions, update);
+    if (next === undefined) return;
+    this.#takeConfigOptions(next, this.#agentSession);
+  }
+
+  /**
+   * Take an agent-reported option list as the new truth, cache it against the session it was about,
+   * and redraw the row.
+   *
+   * **`sessionId` is the session the answer was *about*, not the one on screen.** They differ exactly
+   * when a set or a load is answered for a session the person has since navigated away from, and the
+   * cache is what makes coming back to that session show its real options instead of a blank row.
+   * `null` there means "nobody can say", and then nothing is cached and nothing is drawn.
+   *
+   * `null` and `[]` are stored apart for the same reason as above: "the agent has not answered" and
+   * "the agent has nothing to offer" are different reasons for an empty row, and only one of them is
+   * fixed by the next turn.
+   */
+  #takeConfigOptions(options: SessionConfigOption[] | null | undefined, sessionId: SessionId | null): void {
+    const list = Array.isArray(options) ? options : null;
+    if (sessionId !== null && list !== null) {
+      this.#configBySession.delete(sessionId);
+      this.#configBySession.set(sessionId, list);
+      // Drop the oldest, not an arbitrary one: `Map` keeps insertion order, and re-inserting moves a
+      // session to the end, so this is insertion order == least recently answered.
+      for (const oldest of this.#configBySession.keys()) {
+        if (this.#configBySession.size <= CONFIG_MEMORY_LIMIT) break;
+        if (oldest === sessionId) continue;
+        this.#configBySession.delete(oldest);
+      }
+    }
+    // An answer about another session is cached and not drawn. See `#rowSession` for which session the
+    // row is allowed to be about: it takes *both* the window's binding and the agent's, so an answer
+    // that arrives after the person clicked away cannot repopulate the row they left.
+    if (sessionId !== null && sessionId !== this.#rowSession()) return;
+    this.#configOptions = list;
+    // Any new answer clears the refusal: a sentence saying "that did not change" under a dropdown
+    // showing the value it *did* change to is a contradiction on screen.
+    this.#configError = null;
+    this.#emitConfig();
+  }
+
+  /**
+   * Set one option through `session/set_config_option`, and redraw from the answer.
+   *
+   * **The one door, not two.** The agent can be asked through `session/set_mode` as well, and opencode
+   * keeps the two in step; kurier uses only the option door, because the `mode` option is the one the
+   * row draws and a second path is a second way for the row and the agent to disagree.
+   *
+   * **Three refusals before anything is sent, and none of them is defensive.**
+   *
+   * - `isConfigChange` drops a re-selection of the value that is already current. The row is rebuilt on
+   *   every answer and `notify::selected` fires on that rebuild, so without this the row would send the
+   *   value it has just displayed.
+   * - `configRequest` drops a value the agent did not offer, so a stale id — from a dev hook, from a
+   *   list that has moved on, from a bug — is never put on the wire.
+   * - `!handle || sessionId === null` drops a set with no agent behind it. The process starts on the
+   *   first prompt (plan §6), so the row is empty then and there is nothing on screen to press, and a
+   *   set without a session would have to name none.
+   *
+   * **A refusal is both shown and logged, and the two say different things.** The row gets a fixed
+   * English sentence — "the agent did not change this, its previous value is still in use" — because
+   * that is the part a person can act on, and `configAfterSet` is what decides it: the controls stay
+   * exactly as the agent last answered them and nothing else moves. The agent's own message goes to the
+   * notice channel, because it is written for whoever is debugging it (ids, error codes) and belongs in
+   * the log rather than in a caption under a model dropdown.
+   */
+  async setConfigOption(controlId: string, value: string): Promise<void> {
+    const view = this.configRow;
+    // A set in flight refuses a second one, which is what makes "no queue in the GUI" true at the layer
+    // that decides rather than a promise the widget keeps. Two sets against one option list is a race
+    // whose loser is whichever answer arrives last, and the person would see a value they did not pick.
+    if (view.busy) return;
+    if (!isConfigChange(view, controlId, value)) return;
+    const request = configRequest(this.#configControl(controlId), value);
+    const handle = this.#handle;
+    const sessionId = this.#agentSession;
+    if (request === null || !handle || sessionId === null) return;
+
+    this.#configBusy = true;
+    this.#configSetSession = sessionId;
+    this.#configError = null;
+    this.#emitConfig();
+    // **Whether this answer is still wanted.** `#configSetSession` is cleared by `bind` and by
+    // `#bindAgent` — both of which mean "the row is now about something else" — and `#agentSession` is
+    // what the row is for. Either one changing means this answer belongs to a session the person has
+    // navigated away from, and drawing it would put session A's model picker over session B's
+    // conversation. On success the check lives in `#takeConfigOptions`, which caches the answer against
+    // the session it was about and draws it only when that session is still the one on screen — so an
+    // answer that arrives late is kept where it belongs and shown nowhere it does not.
+    const stillMine = (): boolean => this.#configSetSession === sessionId && this.#agentSession === sessionId;
+    try {
+      const answer = await handle.client.setConfigOption({ sessionId, configId: controlId, value: request });
+      this.#takeConfigOptions(answer.configOptions, sessionId);
+    } catch (error) {
+      // The refusal is turned into the row by `configAfterSet`, which keeps the controls exactly as
+      // the agent last answered them and supplies the sentence. Only the sentence is written back:
+      // `#configOptions` is deliberately not touched, because a refusal is not an answer and an agent
+      // that said no has told us nothing new about what it offers.
+      if (stillMine()) this.#configError = configAfterSet(this.configRow, error as Error).error;
+      this.#events.onNotice?.(`session/set_config_option was refused: ${describe(error)}`);
+    } finally {
+      // Only our own bookkeeping is cleared. A set that a session switch has already disowned must not
+      // un-insensitize a *different* set that the new session has since started.
+      if (this.#configSetSession === sessionId) {
+        this.#configSetSession = null;
+        this.#configBusy = false;
+      }
+      this.#emitConfig();
+    }
+  }
+
+  /**
+   * The session the config row is allowed to show, or `null` when it is allowed to show nothing.
+   *
+   * **Both bindings have to agree, and that is the whole of BLOCKER-1's fix.** The agent's answer is
+   * about the session *the agent holds*; the row is drawn under the session *the window has open*. They
+   * are the same session until a person clicks another row — selecting a session starts nothing (plan
+   * §6), so the agent keeps holding the old one for as long as nobody prompts, and every answer that
+   * lands in that gap is about a conversation that is no longer on screen.
+   *
+   * So the row is only ever about one session, and an answer that arrives late is *cached* against its
+   * own session rather than dropped: it is still true, and `bind` puts it back when that session returns.
+   */
+  #rowSession(): SessionId | null {
+    const shown = this.#session?.id ?? null;
+    return shown !== null && shown === this.#agentSession ? shown : null;
+  }
+
+  /**
+   * The projected control for an id, or a control that cannot be set.
+   *
+   * **`configRequest` takes the `ConfigControl` and not the `ConfigRowControl` on purpose.** The
+   * request payload needs the protocol-projected form — the value list `core/config.ts` validated — and
+   * this re-projects the agent's last answer rather than reaching into a widget for it. The fallback
+   * control is the honest "nothing here" for `configRequest`, which refuses it because no value of it is
+   * on offer; there is no throw, because a set arriving for a control the agent dropped is a thing a
+   * window should survive.
+   */
+  #configControl(controlId: string): ConfigControl {
+    const found = findControl(projectConfigOptions(this.#configOptions), controlId);
+    return (
+      found ?? {
+        kind: 'switch',
+        id: controlId,
+        name: controlId,
+        description: null,
+        category: null,
+        currentValue: false,
+      }
+    );
+  }
+
+  /**
+   * `KU_APP_CONFIG`: set one option the way a person picking it would, once the agent is bound.
+   *
+   * **Through `setConfigOption`, not around it.** The hook exists because the devtools plane cannot
+   * operate a dropdown (see `hooks.ts`), so the screenshot has to be of the real path or it proves
+   * nothing — same argument as `stagePermissionRequest` and the same gate it goes through.
+   *
+   * **It sends the prompt first if no turn has run, because there is no agent before one.** The
+   * process starts on the first prompt (plan §6), so `KU_APP_CONFIG` alone would have no agent to ask.
+   * `KU_APP_PROMPT` supplies the prompt, so the hook adds no text of its own.
+   */
+  async stageConfigOption(controlId: string, value: string, prompt?: string): Promise<void> {
+    if (this.#agentSession === null) {
+      const session = this.#session;
+      if (!session) {
+        this.#events.onNotice?.('KU_APP_CONFIG: no session is open, so there is no option to set');
+        return;
+      }
+      await this.prompt(prompt ?? 'Answer with one short sentence.');
+    }
+    await this.setConfigOption(controlId, value);
   }
 
   /**
@@ -727,6 +1070,13 @@ export class AgentSession {
     }
     const sessionId = this.#turnSession;
     if (sessionId) this.#record(sessionId, [agentExitedEntry(sessionId, this.#now(), message)]);
+    // **The config row goes with the agent.** Live dropdowns over a process that has exited are controls
+    // pointing at nothing: a person would pick a model, the row would accept it, and the request would go
+    // into a connection that is closed. The cache goes too, for the same reason — restoring a dead
+    // agent's list on the next `bind` would put those controls back on screen with nothing behind them.
+    this.#clearConfigRow();
+    this.#configBySession.clear();
+    this.#emitConfig();
     this.#setAttachment({ status: 'gone', reason: message });
     this.#move({ kind: 'agent-gone', reason: message });
   }
@@ -743,6 +1093,11 @@ export class AgentSession {
 
   #emit(): void {
     this.#events.onSnapshot(this.snapshot);
+  }
+
+  /** The config row changed. Its own callback, on its own clock — see `onConfig`. */
+  #emitConfig(): void {
+    this.#events.onConfig?.(this.configRow);
   }
 
   #after(ms: number): Promise<void> {

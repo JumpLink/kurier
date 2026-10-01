@@ -4,6 +4,7 @@ import { AcpClient } from '@kurier/acp/client';
 import type { TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../../src/core/agent-session.ts';
+import type { ConfigRowView } from '../../../src/core/config-row.ts';
 import type { PermissionQuestion } from '../../../src/core/permission.ts';
 import { OPENCODE_COMMAND } from '../../../src/core/agents/opencode.ts';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
@@ -18,6 +19,8 @@ interface Harness {
   readonly entries: TranscriptEntry[];
   readonly persisted: { sessionId: string; entries: TranscriptEntry[] }[];
   readonly notices: string[];
+  /** Every config view handed to the surface, in order. */
+  readonly configViews: ConfigRowView[];
   /** True once `onSpawn`'s closer has been called — the "nothing unowned" assertion. */
   spawnCloserUsed(): boolean;
   /** One tick of the microtask queue, which is where the fixture's turn replies land. */
@@ -64,6 +67,7 @@ function harness(options: HarnessOptions = {}): Harness {
   const entries: TranscriptEntry[] = [];
   const persisted: { sessionId: string; entries: TranscriptEntry[] }[] = [];
   const notices: string[] = [];
+  const configViews: ConfigRowView[] = [];
   let spawnCloserUsed = false;
   let tick = 0;
   const clock = (): string => {
@@ -78,6 +82,9 @@ function harness(options: HarnessOptions = {}): Harness {
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       onEntries: (batch) => entries.push(...batch),
       onNotice: (message) => notices.push(message),
+      // The row's own channel, collected like the snapshots: what a surface would be handed, and the
+      // only way to see *when* it was handed something rather than only what it holds now.
+      onConfig: (view) => configViews.push(view),
       // Spread so an absent hook stays absent: `onPermission: undefined` would be a hook that exists
       // and cannot ask, which is not the same thing the CLI has.
       ...(options.onPermission ? { onPermission: options.onPermission } : {}),
@@ -104,6 +111,7 @@ function harness(options: HarnessOptions = {}): Harness {
     entries,
     persisted,
     notices,
+    configViews,
     spawnCloserUsed: () => spawnCloserUsed,
     flush: async () => {
       // The fixture's turn runs on the microtask queue, so a fixed number of ticks is what "the turn has
@@ -234,7 +242,12 @@ export default async () => {
       const h = harness({ chunks: ['one', 'two'] });
       await h.session.prompt('hello');
       expect(h.persisted.length).toBeGreaterThan(0);
-      for (const batch of h.persisted) expect(batch.sessionId).toBe(SESSION.id);
+      // **One assertion, not one per batch.** The claim is "every batch belongs to this session", and
+      // how many batches a turn produced is a property of how the stream arrived — so a loop here makes
+      // the *assertion count* of the whole suite depend on batching, which is how a run can print a
+      // different number of assertions than the run before it on the same code. Comparing the distinct
+      // session ids says the same thing and always costs one.
+      expect([...new Set(h.persisted.map((batch) => batch.sessionId))]).toStrictEqual([SESSION.id]);
     });
 
     await it('records the history an agent replays on load exactly once, not twice', async () => {
@@ -378,7 +391,9 @@ export default async () => {
       expect(new Set(shown).size).toBe(2);
       // Both answered, both refused, and the turn ended rather than hanging.
       expect(h.agent.permissionOutcomes.length).toBe(2);
-      expect(h.agent.permissionOutcomes.every((outcome) => outcome?.outcome.outcome === 'selected')).toBe(true);
+      expect(h.agent.permissionOutcomes.every((outcome) => outcome?.outcome.outcome === 'selected')).toBe(
+        true,
+      );
       expect(h.session.turnRunning).toBe(false);
     });
 
@@ -514,7 +529,7 @@ export default async () => {
   });
 
   await describe('agent-session — stopping', async () => {
-    it('sends session/cancel and stays in thinking until the turn has answered', async () => {
+    await it('sends session/cancel and stays in thinking until the turn has answered', async () => {
       // `holdTurn` parks the fixture's turn, so the cancel lands *inside* it — the shape a real agent has
       // while it works. Asserted in that order deliberately: a controller that left `thinking` on the
       // click rather than on the answer would pass the second assertion and fail the first.
@@ -592,7 +607,7 @@ export default async () => {
   });
 
   await describe('agent-session — an agent that dies', async () => {
-    it('is gone, with no stopReason and the plan §6 line in the transcript', async () => {
+    await it('is gone, with no stopReason and the plan §6 line in the transcript', async () => {
       // The agent vanishes mid-turn: the transport ends, `session/prompt` rejects, and nothing answered.
       // Inventing an `end_turn` here is the fabrication §6 forbids.
       const h = harness({ holdTurn: true });
@@ -628,7 +643,7 @@ export default async () => {
   });
 
   await describe('agent-session — failing to start', async () => {
-    it('is a sentence on the surface, not an exception', async () => {
+    await it('is a sentence on the surface, not an exception', async () => {
       // A bad command, a handshake timeout and a protocol mismatch all land here, and a person must be
       // able to read what to do rather than watch a spinner that will never resolve.
       const h = harness({ failWith: new Error('spawn opencode ENOENT') });
@@ -639,7 +654,7 @@ export default async () => {
       expect(h.session.snapshot.state).toBe('idle');
     });
 
-    it('leaves no turn state behind, because no turn ran', async () => {
+    await it('leaves no turn state behind, because no turn ran', async () => {
       const h = harness({ failWith: new Error('handshake failed') });
       await h.session.prompt('hello');
       // The *final* state, not "thinking never appeared": the controller does pass through `thinking`
@@ -650,7 +665,7 @@ export default async () => {
       expect(h.session.turnRunning).toBe(false);
     });
 
-    it('reports the auth hint through the attachment, which is where the composer shows it', async () => {
+    await it('reports the auth hint through the attachment, which is where the composer shows it', async () => {
       const h = harness({ requireAuth: true });
       await h.session.prompt('hello');
       const attachment = h.session.snapshot.attachment;
@@ -672,7 +687,7 @@ export default async () => {
   });
 
   await describe('agent-session — closing the window', async () => {
-    it('cancels, waits for the turn, and only then ends the process', async () => {
+    await it('cancels, waits for the turn, and only then ends the process', async () => {
       // Plan §6's ordering, and the one that is not interchangeable: terminating first SIGTERMs the agent
       // out of the turn it is in the middle of, which loses whatever it had not flushed.
       const h = harness({ holdTurn: true });
@@ -688,14 +703,14 @@ export default async () => {
       await sent;
     });
 
-    it('resolves rather than hanging when no turn is running', async () => {
+    await it('resolves rather than hanging when no turn is running', async () => {
       const h = harness();
       await h.session.prompt('hello');
       await h.session.shutdown();
       expect(h.agent.closed).toBe(true);
     });
 
-    it('ends a process that exists with no turn — the handshake window', async () => {
+    await it('ends a process that exists with no turn — the handshake window', async () => {
       // The orphan `onSpawn` exists to prevent: a close between spawn and the first answer must not leave
       // an agent running behind the window. `agentRunning` is what the window's close-request reads, so it
       // has to become false here or the close path would not know there was anything to end.
@@ -705,7 +720,7 @@ export default async () => {
       expect(h.session.agentRunning).toBe(false);
     });
 
-    it('is idempotent, because the window calls it and its closer afterwards', async () => {
+    await it('is idempotent, because the window calls it and its closer afterwards', async () => {
       const h = harness();
       await h.session.prompt('hello');
       await h.session.shutdown();
@@ -715,14 +730,14 @@ export default async () => {
   });
 
   await describe('agent-session — the prompts themselves', async () => {
-    it('ignores an empty prompt: there is no turn to run and nothing to record', async () => {
+    await it('ignores an empty prompt: there is no turn to run and nothing to record', async () => {
       const h = harness();
       await h.session.prompt('   ');
       expect(h.entries.length).toBe(0);
       expect(h.agent.calls('session/prompt').length).toBe(0);
     });
 
-    it('ignores a prompt with no session open — nowhere to send it', async () => {
+    await it('ignores a prompt with no session open — nowhere to send it', async () => {
       const h = harness();
       h.session.bind(null);
       await h.session.prompt('hello');
@@ -733,10 +748,271 @@ export default async () => {
       expect(h.session.snapshot.sessionId).toBe(null);
     });
 
-    it('trims the prompt, so a stray newline is not part of the question', async () => {
+    await it('trims the prompt, so a stray newline is not part of the question', async () => {
       const h = harness();
       await h.session.prompt('  hello\n');
       expect(h.entries[0]?.text).toBe('hello');
+    });
+  });
+
+  // The config row over the real wire. Everything here goes through `FixtureAgent`, so "the agent's
+  // answer is the truth" is a measurement of a peer rather than of a local array — the same reason the
+  // gate's tests are: a mock that agreed with the client would prove nothing about either.
+  await describe('agent-session — the config row', async () => {
+    await it('has no row before the agent has answered, because the agent starts on the first prompt', async () => {
+      const h = harness();
+      // Decision 2: with no agent there is nothing to configure, and a row of controls that point at
+      // no agent is the control-this-window-forbids. Selecting a session must not invent one.
+      expect(h.session.configRow.visible).toBe(false);
+      expect(h.session.configOptions).toBe(null);
+    });
+
+    await it('shows what session/load reported, on the first prompt', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      const view = h.session.configRow;
+      expect(view.visible).toBe(true);
+      expect(view.controls.map((control) => control.id)).toEqualArray(['model', 'effort', 'mode']);
+      expect(view.controls[0]?.selected).toBe(0);
+    });
+
+    await it('an agent that reports no options draws no row, and that is not an error', async () => {
+      const h = harness({ configOptions: [] });
+      await h.session.prompt('hello');
+      expect(h.session.configRow.visible).toBe(false);
+      expect(h.snapshots[h.snapshots.length - 1]?.state).toBe('idle');
+    });
+
+    await it('sends the value id and takes the agent’s list as the truth', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      await h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      expect(h.agent.configSets).toStrictEqual([
+        { configId: 'model', value: 'github-copilot/gpt-5.5-codex' },
+      ]);
+      expect(h.session.configRow.controls[0]?.selected).toBe(2);
+    });
+
+    await it('re-selecting the value that is already current sends nothing', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      // The row is rebuilt on every answer and `notify::selected` fires on that rebuild. Without the
+      // guard this call — and every rebuild the surface makes — would put the displayed value back on
+      // the wire, in a loop.
+      await h.session.setConfigOption('model', 'openrouter/openai/gpt-6.1-sol');
+      expect(h.agent.configSets.length).toBe(0);
+      expect(h.agent.calls('session/set_config_option').length).toBe(0);
+    });
+
+    await it('never sends a value the agent did not offer', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      await h.session.setConfigOption('model', 'openrouter/openai/gpt-9-imaginary');
+      expect(h.agent.calls('session/set_config_option').length).toBe(0);
+    });
+
+    await it('never sends a config option the agent no longer reports', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      // The row shows `effort`; an id for a control the agent has dropped is not a request, it is a
+      // guess. (The person cannot produce this from the row — that is the point.)
+      await h.session.setConfigOption('web', 'true');
+      expect(h.agent.calls('session/set_config_option').length).toBe(0);
+    });
+
+    await it('refuses a second set while one is in flight — no queue, and no race', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      // Two calls, one awaited pair. `setConfigOption` marks itself busy synchronously before its first
+      // await, so the second call is refused deterministically — no sleep, no flake.
+      const first = h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      const second = h.session.setConfigOption('effort', 'high');
+      await Promise.all([first, second]);
+      // The rule is "not two in flight", and which one wins is not asserted: a person cannot get here
+      // twice, because the row is insensitive while a set is in flight, so a test naming the winner
+      // would only pin the order of two async calls.
+      expect(h.agent.calls('session/set_config_option').length).toBe(1);
+      expect(h.session.configRow.busy).toBe(false);
+    });
+
+    await it('a refused set leaves the agent’s last answered state and says so', async () => {
+      const h = harness({ refuseConfigOptions: ['model'] });
+      await h.session.prompt('hello');
+      await h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      const view = h.session.configRow;
+      // The controls are the agent's, untouched: the person clicked, the agent said no, and a dropdown
+      // still showing the click would be a lie about what the agent is doing.
+      expect(view.controls.map((control) => control.id)).toEqualArray(['model', 'effort', 'mode']);
+      expect(view.controls[0]?.selected).toBe(0);
+      expect(view.error).toBe('The agent did not change this. Its previous value is still in use.');
+      expect(view.busy).toBe(false);
+      // …and the agent's own words go to the log, where a dev run can read them.
+      expect(h.notices.some((line) => line.includes('refused'))).toBe(true);
+    });
+
+    await it('recovers on the next set: the refusal sentence is gone', async () => {
+      const h = harness({ refuseConfigOptions: ['model'] });
+      await h.session.prompt('hello');
+      await h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      await h.session.setConfigOption('effort', 'high');
+      expect(h.session.configRow.error).toBe(null);
+      expect(h.session.configRow.controls[1]?.selected).toBe(2);
+    });
+
+    await it('a config_option_update arriving mid-turn moves the row', async () => {
+      // The other door. opencode pushes one when the *model* changes and answers with the list for the
+      // rest, so a row that only read set answers would be stale on every agent-side change. The turn
+      // is held open so the push lands inside it, which is where the notification listener lives.
+      const h = harness({ holdTurn: true });
+      const running = h.session.prompt('hello');
+      // On the row being visible, not on `turnRunning`: a turn is "running" from the moment the prompt
+      // is sent, which is *before* the handshake and the `session/load` that answer with the options.
+      await h.waitUntil(() => h.session.configRow.visible);
+      await h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      expect(h.session.configRow.controls[0]?.selected).toBe(2);
+      h.session.stop();
+      await running;
+    });
+
+    await it('an update for another session does not move this session’s row', async () => {
+      // opencode announces child sessions, and an update naming one is another conversation’s
+      // configuration. Applying it would put a model picker showing somebody else’s model over this one.
+      const h = harness({ holdTurn: true });
+      const running = h.session.prompt('hello');
+      await h.waitUntil(() => h.session.configRow.visible);
+      // **Own session first, and waited for.** Proving that an update *for this session* moves the row is
+      // the positive half, and it has to come first: it establishes that notifications are not being
+      // dropped wholesale, which is the only other explanation for the second half.
+      h.agent.pushConfigOptionUpdate(SESSION.id, 'model', 'openrouter/anthropic/claude-sonnet-5.5');
+      await h.waitUntil(() => h.session.configRow.controls[0]?.selected === 1);
+      // Then the one that must be ignored. **A negative needs a real wait, not `flush`**: `flush` counts
+      // microtask ticks, and "the notification for another session never arrives" is not something a tick
+      // count can prove — the row would look unchanged whether the update was dropped or merely late. Five
+      // milliseconds is orders of magnitude more than an in-process transport needs, and it is the direction
+      // that fails loudly rather than quietly.
+      h.agent.pushConfigOptionUpdate('ses_other_0003', 'model', 'openrouter/anthropic/claude-sonnet-5.5');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(h.session.configRow.controls[0]?.selected).toBe(1);
+      h.session.stop();
+      await running;
+    });
+
+    await it('drops the row when the window switches to another session', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      expect(h.session.configRow.visible).toBe(true);
+      // The options in hand came from *this agent's* answer about the session it holds; the window may
+      // be pointing at another row before the agent has reattached to it.
+      const emitted = h.configViews.length;
+      h.session.bind({ id: 'ses_fixture_0002', cwd: '/fixture' });
+      expect(h.session.configRow.visible).toBe(false);
+      // **And it says so.** The row redraws only when `onConfig` fires, so a switch that merely cleared
+      // the controller's state would leave the model picker on screen over the other session's
+      // conversation — a control pointing at nothing, which is the one thing this window forbids.
+      expect(h.configViews.length).toBe(emitted + 1);
+      expect(h.configViews[h.configViews.length - 1]?.visible).toBe(false);
+    });
+
+    await it('setConfigOption with no agent behind it sends nothing', async () => {
+      const h = harness({ bind: false });
+      h.session.bind(SESSION);
+      await h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      // No agent, and `#agentSession === null` — so there is no session to name, and a request without
+      // one is not a request.
+      expect(h.agent.calls('session/set_config_option').length).toBe(0);
+    });
+
+    await it('stageConfigOption sends the prompt that starts the agent, then sets through the real path', async () => {
+      // `KU_APP_CONFIG` goes through this, because the process starts on the first prompt (plan §6) and
+      // an option cannot be set on an agent that does not exist yet.
+      const h = harness();
+      await h.session.stageConfigOption('mode', 'plan', 'hi');
+      expect(h.agent.calls('session/prompt').length).toBe(1);
+      expect(h.agent.configSets).toStrictEqual([{ configId: 'mode', value: 'plan' }]);
+      expect(h.session.configRow.controls[2]?.selected).toBe(1);
+    });
+
+    await it('stageConfigOption with no session open reports it instead of throwing', async () => {
+      const h = harness({ bind: false });
+      await h.session.stageConfigOption('mode', 'plan');
+      expect(h.agent.calls('session/prompt').length).toBe(0);
+      expect(h.notices.some((line) => line.includes('no session is open'))).toBe(true);
+    });
+
+    await it('a set answer that lands after the window moved on is cached, not drawn', async () => {
+      // The race the plan does not mention and every round trip has: `session/set_config_option` is in
+      // the air and the person clicks another session. The answer is about session A; the row is now
+      // about B. Writing it would put A's model picker over B's conversation.
+      const h = harness({ holdConfigAnswer: true });
+      await h.session.prompt('hello');
+      const setting = h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      expect(h.session.configRow.busy).toBe(true);
+      h.session.bind({ id: 'ses_fixture_0002', cwd: '/fixture' });
+      // **And the row is usable at once.** Leaving the new session insensitive until an answer about the
+      // *old* one arrives would lock the controls for as long as that agent takes — or for ever.
+      expect(h.session.configRow.visible).toBe(false);
+      expect(h.session.configRow.busy).toBe(false);
+      h.agent.releaseConfigAnswer();
+      await setting;
+      // Nothing about A reached the screen for B…
+      expect(h.session.configRow.visible).toBe(false);
+      // …and nothing about it was thrown away either: the agent's answer about A is still true about A.
+      h.session.bind(SESSION);
+      expect(h.session.configRow.controls[0]?.selected).toBe(2);
+      expect(h.session.configRow.busy).toBe(false);
+    });
+
+    await it('bind(A) → bind(B) → bind(A) with no prompt leaves the row as the agent last answered it', async () => {
+      // Selecting a session starts nothing (plan §6), so the agent never leaves A and there is no
+      // `session/load` to re-ask. Emptying the row on the way to B and having nothing to restore it on
+      // the way back leaves A's model picker gone for the rest of the window's life.
+      const h = harness();
+      await h.session.prompt('hello');
+      await h.session.setConfigOption('effort', 'high');
+      h.session.bind({ id: 'ses_fixture_0002', cwd: '/fixture' });
+      expect(h.session.configRow.visible).toBe(false);
+      h.session.bind(SESSION);
+      const view = h.session.configRow;
+      expect(view.visible).toBe(true);
+      expect(view.controls.map((control) => control.id)).toEqualArray(['model', 'effort', 'mode']);
+      expect(view.controls[1]?.selected).toBe(2);
+    });
+
+    await it('a notification that lands during a set is superseded by the answer', async () => {
+      // Both carry the options; the answer is the state *after* the change, so it is the later word.
+      // Applying the notification first would move the row twice for one click — and the held answer
+      // snapshots its list on arrival, so the two really do disagree here.
+      const h = harness({ holdTurn: true, holdConfigAnswer: true });
+      const running = h.session.prompt('hello');
+      await h.waitUntil(() => h.session.configRow.visible);
+      const setting = h.session.setConfigOption('model', 'github-copilot/gpt-5.5-codex');
+      // The agent changes something else of its own accord while the set is in the air.
+      h.agent.pushConfigOptionUpdate(SESSION.id, 'effort', 'high');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(h.session.configRow.controls[1]?.selected).toBe(5);
+      h.agent.releaseConfigAnswer();
+      await setting;
+      expect(h.session.configRow.controls[0]?.selected).toBe(2);
+      // The answer wins outright, so the effort level it carried is what is shown — not the update's.
+      expect(h.session.configRow.controls[1]?.selected).toBe(5);
+      h.session.stop();
+      await running;
+    });
+
+    await it('an agent that dies takes the config row with it', async () => {
+      // Live dropdowns over a process that has exited are controls pointing at nothing: a person picks a
+      // model, the row accepts it, and the request goes into a connection that is closed.
+      const h = harness({ holdTurn: true });
+      const sent = h.session.prompt('hello');
+      await h.waitUntil(() => h.session.configRow.visible);
+      h.agent.vanish('the agent process ended');
+      await sent;
+      expect(h.session.snapshot.state).toBe('gone');
+      expect(h.session.configRow.visible).toBe(false);
+      expect(h.session.configRow.busy).toBe(false);
+      // And the cache went with it: a `bind` afterwards must not put those controls back on screen.
+      h.session.bind(SESSION);
+      expect(h.session.configRow.visible).toBe(false);
     });
   });
 };

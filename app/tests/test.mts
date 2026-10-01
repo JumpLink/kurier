@@ -14,6 +14,7 @@ import sessionModel from './unit/session/model.test.ts';
 import sessionStore from './unit/session/store.test.ts';
 
 import config from './unit/core/config.test.ts';
+import configRow from './unit/core/config-row.test.ts';
 import policy from './unit/core/policy.test.ts';
 import interrupt from './unit/core/interrupt.test.ts';
 import transcript from './unit/core/transcript.test.ts';
@@ -41,6 +42,7 @@ run({
   sessionModel,
   sessionStore,
   config,
+  configRow,
   policy,
   interrupt,
   transcript,
