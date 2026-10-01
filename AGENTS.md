@@ -289,34 +289,29 @@ question. Both runtimes, as in postbote and beifahrer:
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.
 
-> **A green `gjsify test` used to mean "the last build is green", not "the source is green" — and on
-> every RELEASED gjsify it still does.** Measured here: editing `packages/session/src/model.ts` and
-> re-running left `app/dist/test.*.mjs` untouched (mtime unchanged) and printed **136 tests passed**
-> for code that no longer existed. Touching the entry, `app/tests/test.mts`, forced the rebuild.
+> **A green `gjsify test` meant "the last build is green", not "the source is green" — on every gjsify
+> before 0.53.0.** Measured here: editing `packages/session/src/model.ts` and re-running left
+> `app/dist/test.*.mjs` untouched (mtime unchanged) and printed **136 tests passed** for code that no
+> longer existed. Touching the entry, `app/tests/test.mts`, forced the rebuild. The cause was scope,
+> not staleness arithmetic: `packageBuildInputs` walks the package directory, and a workspace sibling
+> is reached only through a `node_modules` symlink pointing **outside** it. CI never saw it — a fresh
+> container has no `dist/`, so it always built, which is why the trap survived the whole 0.5x series
+> and then needed an `rm -rf` here after every source edit.
 >
-> The cause is scope, not staleness arithmetic: `packageBuildInputs` walks the package directory, and
-> a workspace sibling is reached only through a `node_modules` symlink pointing **outside** it. CI
-> cannot see this either — a fresh container has no `dist/`, so it always builds.
+> **0.53.0 carries the fix** (gjsify [#1896](https://github.com/gjsify/gjsify/pull/1896),
+> [#1905](https://github.com/gjsify/gjsify/issues/1905)): the build records what it actually READ into
+> `<outfile>.inputs.json` beside the bundle, from the bundler's own module graph. Re-verified here on
+> the release rather than on a checkout — `app/dist/test.gjs.mjs.inputs.json` lists
+> `packages/acp/src/*.ts` and `packages/session/src/*.ts` by exact path, and appending a line to
+> `packages/session/src/model.ts` moved the bundle's mtime with no `rm -rf`. **The failure mode is a
+> green run, which is the one thing a test suite cannot report about itself**, so that measurement is
+> worth repeating whenever the toolchain moves; treat a suspiciously fast green as this, not as a win.
 >
-> **The fix is upstream** — gjsify [#1896](https://github.com/gjsify/gjsify/pull/1896), "rebuild when
-> an input file changed", records what the build actually READ into `<outfile>.inputs.json` beside the
-> bundle, from the bundler's own module graph. Verified here against a checkout of `main`: the
-> manifest lists `packages/acp/src/*.ts` and `packages/session/src/*.ts` by exact path, and an edit to
-> either rebuilds without `rm -rf`. Tracked as [#1905](https://github.com/gjsify/gjsify/issues/1905).
->
-> **It is in no published version yet** — 0.52.0 shipped five days before the merge — so until the
-> next release: `rm -rf app/dist` after editing anything outside `app/tests/`, or run the tests
-> through a linked checkout (`gjsify link`, ADR 0065) whose CLI bundle carries the fix. The link's
-> `.gjsify-link.json` is git-ignored and `gjsify install --immutable` refuses to run while it exists,
-> so CI and a release build are unaffected either way.
->
-> Two traps in the same family, both measured, neither a kurier bug:
-> **the `gjsify` on `PATH` is the one that decides.** A global install in
-> `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`, so a run that
-> looks linked was a released CLI — and it reported a test result for a bundle from an earlier run.
-> Run `./node_modules/.bin/gjsify …` when the version matters. And under GJS the launcher executes
-> `dist/cli.gjs.mjs`, so in a gjsify checkout the source having the fix is not enough:
-> `gjsify workspace @gjsify/cli run build:gjs-bundle` (not `run build`, which only rebuilds `lib/`).
+> One trap survives, and it is the same family: **the `gjsify` on `PATH` is the one that decides.** A
+> global install in `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`,
+> so a run that looks like it used the pinned toolchain was a released CLI — and it happily reports a
+> test result for a bundle from an earlier run. `./node_modules/.bin/gjsify …` whenever the version
+> matters, which under the freshness rule means always.
 
 `refs/acp/schema.v1.json` is the normative artifact `packages/acp`'s types are written against,
 refreshed by `./scripts/update-acp-schema`. `scripts/check-schema.mjs` fails the build when the
@@ -390,13 +385,13 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 ## Conventions
 
 - `gjsify install` — never `npm install`, it prunes gjsify deps.
-- All `@gjsify/*` packages pinned to the **same exact version** (0.52.0 here). gjsify ships as one
-  release train; a CLI ↔ libs skew produces silently broken bundles.
+- All `@gjsify/*` packages pinned to the **same exact version** (0.53.0 here). gjsify ships as one
+  release train; a CLI ↔ libs skew produces silently broken bundles. One exception has a reason and
+  is gone: `@gjsify/napi` was dropped, because 0.53.0 was bumped in gjsify's tree and never
+  published (`packages/napi/**` is not a workspace member — its release leg builds a meson prebuild
+  per platform first), and nothing in kurier imported it.
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
-- **After editing a workspace source, `rm -rf app/dist` before trusting a test result** — until
-  gjsify ships #1896. See the note above: the failure mode is a green run, which is the one a test
-  suite cannot report about itself.
 - **`./node_modules/.bin/gjsify`, not the `gjsify` on `PATH`**, whenever the toolchain version
   matters. The global install wins, and a run that looks linked is then a released CLI.
 - `typescript` pinned `^6.0.3`, **not** 7: `gjsify tsc` runs a bundle with 6.0.3 baked in,
