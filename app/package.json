@@ -42,18 +42,17 @@
     "yargs": "^18.1.0"
   },
   "devDependencies": {
-    "@gjsify/cli": "0.52.0",
-    "@gjsify/napi": "0.52.0",
-    "@gjsify/node-globals": "0.52.0",
-    "@gjsify/rolldown-native": "0.52.0",
-    "@gjsify/runtime": "0.52.0",
-    "@gjsify/unit": "0.52.0",
-    "@gjsify/ws": "0.52.0",
+    "@gjsify/cli": "0.53.0",
+    "@gjsify/node-globals": "0.53.0",
+    "@gjsify/rolldown-native": "0.53.0",
+    "@gjsify/runtime": "0.53.0",
+    "@gjsify/unit": "0.53.0",
+    "@gjsify/ws": "0.53.0",
     "@types/node": "^26.1.2",
     "@types/yargs": "^17.0.35",
     "oxfmt": "^0.56.0",
     "oxlint": "^1.71.0",
     "typescript": "^6.0.3",
-    "@gjsify/adwaita-app": "0.52.0"
+    "@gjsify/adwaita-app": "0.53.0"
   }
 }
