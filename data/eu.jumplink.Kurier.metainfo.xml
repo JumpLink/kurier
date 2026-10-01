@@ -24,17 +24,9 @@
       <li>One agent needs no driver: opencode today, anything that speaks ACP tomorrow</li>
     </ul>
   </description>
-  <!--
-    TODO: no <screenshots> block yet. kurier has no committed screenshot and no
-    release tag, so there is no URL that would resolve — an <image> that 404s is
-    worse than no screenshot, because the store renders a broken card. Add
-    `gjsify.flatpak.screenshots` (see https://github.com/JumpLink/kurier/issues)
-    with raw.githubusercontent.com URLs pinned to a real tag, then re-run
-    `gjsify flatpak init`; this block is GENERATED, so a comment typed here does
-    not survive regeneration.
-  -->
   <developer id="eu.jumplink">
     <name translate="no">Pascal Garber</name>
+    <email>pascal@jumplink.eu</email>
   </developer>
   <launchable type="desktop-id">eu.jumplink.Kurier.desktop</launchable>
   <url type="homepage">https://github.com/JumpLink/kurier</url>
