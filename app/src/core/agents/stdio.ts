@@ -107,6 +107,11 @@ export class StdioChannel implements RawChannel {
   #closed = false;
   #killTimer: ReturnType<typeof setTimeout> | undefined;
   #killGraceMs: number;
+  /** The child has been reaped and `#exitReason` is the answer. */
+  #hasExited = false;
+  #exitReason: Error | undefined = undefined;
+  /** stdout has reached EOF (or been torn down), so no further chunk can arrive. */
+  #isStdoutDone = false;
 
   constructor(options: StdioChannelOptions) {
     const { program } = options.command;
@@ -127,6 +132,15 @@ export class StdioChannel implements RawChannel {
       // decision; this layer only moves bytes and never looks inside a line.
       for (const listener of this.#dataListeners) listener(chunk);
     });
+    // The channel's end is gated on stdout EOF, not on the process's exit — see `#maybeEnd`.
+    // `end` is the complete answer; `close` also covers the other teardown (`destroy()` with an
+    // error emits `close` and never `end`), and it is idempotent, so both may fire.
+    const onStdoutDone = (): void => {
+      this.#isStdoutDone = true;
+      this.#maybeEnd();
+    };
+    this.#child.stdout.on('end', onStdoutDone);
+    this.#child.stdout.on('close', onStdoutDone);
     this.#child.stderr.setEncoding('utf8');
     this.#child.stderr.on('data', (chunk: string) => {
       if (!options.onStderr) return;
@@ -143,11 +157,13 @@ export class StdioChannel implements RawChannel {
       // exit(code 0) is a clean end; anything else carries a reason the client should surface
       // rather than swallow — a crashed agent and a cancelled one look the same otherwise.
       // `program`, not `actual.program`: a message has to name the agent a person recognises.
-      this.#end(
+      this.#hasExited = true;
+      this.#exitReason =
         code === 0
           ? undefined
-          : new Error(`${program} exited with code ${code ?? 'none'}${signal ? ` (${signal})` : ''}`),
-      );
+          : new Error(`${program} exited with code ${code ?? 'none'}${signal ? ` (${signal})` : ''}`);
+      // NOT `#end` here: the process being gone is only half of "the agent has finished talking".
+      this.#maybeEnd();
     });
   }
 
@@ -206,6 +222,32 @@ export class StdioChannel implements RawChannel {
       this.#stderrBuffer = this.#stderrBuffer.slice(newline + 1);
       if (line.trim()) onStderr(line);
     }
+  }
+
+  /**
+   * End the channel — but only once BOTH halves of "the agent has finished talking" are in.
+   *
+   * **Ending on `exit` loses the agent's last words, and the two runtimes lose them differently.**
+   * `exit` says the *process* is gone; it says nothing about whether the bytes it already wrote
+   * have been read. On GJS `node:child_process` is polyfilled over `Gio.Subprocess`, so stdout
+   * arrives through `read_bytes_async` — a GLib main-context source — and the child's `exit`
+   * source can be dispatched first. Ending here dropped the final JSON-RPC message, which for a
+   * one-turn `kurier start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
+   * before the stdio streams are drained, so the same code was a latent bug there too.
+   *
+   * Node's own answer is the event called `close` (emitted once the process has ended *and* the
+   * stdio streams are closed), and that is what this reproduces — but through stdout's own EOF
+   * rather than through `close`, because the polyfill emits `close` from its `wait_async` callback
+   * immediately after `exit`, with no reference to the streams at all, so listening for it would
+   * reproduce the bug rather than fix it.
+   *
+   * fixed upstream in gjsify: `@gjsify/child_process`'s `spawn` emits `close` back to back with
+   * `exit` instead of waiting for the stdout/stderr pipes to end (`src/index.ts`, the
+   * `proc.wait_async` callback; `exec`/`execFile` do the same in the `communicate_async` one).
+   */
+  #maybeEnd(): void {
+    if (!this.#hasExited || !this.#isStdoutDone) return;
+    this.#end(this.#exitReason);
   }
 
   #end(reason: Error | undefined): void {

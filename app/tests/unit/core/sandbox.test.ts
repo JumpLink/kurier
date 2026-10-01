@@ -256,10 +256,7 @@ export default async () => {
         );
 
         const { outer, inner, tail } = shapeOf(
-          toHostCommand(
-            { id: 'p', title: 'p', program, args: [] },
-            SANDBOXED,
-          ),
+          toHostCommand({ id: 'p', title: 'p', program, args: [] }, SANDBOXED),
         );
         // The inner script runs `sh -l`, which reads .profile again — harmless, it is fenced.
         const request = '{"jsonrpc":"2.0","id":1,"method":"initialize"}';
@@ -640,24 +637,23 @@ export default async () => {
           onStderr: () => {},
           sandboxFacts: NOT_SANDBOXED,
         });
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<string>((resolve, reject) => {
           let out = '';
-          const check = (): void => {
-            if (!out.includes('ENV:present')) return;
-            expect(out).toContain('ARGV:one|two');
-            expect(out).toContain(`CWD:${dir}`);
-            resolve();
-          };
           channel.onData((chunk) => {
             out += chunk;
-            check();
           });
-          channel.onEnd((reason) => {
-            if (reason) return reject(reason);
-            // `exit` can be delivered before the last stdout chunk, so settle on whatever arrived.
-            check();
-            resolve();
-          });
+          // **Resolve on the end, assert after it.** The assertions used to run on the first chunk
+          // that happened to contain ENV: and again on end, which made a test that resolved on
+          // *incomplete* output indistinguishable from one that resolved on all of it — on GJS,
+          // where `exit` can beat the last chunk, that was a green test with zero assertions and
+          // 4 fewer counted than Node. Settling first and asserting in the test body is also what
+          // keeps a failing `expect` out of the child's `exit` listener, where the polyfill's
+          // `emit` try/catch turns it into a swallowed error and a timeout instead of a diff.
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
+        }).then((out) => {
+          expect(out).toContain('ARGV:one|two');
+          expect(out).toContain(`CWD:${dir}`);
+          expect(out).toContain('ENV:present');
         });
       });
     });
@@ -676,6 +672,47 @@ export default async () => {
             expect(reason?.message).not.toContain(FLATPAK_SPAWN);
             resolve();
           });
+        });
+      });
+    });
+
+    /**
+     * The regression: **a chunk written before the process died, delivered after the process died.**
+     *
+     * Both halves are needed to make it deterministic rather than lucky. The subshell holds the
+     * write end of stdout open after the parent `sh` has exited, so `exit` is dispatched while
+     * stdout is still open — the ordering GJS's polyfill gets wrong and Node merely gets lucky
+     * about — and it writes its line only afterwards, so the late chunk is guaranteed to exist
+     * rather than to have raced. A channel that ends on `exit` therefore loses `LATE:` every run,
+     * on both runtimes, with no reliance on scheduling.
+     */
+    await it('keeps reading stdout after the child has exited, and ends on EOF', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(
+          dir,
+          'late',
+          '#!/bin/sh\n( sleep 0.4; printf "LATE:%s\\n" "$KURIER_TEST_VAR" ) &\nprintf "EARLY\\n"\nexit 0\n',
+        );
+        const channel = new StdioChannel({
+          command: {
+            id: 'late',
+            title: 'late',
+            program,
+            args: [],
+            env: { KURIER_TEST_VAR: 'after-exit' },
+          },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const events: string[] = [];
+        channel.onData((chunk) => events.push(`data:${chunk.trim()}`));
+        return new Promise<string[]>((resolve, reject) => {
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(events)));
+        }).then((delivered) => {
+          // The end came after the drain, not before it.
+          expect(delivered).toStrictEqual(['data:EARLY', 'data:LATE:after-exit']);
+          expect(channel.isClosed).toBe(true);
         });
       });
     });
