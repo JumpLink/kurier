@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER, not a designed icon.
+
+  `main.ts` sets `applicationIcon: APP_ID`, so GTK resolves the window's icon by
+  NAME and needs an installed `eu.jumplink.Kurier.svg` before the about dialog and
+  the taskbar stop falling back to a generic missing-image. That is all this file
+  has to be for kurier to be installable and correct — and it is deliberately
+  geometric so nobody mistakes it for art somebody chose.
+
+  TODO: replace with a real mark (see https://github.com/JumpLink/kurier/issues).
+  Until then it is the same shape as the symbolic variant, which is the only thing
+  that makes the pair recognisable as one icon.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="kurier-base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#62a0ea"/>
+      <stop offset="1" stop-color="#1a5fb4"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#kurier-base)"/>
+
+  <!-- A transcript: three turns, the last one still streaming (lighter, shorter). -->
+  <g fill="#ffffff">
+    <rect x="30" y="42" width="58" height="12" rx="6" opacity="0.95"/>
+    <rect x="30" y="60" width="68" height="12" rx="6" opacity="0.95"/>
+    <rect x="30" y="78" width="38" height="12" rx="6" opacity="0.55"/>
+  </g>
+</svg>

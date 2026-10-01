@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER symbolic variant of the scalable app icon above.
+
+  Two things are convention, not taste: the 16×16 grid with a 2px safe margin,
+  and a single monochrome fill. GTK recolours a symbolic icon by restyling it, so
+  a second colour here would be thrown away — and `hicolor/symbolic/apps/` is
+  where GTK looks for `<app id>-symbolic`, which is why this is its own directory
+  and not the same file at another size (gjsify/cli AGENTS.md, "symbolic is an
+  icon CONTEXT, never a size").
+
+  TODO: replace together with the scalable icon, never one without the other.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <g fill="#bebebe">
+    <rect x="3" y="4" width="9" height="2" rx="1"/>
+    <rect x="3" y="7" width="10" height="2" rx="1"/>
+    <rect x="3" y="10" width="6" height="2" rx="1"/>
+  </g>
+</svg>

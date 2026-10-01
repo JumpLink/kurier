@@ -235,6 +235,36 @@ code and the schema disagree about a method name or a required field — read th
 committing a refresh; a refresh that only changes the JSON is a sign the schema was copied but not
 read (see [refs/acp/SOURCE.md](refs/acp/SOURCE.md)).
 
+## Packaging
+
+**The `gjsify.flatpak` block in `package.json` is the source of truth** — the desktop entry, the
+AppStream metainfo, the manifest and `flathub.json` are all generated from it, so hand-editing
+`data/*` is lost on the next run:
+
+```bash
+./node_modules/.bin/gjsify flatpak init --force --no-format \
+  --manifest eu.jumplink.Kurier.json \
+  --metainfo data/eu.jumplink.Kurier.metainfo.xml \
+  --desktop data/eu.jumplink.Kurier.desktop \
+  --flathub-json flathub.json
+npm run packaging:validate   # THE gate: desktop-file-validate + appstreamcli validate --no-net
+npm run packaging:install    # the four files into $XDG_DATA_HOME (or DESTDIR/PREFIX)
+```
+
+`flatpak-builder --show-manifest` only *prints* the manifest — it parses, it does not validate, so
+a green run of it says nothing. The two real validators are `desktop-file-validate` and
+`appstreamcli validate`, wired into `packaging:validate` because easy6502 gates its `meson test`
+the same way. `packaging:install` installs metadata only: `bin/kurier-app` is produced by
+`gjsify ship`, not by this script.
+
+**Two finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
+reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
+cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
+this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer. The manifest
+is also not buildable end to end yet (no committed `build-aux/gjsify.gjs.mjs`, no
+`gjsify-sources.json`, and `sources.tag: v0.1.0` against a repo with no tags). Full details,
+including the placeholder icons and the missing `<releases>`: [data/README.md](data/README.md).
+
 ## The project rule that came out of a mismeasurement
 
 > **In a gjsify project you import `node:child_process` — not `@gjsify/child_process`.**

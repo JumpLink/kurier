@@ -17,6 +17,143 @@
     "format:check": "oxfmt --check .",
     "build": "gjsify workspace kurier-cli build",
     "start": "gjsify workspace kurier-cli start",
-    "test": "gjsify workspace kurier-cli test"
+    "test": "gjsify workspace kurier-cli test",
+    "packaging:validate": "desktop-file-validate data/eu.jumplink.Kurier.desktop && appstreamcli validate --no-net --explain data/eu.jumplink.Kurier.metainfo.xml",
+    "packaging:install": "sh scripts/install-packaging.sh"
+  },
+  "gjsify": {
+    "flatpak": {
+      "appId": "eu.jumplink.Kurier",
+      "icon": "data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+      "kind": "app",
+      "name": "Kurier",
+      "command": "kurier-app",
+      "runtime": "gnome",
+      "runtimeVersion": "50",
+      "sdkExtensions": [
+        "org.freedesktop.Sdk.Extension.node24",
+        "org.freedesktop.Sdk.Extension.typescript"
+      ],
+      "finishArgs": [
+        "--device=dri",
+        "--share=ipc",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--talk-name=org.freedesktop.Flatpak",
+        "--filesystem=host"
+      ],
+      "developer": {
+        "id": "eu.jumplink",
+        "name": "Pascal Garber"
+      },
+      "summary": "Start coding agents as subprocesses and drive their sessions",
+      "summaryTranslatorHint": "One line, no full stop: what the app does for the person using it",
+      "description": [
+        {
+          "p": "Kurier is a client for the Agent Client Protocol (ACP), the open standard a coding agent speaks over a JSON-RPC connection on stdio. It starts the agent as a subprocess, keeps its session, and shows you what the agent says while it works.",
+          "translatorHint": "Opening paragraph: what the app is and which standard it speaks"
+        },
+        {
+          "p": "The agent decides which model does the work; kurier owns the environment around it — which directory the session runs in, what the agent is allowed to do, and which MCP servers it may reach. A session record says what is reachable, never what is allowed, so every request is checked again, every time.",
+          "translatorHint": "Second paragraph: the app's own scope versus the agent's"
+        },
+        {
+          "ul": [
+            {
+              "item": "Start, list, resume and cancel agent sessions, from the command line or from a window",
+              "translatorHint": "Feature list: the session commands"
+            },
+            {
+              "item": "Watch one prompt turn stream in, and stop it without killing the session",
+              "translatorHint": "Feature list: streaming a turn and stopping it"
+            },
+            {
+              "item": "Answer the agent's permission requests yourself — kurier denies by default rather than approving for you",
+              "translatorHint": "Feature list: the permission gate"
+            },
+            {
+              "item": "One agent needs no driver: opencode today, anything that speaks ACP tomorrow",
+              "translatorHint": "Feature list: the protocol means no per-agent driver"
+            }
+          ],
+          "translatorHint": "Bullet list of what the app does"
+        }
+      ],
+      "license": {
+        "project": "AGPL-3.0-or-later"
+      },
+      "homepageUrl": "https://github.com/JumpLink/kurier",
+      "bugtrackerUrl": "https://github.com/JumpLink/kurier/issues",
+      "vcsBrowserUrl": "https://github.com/JumpLink/kurier",
+      "categories": [
+        "Development",
+        "GTK"
+      ],
+      "keywords": [
+        "ACP",
+        "agent",
+        "coding assistant",
+        "AI",
+        "session",
+        "Adwaita",
+        "GNOME"
+      ],
+      "contentRating": {
+        "type": "oars-1.1",
+        "attributes": {
+          "social-info": "none",
+          "language-humor": "none"
+        }
+      },
+      "branding": {
+        "accentLight": "#62a0ea",
+        "accentDark": "#1a5fb4"
+      },
+      "kudos": [
+        "ModernToolkit",
+        "HiDpiIcon"
+      ],
+      "provides": {
+        "binaries": [
+          "kurier-app",
+          "kurier"
+        ]
+      },
+      "modules": [
+        {
+          "name": "kurier",
+          "buildsystem": "simple",
+          "build-commands": [
+            "gjs -m build-aux/gjsify.gjs.mjs install --immutable",
+            "gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build:app",
+            "install -Dm755 app/dist/kurier-app.gjs.mjs /app/bin/kurier-app",
+            "install -Dm644 data/eu.jumplink.Kurier.desktop /app/share/applications/eu.jumplink.Kurier.desktop",
+            "install -Dm644 data/eu.jumplink.Kurier.metainfo.xml /app/share/metainfo/eu.jumplink.Kurier.metainfo.xml",
+            "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+            "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+          ],
+          "sources": [
+            {
+              "type": "git",
+              "url": "https://github.com/JumpLink/kurier.git",
+              "tag": "v0.1.0",
+              "x-checker-data": {
+                "type": "git",
+                "tag-pattern": "^v(\\d+\\.\\d+\\.\\d+)$",
+                "version-scheme": "semantic"
+              }
+            },
+            {
+              "type": "file",
+              "path": "build-aux/gjsify.gjs.mjs"
+            },
+            {
+              "type": "file",
+              "path": "gjsify-sources.json"
+            }
+          ]
+        }
+      ]
+    }
   }
 }

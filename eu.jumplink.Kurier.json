@@ -1,0 +1,57 @@
+{
+  "id": "eu.jumplink.Kurier",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "50",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.node24",
+    "org.freedesktop.Sdk.Extension.typescript"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/node24/bin:/usr/lib/sdk/typescript/bin:/app/bin"
+  },
+  "command": "kurier-app",
+  "finish-args": [
+    "--device=dri",
+    "--share=ipc",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--talk-name=org.freedesktop.Flatpak",
+    "--filesystem=host"
+  ],
+  "modules": [
+    {
+      "name": "kurier",
+      "buildsystem": "simple",
+      "build-commands": [
+        "gjs -m build-aux/gjsify.gjs.mjs install --immutable",
+        "gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build:app",
+        "install -Dm755 app/dist/kurier-app.gjs.mjs /app/bin/kurier-app",
+        "install -Dm644 data/eu.jumplink.Kurier.desktop /app/share/applications/eu.jumplink.Kurier.desktop",
+        "install -Dm644 data/eu.jumplink.Kurier.metainfo.xml /app/share/metainfo/eu.jumplink.Kurier.metainfo.xml",
+        "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+        "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/JumpLink/kurier.git",
+          "tag": "v0.1.0",
+          "x-checker-data": {
+            "type": "git",
+            "tag-pattern": "^v(\\d+\\.\\d+\\.\\d+)$",
+            "version-scheme": "semantic"
+          }
+        },
+        {
+          "type": "file",
+          "path": "build-aux/gjsify.gjs.mjs"
+        },
+        {
+          "type": "file",
+          "path": "gjsify-sources.json"
+        }
+      ]
+    }
+  ]
+}
