@@ -13,6 +13,8 @@ import {
   requireLauncher,
 } from '../../../src/core/agents/launcher.ts';
 import type { SandboxFacts } from '../../../src/core/agents/sandbox.ts';
+import type { AgentDetection } from '../../../src/core/agents/detect.ts';
+import { agentsReport } from '../../../src/frontends/cli/agents.ts';
 
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };
 const NOT_SANDBOXED: SandboxFacts = { flatpakInfoExists: false };
@@ -127,6 +129,55 @@ export default async () => {
       for (const entry of LAUNCHERS) {
         expect(Object.keys(entry).sort()).toStrictEqual(['args', 'id', 'program', 'title']);
       }
+    });
+  });
+
+  await describe('kurier agents report', async () => {
+    const launcher = LAUNCHERS[0]!;
+    const found = (source: AgentDetection['source']): AgentDetection => ({
+      id: launcher.id,
+      source,
+      path: source === 'none' ? null : '/synthetic/opencode',
+      version: source === 'none' ? null : '1.2.3',
+    });
+
+    await it('has a SOURCE column in the header', async () => {
+      const lines = agentsReport(LAUNCHERS, [found('none')], null);
+      expect(lines[0]!.includes('SOURCE')).toBe(true);
+    });
+
+    await it('labels host, bundled and not found, and names the choice', async () => {
+      const host = agentsReport(LAUNCHERS, [found('host')], found('host'));
+      expect(host[1]!.includes(' host ')).toBe(true);
+      expect(host[host.length - 1]).toBe(
+        `kurier would use: ${launcher.id} (host, /synthetic/opencode, 1.2.3)`,
+      );
+
+      const bundled = agentsReport(LAUNCHERS, [found('bundled')], found('bundled'));
+      expect(bundled[1]!.includes(' bundled ')).toBe(true);
+      expect(bundled[bundled.length - 1]!.includes('(bundled,')).toBe(true);
+    });
+
+    await it('lines up every column, whatever the length of the path', async () => {
+      const long = { ...found('host'), path: '/synthetic/a/very/long/path/to/the/opencode' };
+      const lines = agentsReport(LAUNCHERS, [long], long);
+      const header = lines[0]!;
+      const row = lines[1]!;
+      for (const word of ['PROGRAM', 'SOURCE', 'STATE', 'COMMAND']) {
+        const column = header.indexOf(word);
+        expect(row[column - 1]).toBe(' ');
+        expect(row[column]).not.toBe(' ');
+      }
+      expect(row.indexOf(long.path)).toBe(header.indexOf('STATE'));
+      expect(row.indexOf(launcher.args.join(' '), row.indexOf(long.path))).toBe(header.indexOf('COMMAND'));
+    });
+
+    await it('says none is available, and never "bundled", when nothing was found', async () => {
+      const lines = agentsReport(LAUNCHERS, [found('none')], null);
+      expect(lines[1]!.includes('not found')).toBe(true);
+      expect(lines[1]!.includes('NOT FOUND')).toBe(true);
+      expect(lines[1]!.includes('bundled')).toBe(false);
+      expect(lines[lines.length - 1]!.startsWith('kurier would use: none')).toBe(true);
     });
   });
 };

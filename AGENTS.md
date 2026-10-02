@@ -41,8 +41,15 @@ kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
 kurier auth [--agent opencode]             # trap 1's escape hatch
-kurier agents                              # launchers, and whether the binary is on PATH
+kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
 ```
+
+**Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
+`app/data/bundled-agents.json` under `BUNDLED_PREFIX` (`core/agents/catalog.ts`, the one place the
+prefix is written), never `/app/bin` — there it would shadow the person's own opencode, which carries
+their login. `detectAgents` ignores a host hit under the prefix; `resolveAgent` takes the setting, else
+the first host install, else the first bundled copy (`core/agents/detect.ts`, pure over facts gathered
+by `probe.ts`). The catalog's `env` is flags only, never a credential.
 
 **One turn, not a REPL**, and that is a decision rather than a missing feature. A REPL needs
 somewhere to put the approval surface, and the plan puts the surface in a later slice; a REPL now

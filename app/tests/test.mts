@@ -24,6 +24,8 @@ import transcript from './unit/core/transcript.test.ts';
 import composerState from './unit/core/composer-state.test.ts';
 import agents from './unit/core/agents.test.ts';
 import sandbox from './unit/core/sandbox.test.ts';
+import catalog from './unit/core/catalog.test.ts';
+import detect from './unit/core/detect.test.ts';
 import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
 import scroll from './unit/core/scroll.test.ts';
@@ -57,6 +59,8 @@ run({
   composerState,
   agents,
   sandbox,
+  catalog,
+  detect,
   devAgent,
   paths,
   scroll,
