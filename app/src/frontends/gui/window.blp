@@ -130,8 +130,18 @@ template $KurierMainWindow: Adw.ApplicationWindow {
             };
           }
         };
+        // **The bar is a vertical box of [config row, composer], in that order.** One bottom bar, two
+        // things in it, and the order is the plan's: what you pick here applies to what you are about
+        // to send in the entry below it. A `Gtk.Box` rather than a second `Adw.ToolbarView` bottom bar
+        // because there is only one bottom bar, and because a second raised surface would read as two
+        // panes stacked rather than as one control area.
         [bottom]
-        Adw.Bin composerHost {}
+        Gtk.Box {
+          orientation: vertical;
+          spacing: 0;
+          Adw.Bin configHost {}
+          Adw.Bin composerHost {}
+        }
       };
     };
   };
