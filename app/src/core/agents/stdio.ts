@@ -21,6 +21,7 @@ import { accessSync, constants } from 'node:fs';
 
 import { channelTransport, type RawChannel, type Transport } from '@kurier/acp/transport';
 
+import { prepareIsolation } from './isolation.ts';
 import {
   currentSandboxFacts,
   FLATPAK_SPAWN,
@@ -50,6 +51,11 @@ export interface AgentCommand {
    * Scheibe 1, and a token in here would land in a session record's process listing.
    */
   readonly env?: Record<string, string>;
+  /**
+   * This is the copy shipped inside the build, under `/app/extra`. It runs where kurier runs — the
+   * sandbox — so `toHostCommand` leaves it alone: the host cannot see that path.
+   */
+  readonly bundled?: true;
 }
 
 export interface StdioChannelOptions {
@@ -119,6 +125,8 @@ export class StdioChannel implements RawChannel {
     // `opencode`, never the `flatpak-spawn` that happens to be carrying it. See sandbox.ts.
     this.command = options.command;
     this.#killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
+    // At launch rather than when the command is built: building one stays free of side effects.
+    if (options.command.bundled) prepareIsolation(options.command.env);
     const actual = resolveSpawnCommand(options.command, options.sandboxFacts ?? currentSandboxFacts());
     const { cwd, env } = actual;
     this.#child = spawn(actual.program, actual.args, {

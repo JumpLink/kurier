@@ -52,6 +52,15 @@ fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/R
 `detectAgents` ignores a host hit under the prefix; `resolveAgent` takes the setting, else the first
 host install, else the first bundled copy (`core/agents/detect.ts`, pure over facts gathered by
 `probe.ts`). The catalog's `env` is flags only, never a credential.
+With no `--agent`/`KU_APP_AGENT`, every command and the window use that resolution; `resume` and `cancel`
+use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
+`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under
+`<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real
+`~/.config/opencode` in reach and its login must not be shared; `kurier auth` logs in there too.
+The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
+(`host`|`bundled`; **absent = host**, the old records) and `resolveRecorded` resumes on that copy — a copy
+that is gone is an error naming why, never a fall to the other. The window resolves with
+`gatherResolveContext(env, false)`: no `--version` spawn, so it never waits on a child before it appears.
 
 **One turn, not a REPL**, and that is a decision rather than a missing feature. A REPL needs
 somewhere to put the approval surface, and the plan puts the surface in a later slice; a REPL now

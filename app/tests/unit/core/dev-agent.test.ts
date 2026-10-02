@@ -8,7 +8,9 @@ import {
   standInCommand,
   standInScriptPath,
 } from '../../../src/core/agents/dev-agent.ts';
+import { isolationDirs } from '../../../src/core/agents/isolation.ts';
 import { DEFAULT_AGENT, LAUNCHERS, launcherIds } from '../../../src/core/agents/launcher.ts';
+import type { ResolvedAgent } from '../../../src/core/agents/resolve.ts';
 
 export default async () => {
   await describe('dev-agent — the stand-in is not a launcher', async () => {
@@ -48,6 +50,33 @@ export default async () => {
       expect(chooseAgent(undefined).command.id).toBe(DEFAULT_AGENT);
       expect(chooseAgent(null).note).toBe(null);
       expect(chooseAgent('  ').command.id).toBe(DEFAULT_AGENT);
+    });
+
+    await it('asks the resolver only when no hook is set, and uses what it found', async () => {
+      const bundled: ResolvedAgent = {
+        command: { id: 'opencode', title: 'bundled', program: '/app/extra/x', args: ['acp'], bundled: true },
+        source: 'bundled',
+        version: '1.0.0',
+        isolation: isolationDirs('/synthetic/data', 'opencode'),
+      };
+      let asked = 0;
+      const resolver = () => {
+        asked += 1;
+        return bundled;
+      };
+      const choice = chooseAgent(undefined, resolver);
+      expect(choice.command).toBe(bundled.command);
+      expect(choice.note).toContain('bundled opencode 1.0.0');
+      expect(asked).toBe(1);
+      expect(chooseAgent('opencode', resolver).command.bundled).toBe(undefined);
+      expect(chooseAgent(STAND_IN_AGENT_ID, resolver).command.id).toBe(STAND_IN_AGENT_ID);
+      expect(asked).toBe(1);
+    });
+
+    await it('keeps the launcher when the resolver finds nothing', async () => {
+      const choice = chooseAgent(undefined, () => null);
+      expect(choice.command.id).toBe(DEFAULT_AGENT);
+      expect(choice.command.bundled).toBe(undefined);
     });
 
     await it('resolves a real launcher by id', async () => {

@@ -11,7 +11,6 @@
 
 import type { CommandModule } from 'yargs';
 
-import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
 import { installInterruptHandler } from '../../core/interrupt.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
@@ -19,6 +18,7 @@ import { toTranscript } from '../../core/transcript.ts';
 import { createSessionStore } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 
+import { agentForRecorded } from './choose.ts';
 import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
@@ -36,8 +36,7 @@ const command: CommandModule = {
       })
       .option('agent', {
         type: 'string',
-        default: DEFAULT_AGENT,
-        describe: "which agent launcher to start (must match the session's agent)",
+        describe: "must match the session's agent; the session's own agent is used when omitted",
       })
       .option('deny-all', { type: 'boolean', describe: 'refuse every tool call without asking' })
       .option('quiet', { type: 'boolean', describe: "do not echo the agent's log lines" })
@@ -45,7 +44,7 @@ const command: CommandModule = {
   handler: async (argv) => {
     const raw = argv as Record<string, unknown>;
     const id = pickArgv<string>(raw, 'id') ?? '';
-    const agentId = pickArgv<string>(raw, 'agent') ?? DEFAULT_AGENT;
+    const agentId = pickArgv<string>(raw, 'agent');
     const prompt = pickArgv<string[]>(raw, 'prompt') ?? [];
     const denyAll = pickArgv<boolean>(raw, 'deny-all', 'denyAll') === true;
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
@@ -58,7 +57,7 @@ const command: CommandModule = {
       process.exitCode = 1;
       return;
     }
-    if (record.agent !== agentId) {
+    if (agentId !== undefined && record.agent !== agentId) {
       // A session is a conversation with *an* agent. Handing an opencode session id to a different
       // launcher is a guess about somebody's history, so it is refused with the way out.
       err(
@@ -68,7 +67,9 @@ const command: CommandModule = {
       process.exitCode = 1;
       return;
     }
-    const launcher = requireLauncher(record.agent);
+    const resolved = agentForRecorded(record.agent, record.agentSource);
+    if (!resolved) return;
+    const launcher = resolved.command;
     const terminal = processTerminal();
     const at = () => new Date().toISOString();
 

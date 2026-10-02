@@ -47,11 +47,23 @@ export interface TranscriptEntry {
   toolCallId?: string;
 }
 
+/**
+ * Which copy of the agent holds a session's history: the person's own install (`host`) or the copy
+ * shipped inside the build (`bundled`). The two keep separate databases, so `resume` has to go back
+ * to the one that has the session. A label, never a permission.
+ */
+export type AgentSource = 'host' | 'bundled';
+
 export interface SessionRecord {
   /** The agent's own session id. Opaque; kurier stores it and hands it back, never parses it. */
   id: SessionId;
   /** Which adapter started the agent, e.g. `opencode`. */
   agent: string;
+  /**
+   * Which copy of `agent` started the session. **Absent means `host`**: records written before this
+   * field existed were all started on the person's own install.
+   */
+  agentSource?: AgentSource;
   /** The working directory the session runs in. Part of its *scope*, so part of the record. */
   cwd: string;
   principal: Principal;
@@ -72,6 +84,7 @@ export interface SessionRecord {
 export interface NewSession {
   id: SessionId;
   agent: string;
+  agentSource?: AgentSource;
   cwd: string;
   principal?: Principal;
   boundTo?: string | null;
@@ -93,6 +106,8 @@ export function newSession(input: NewSession): SessionRecord {
     reattach: input.reattach ?? null,
     turns: [],
   };
+  // Left off the record when not given, so a record stays byte-identical to what older kurier wrote.
+  if (input.agentSource) record.agentSource = input.agentSource;
   assertScopeIsNotAuthority(record as unknown as Record<string, unknown>);
   return record;
 }

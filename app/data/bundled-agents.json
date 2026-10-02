@@ -22,7 +22,14 @@
       ],
       "command": ["acp"],
       "env": {
-        "OPENCODE_DISABLE_AUTOUPDATE": "true"
+        "OPENCODE_DISABLE_AUTOUPDATE": "true",
+        "OPENCODE_DISABLE_CLAUDE_CODE": "true",
+        "OPENCODE_DISABLE_EXTERNAL_SKILLS": "true",
+        "OPENCODE_CONFIG": "",
+        "OPENCODE_CONFIG_DIR": "",
+        "OPENCODE_CONFIG_CONTENT": "",
+        "OPENCODE_AUTH_CONTENT": "",
+        "OPENCODE_DB": ""
       },
       "refreshed": "2026-10-02",
       "installPath": "/app/extra/agents/opencode",

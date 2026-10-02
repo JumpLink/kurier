@@ -33,19 +33,33 @@ import type { CommandModule } from 'yargs';
 
 import { classifyAuthMethods } from '@kurier/acp/gate';
 
-import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
+import { DEFAULT_AGENT } from '../../core/agents/launcher.ts';
 import { OPENCODE_LOGIN } from '../../core/agents/opencode.ts';
 import { currentSandboxFacts, toHostCommand } from '../../core/agents/sandbox.ts';
-import { which } from '../../core/agents/stdio.ts';
+import { which, type AgentCommand } from '../../core/agents/stdio.ts';
 import { openAgent } from '../../core/run.ts';
 
+import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-/** The login command per adapter. A program to run, not a permission to hold. */
-function loginCommandFor(agentId: string): { program: string; args: string[] } {
-  if (agentId === DEFAULT_AGENT) return { program: OPENCODE_LOGIN.program, args: OPENCODE_LOGIN.args };
-  throw new Error(`no login command is known for agent "${agentId}" — run the agent's own login`);
+/**
+ * The login command per adapter. A program to run, not a permission to hold.
+ *
+ * For the bundled copy it is the copy's own program with its own environment: a login run through the
+ * person's `opencode` would land in their config, and the bundled agent would never see it.
+ */
+function loginCommandFor(agent: AgentCommand): AgentCommand {
+  if (agent.id !== DEFAULT_AGENT)
+    throw new Error(`no login command is known for agent "${agent.id}" — run the agent's own login`);
+  return agent.bundled
+    ? { ...agent, args: OPENCODE_LOGIN.args }
+    : {
+        id: OPENCODE_LOGIN.id,
+        title: OPENCODE_LOGIN.title,
+        program: OPENCODE_LOGIN.program,
+        args: OPENCODE_LOGIN.args,
+      };
 }
 
 const command: CommandModule = {
@@ -53,14 +67,21 @@ const command: CommandModule = {
   describe: 'arrange the login an agent asked for, so a session does not die on -32000',
   builder: (yargs) =>
     yargs
-      .option('agent', { type: 'string', default: DEFAULT_AGENT, describe: 'which agent to log in' })
+      .option('agent', {
+        type: 'string',
+        describe: 'which agent to log in (default: your own install, else the bundled copy)',
+      })
       .option('quiet', { type: 'boolean', describe: "do not echo the agent's log lines" })
       .strict(),
   handler: async (argv) => {
     const raw = argv as Record<string, unknown>;
-    const agentId = pickArgv<string>(raw, 'agent') ?? DEFAULT_AGENT;
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
-    const launcher = requireLauncher(agentId);
+    const resolved = agentForNew(pickArgv<string>(raw, 'agent'));
+    if (!resolved) return;
+    const launcher = resolved.command;
+    if (resolved.isolation) {
+      err(`  a login here is kept in ${resolved.isolation.data} and is not your own opencode login`);
+    }
     if (!which(launcher.program)) {
       err(`${launcher.program} is not on PATH — install it, or point PATH at it, then try again`);
       process.exitCode = 1;
@@ -106,7 +127,7 @@ const command: CommandModule = {
       process.exitCode = 1;
       return;
     }
-    const login = loginCommandFor(agentId);
+    const login = loginCommandFor(launcher);
     const found = which(login.program);
     if (!found) {
       err(`${login.program} is not on PATH — run \`${login.program} ${login.args.join(' ')}\` yourself`);
@@ -149,15 +170,12 @@ const command: CommandModule = {
  * the person's own home. A `kurier auth` that only worked on a desktop install would be a second
  * version of the same bug.
  */
-function runInteractively(command: { program: string; args: string[] }): Promise<number> {
+function runInteractively(command: AgentCommand): Promise<number> {
   return new Promise((resolve, reject) => {
     // `cwd`/`env` are read off the rewritten command for the same reason as in StdioChannel: on a
     // Flatpak they are the host's, carried in the argv, and re-applying them to `flatpak-spawn` would
     // place it in a directory that does not exist in the sandbox.
-    const actual = toHostCommand(
-      { id: 'interactive', title: command.program, program: command.program, args: command.args },
-      currentSandboxFacts(),
-    );
+    const actual = toHostCommand(command, currentSandboxFacts());
     const child = spawn(actual.program, actual.args, {
       stdio: 'inherit',
       ...(actual.cwd ? { cwd: actual.cwd } : {}),

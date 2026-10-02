@@ -26,6 +26,8 @@ import agents from './unit/core/agents.test.ts';
 import sandbox from './unit/core/sandbox.test.ts';
 import catalog from './unit/core/catalog.test.ts';
 import detect from './unit/core/detect.test.ts';
+import isolation from './unit/core/isolation.test.ts';
+import resolve from './unit/core/resolve.test.ts';
 import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
 import scroll from './unit/core/scroll.test.ts';
@@ -61,6 +63,8 @@ run({
   sandbox,
   catalog,
   detect,
+  isolation,
+  resolve,
   devAgent,
   paths,
   scroll,

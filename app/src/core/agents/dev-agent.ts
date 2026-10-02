@@ -32,6 +32,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_AGENT, findLauncher, launcherIds, requireLauncher } from './launcher.ts';
+import { describeResolved, type ResolvedAgent } from './resolve.ts';
 import type { AgentCommand } from './stdio.ts';
 
 /** The name `KU_APP_AGENT` takes for the fixture. */
@@ -80,9 +81,19 @@ export interface AgentChoice {
  * A refusal here would mean no window at all, and the reason would be printed to a stderr they may not
  * be watching — a dev hook that can keep the app from starting is not a dev hook.
  */
-export function chooseAgent(id: string | undefined | null): AgentChoice {
+export function chooseAgent(
+  id: string | undefined | null,
+  resolveDefault: () => ResolvedAgent | null = () => null,
+): AgentChoice {
   const wanted = id?.trim();
-  if (!wanted) return { command: requireLauncher(DEFAULT_AGENT), note: null };
+  if (!wanted) {
+    // No explicit choice: the person's own install, else the bundled copy. With neither, the launcher
+    // stays the command, so the window starts and its composer says why the agent will not (the same
+    // failure as before the bundled copy existed).
+    const found = resolveDefault();
+    if (found) return { command: found.command, note: describeResolved(found) };
+    return { command: requireLauncher(DEFAULT_AGENT), note: null };
+  }
   if (wanted === STAND_IN_AGENT_ID) {
     return {
       command: standInCommand(),

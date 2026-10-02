@@ -138,6 +138,66 @@ export default async () => {
     });
   });
 
+  await describe('toHostCommand — a bundled command', async () => {
+    const BUNDLED: AgentCommand = {
+      ...OPENCODE,
+      program: '/app/extra/agents/opencode/opencode',
+      env: { XDG_CONFIG_HOME: '/data/kurier/agents/opencode/config' },
+      bundled: true,
+    };
+
+    await it('is returned as the very same object even when sandboxed', async () => {
+      // It lives in /app/extra, which the host cannot see: rewriting it would start a program that
+      // does not exist there.
+      expect(toHostCommand(BUNDLED, SANDBOXED)).toBe(BUNDLED);
+    });
+
+    await it('is returned unchanged when not sandboxed', async () => {
+      expect(toHostCommand(BUNDLED, NOT_SANDBOXED)).toBe(BUNDLED);
+    });
+
+    await it('leaves a non-bundled command rewritten as before', async () => {
+      expect(toHostCommand(OPENCODE, SANDBOXED).program).toBe(FLATPAK_SPAWN);
+      expect(toHostCommand({ ...OPENCODE, bundled: undefined }, SANDBOXED).program).toBe(FLATPAK_SPAWN);
+    });
+
+    await it('is spawned directly, with its own environment, and its directories exist after launch', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const root = join(dir, 'agents', 'fake');
+        const config = join(root, 'config');
+        const program = writeProgram(
+          dir,
+          'bundled',
+          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$KURIER_BLANKED"\n',
+        );
+        const channel = new StdioChannel({
+          command: {
+            id: 'fake',
+            title: 'fake',
+            program,
+            args: [],
+            env: { XDG_CONFIG_HOME: config, KURIER_BLANKED: '' },
+            bundled: true,
+          },
+          onStderr: () => {},
+          sandboxFacts: SANDBOXED,
+        });
+        return new Promise<string>((resolve, reject) => {
+          let out = '';
+          channel.onData((chunk) => {
+            out += chunk;
+          });
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
+        }).then((out) => {
+          expect(out).toContain(`XDG:${config}`);
+          expect(out).toContain('BLANK:[]');
+          expect(existsSync(config)).toBe(true);
+        });
+      });
+    });
+  });
+
   await describe('toHostCommand — inside a sandbox', async () => {
     await it('starts flatpak-spawn, not the agent', async () => {
       expect(toHostCommand(OPENCODE, SANDBOXED).program).toBe(FLATPAK_SPAWN);

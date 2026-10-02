@@ -27,6 +27,8 @@ import { runAdwaitaApp } from '@gjsify/adwaita-app';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 
 import { chooseAgent } from '../../core/agents/dev-agent.ts';
+import { gatherResolveContext } from '../../core/agents/probe.ts';
+import { NO_AGENT_MESSAGE, resolveDefault } from '../../core/agents/resolve.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
@@ -51,9 +53,15 @@ const hooks = readHooks();
  * reading `KU_APP_AGENT` itself — would put an environment lookup and a fallback rule in a widget file,
  * and `hooks.ts` exists precisely so that every environment read happens once at startup and can be
  * reasoned about as a whole. An unknown id prints its line here, where a person watching the terminal
- * will see it, and falls back rather than refusing to start.
+ * will see it, and falls back rather than refusing to start. With no hook the agent is resolved as the CLI
+ * resolves it: the person's own install, else the bundled copy.
  */
-const agent = chooseAgent(hooks.agent);
+const agent = chooseAgent(hooks.agent, () => {
+  // No `--version` spawn: the window must not wait on a child before it appears.
+  const found = resolveDefault(gatherResolveContext(process.env, false));
+  if (!found) console.log(`kurier: ${NO_AGENT_MESSAGE}`);
+  return found;
+});
 if (agent.note) console.log(`kurier: ${agent.note}`);
 
 const status = await runAdwaitaApp({

@@ -45,6 +45,24 @@ export default async () => {
     });
   });
 
+  await describe('newSession — agentSource', async () => {
+    await it('records the source when given', async () => {
+      const record = newSession({
+        id: 'ses_1',
+        agent: 'opencode',
+        agentSource: 'bundled',
+        cwd: '/tmp',
+        at: AT,
+      });
+      expect(record.agentSource).toBe('bundled');
+    });
+
+    await it('leaves the key off when not given, as older records had it', async () => {
+      const record = newSession({ id: 'ses_1', agent: 'opencode', cwd: '/tmp', at: AT });
+      expect('agentSource' in record).toBe(false);
+    });
+  });
+
   await describe('appendTurns — immutable', async () => {
     await it('returns a new record and does not mutate the original', async () => {
       const record = newSession({ id: 'ses_1', agent: 'opencode', cwd: '/tmp', at: AT });

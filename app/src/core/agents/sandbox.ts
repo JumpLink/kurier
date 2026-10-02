@@ -263,7 +263,8 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
  * the reason `killGraceMs` defaults to a real 2 s rather than 0.
  */
 export function toHostCommand(command: AgentCommand, facts: SandboxFacts): AgentCommand {
-  if (!isSandboxed(facts)) return command;
+  // A bundled agent lives in `/app/extra`, which the host cannot see, and runs where kurier runs.
+  if (!isSandboxed(facts) || command.bundled) return command;
   return {
     id: command.id,
     title: command.title,
