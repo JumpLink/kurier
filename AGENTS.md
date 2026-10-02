@@ -163,7 +163,7 @@ gjsify run app/dist/kurier.gjs.mjs <command>
 gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
 
-**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
+**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
 
 ### Watching a turn without a model
 
@@ -256,17 +256,17 @@ measured GTK facts behind it are in
 decided in `app/src/core/permission.ts` and tested on both runtimes, while the widget only renders.
 
 **Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
-measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md).
+measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd).
 The rules that survive here: the first added button is the bottom one and the last added is the topmost,
 so **both end slots are a decline**; `buildDialog` names `default_response` explicitly rather than letting
 the add order choose it; and `show()` grabs the focus.
 
 **The button labels** are kurier's four short sentences; the agent's own names are not on them
-(captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md)). A button label must fit one line.
+(captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd)). A button label must fit one line.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
 `Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is
-unusable. [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md) has the
+unusable. [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) has the
 reproduction sweep and the cost to the config row.
 
 **GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
