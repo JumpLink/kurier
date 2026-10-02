@@ -401,11 +401,13 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 ## Conventions
 
 - `gjsify install` — never `npm install`, it prunes gjsify deps.
-- All `@gjsify/*` packages pinned to the **same exact version** (0.53.0 here). gjsify ships as one
-  release train; a CLI ↔ libs skew produces silently broken bundles. One exception has a reason and
-  is gone: `@gjsify/napi` was dropped, because 0.53.0 was bumped in gjsify's tree and never
-  published (`packages/napi/**` is not a workspace member — its release leg builds a meson prebuild
-  per platform first), and nothing in kurier imported it.
+- All `@gjsify/*` packages pinned to the **same exact version** (0.54.0 here). gjsify ships as one
+  release train; a CLI ↔ libs skew produces silently broken bundles. One is absent: `@gjsify/napi`,
+  which nothing in kurier imports — its rewrite only fires for a compiled `.node` addon inside a
+  bundle, and every addon in this tree is build-time tooling that runs under Node. It was also
+  unpublishable through 0.53.0 (`packages/napi/**` is not a workspace member — its release leg builds
+  a meson prebuild per platform first, and the 0.53.0 tarball never landed); 0.54.0 publishes it
+  again, so the pin can come back if a build ever does carry an addon.
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
 - **`./node_modules/.bin/gjsify`, not the `gjsify` on `PATH`**, whenever the toolchain version
