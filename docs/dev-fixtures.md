@@ -32,6 +32,45 @@ KU_STANDIN_DELAY_MS=900 KU_STANDIN_CHUNKS=2   # a short, slow answer, to shoot m
 KU_STANDIN_PERMISSION=1       # asks session/request_permission mid-turn and waits for the answer
 ```
 
+**`KU_STANDIN_PERMISSION=1` sends all four option kinds**, so the dialog on screen shows four buttons.
+That is the point of the fixture: the two `*_always` kinds used to be filtered out of the projection,
+and a stand-in that only sent the `*_once` pair would have let that filter pass.
+
+**The order on screen is not the order kurier adds them, and neither is the order the stand-in lists
+them.** Three orders, all measured (`orderOptions` in `app/src/core/permission.ts` has the reasoning;
+case 9 of `alert-dialog-close.mjs` prints the two GTK facts):
+
+| | order |
+| --- | --- |
+| the stand-in sends | `allow_once`, `allow_always`, `reject_once`, `reject_always` |
+| kurier **adds** the buttons | `reject_once`, `allow_once`, `allow_always`, `reject_always` |
+| they appear on screen, top to bottom | `Always decline`, `Always allow`, `Allow once`, `Decline` |
+
+The screen order is the reverse of the add order — libadwaita fills the row bottom-up — so the first
+added is the **bottom** button and the last added is the **topmost**, the one a hand reaches first. The
+focus goes to the bottom one, `Decline`, and the topmost is a decline too. **The button labels are
+kurier's four short sentences; the stand-in's own names ("Always allow in this session") appear once,
+as a caption line in the body** — they used to be appended to the button, which read "Always decline:
+Always decline in thi…" and was unreadable at the 360 px floor.
+
+Three knobs reach the shapes around this, and **all three are off unless set** (same rule as every other
+hook here):
+
+| Variable                              | What it sends                                             | Why it is a knob |
+| ------------------------------------- | --------------------------------------------------------- | ---------------- |
+| `KU_STANDIN_PERMISSION_ONCE`          | only `allow_once` + `reject_once`                          | what an agent with no lasting grant looks like — the minimal two-button dialog |
+| `KU_STANDIN_PERMISSION_ALWAYS_FIRST`  | all four, `*_always` listed **first**                      | the order that used to decide where libadwaita put the focus, so a screenshot can show kurier's order winning |
+| `KU_STANDIN_PERMISSION_NO_REJECT`     | only `allow_once` + `allow_always`                         | **the state with nothing safe to name.** There is no decline, so `default_response` has nothing to point at and libadwaita's fallback lands on `allow_once`; kurier's own grab in `show()` is the only thing keeping the focus on the diff body (case 10 measures what happens without one). Off by default, because the default keeps a decline available |
+
+```sh
+# four buttons — the default, and the dialog to photograph
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# two allows and no decline: the focus must land on the diff body, not on "Always allow"
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 KU_STANDIN_PERMISSION_NO_REJECT=1 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
 `KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. A hook set to `0` or `false`
 is **off** — unset, empty, `0` and `false` all mean not set, in kurier and in the stand-in alike, so
 there is one rule for "is this on" in the repo.
@@ -137,7 +176,32 @@ on the allow button while the app's own screenshot showed a highlighted label in
 behind the dialog are measured rather than read from the signal docs: `Adw.Dialog` emits `closed`
 **before** `response` (so a dialog that settles on `closed` can never allow anything), `force_close()`
 emits neither signal (so it would hang the turn), and with no `default_response` set libadwaita focuses
-the **last added** response — which is the allow button whenever the agent sends it last.
+the **first added** response — which is *not* what `Adw-1.gir` says ("the last added response will be
+focused by default"). Case 9 of `alert-dialog-close.mjs` builds the dialog twice, `allow_once, reject_once`
+and `reject_once, allow_once`, because the two readings agree on every single-order dialog: measured both
+ways on libadwaita 1.9.3, the focus follows the **first** add. The same case prints the layout direction
+from `get_allocation().y` — the row is filled **bottom-up from the add order**, so the last added
+response is the *topmost* button — which is why `orderOptions` puts a decline in both end slots.
+
+The permission-focus probe carries six cases for this, four of them with the `*_always` kinds, and its
+allow-button test matches the *rendered* label of **any** allowing kind rather than `allow_once` alone: a
+focused "Always allow" answers Enter exactly as a focused "Allow once" does, and also widens the answer.
+It also samples the focus **every main-loop turn until it settles**, not once, so a focus that passes
+through an allow button and lands somewhere safe afterwards cannot pass. The last two cases exist only
+because kurier began passing the `*_always` kinds through: an agent offering `allow_once` and
+`allow_always` and nothing rejecting leaves no safe button, and the probe fails if any sampled turn names
+one.
+
+**The two probes do not cover the same turn, and which covers what is worth knowing.** Case 10 of
+`alert-dialog-close.mjs` is the look-alike version: two allows, no `default_response`, the same dialog
+built three times — grabbing synchronously inside `map`, deferring the grab to an idle, and not grabbing
+at all. The first sample is the body in the first two and `Allow once` in the third, which stays there.
+So **a grab is what matters**, not which kind; the synchronous form is kept because an idle libadwaita
+queues after ours would run after ours, which is a structural argument and not a measured one. That
+case cannot be reproduced against `PermissionDialog` at all: `present()` maps synchronously, so by the
+time `permission-focus.ts` has a timer running, kurier's grab has already happened and the pre-idle frame
+is not observable from outside. The widget probe therefore covers the **settled** focus and the
+turn-by-turn sequence; neither result is stretched to answer the other.
 
 The fourth fact is the failure dialog's: an external `close()` emits `closed` and *then*
 `response("close")` — the same pair, with the same argument, that the one response button produces — so

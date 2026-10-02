@@ -91,12 +91,18 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
 2. **Fail closed on `request_permission`.** `denyAll` remains the default `PermissionGate`; the Adwaita
    surface passes its own, which asks a person and answers `cancelled` on every path where nobody chose
    — Escape, Stop, a closing window, an agent that died, a closed dialog. Never "auto-allow because the
-   agent asked", and **never "always allow"**: `allow_always`/`reject_always` are filtered out in the
-   projection (`core/permission.ts`), so kurier is never offered a promise it keeps nothing for.
-   There is no timeout on a question — a diff takes longer than any deadline kurier could pick.
+   agent asked". **`allow_always`/`reject_always` are passed through**, not filtered: the **agent**
+   remembers an "always" (ACP has no `allowed_always` — the answer is `selected` plus the agent's own
+   option id, and it decides whether to ask again), while kurier stores no policy at all. What still
+   holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
+   `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
+   says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
+   kurier could pick.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
-   access through that channel at all. File access is a decision, not a default.
+   access through that channel at all. File access is a decision, not a default — these two may be
+   enabled later for a **canvas surface**, where kurier would hold the real buffer and hand it over
+   deliberately rather than proxying a path the agent named.
 4. **`_meta` is passed through, never parsed.** `opencode acp` sends
    `_meta: {"opencode/child-session-updates": true}` and a `sessionCapabilities.fork` marker the v1
    schema does not define. Unknown `_meta` must never be an error — otherwise every agent with an
@@ -173,10 +179,10 @@ same twice. `KU_APP_AGENT=stand-in` selects it; it is reachable through the dev 
 `LAUNCHERS`, which is the table of programs a person installs.
 
 **Every knob, every recipe and every measured GTK fact is in
-[docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, the config row's four
-values and its two known limits, the per-session option cache, the failure knobs (`KU_STANDIN_AUTH` /
-`KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and the two kinds of GTK probe with the commands that
-print the numbers. Two rules that change behaviour stay here:
+[docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, its three permission-option
+knobs, the config row's four values and its two known limits, the per-session option cache, the failure
+knobs (`KU_STANDIN_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and the two kinds of GTK probe
+with the commands that print the numbers. Two rules that change behaviour stay here:
 
 - **`KU_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed sentences, so its default is `4`
   and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply still
@@ -234,10 +240,11 @@ says so and offers nothing else, because a button that could only copy a string 
 pointing at nothing.
 
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
-`session/request_permission`, carried over the real stdio chain, with all four option kinds on the wire
-so the `*_always` filtering has something to filter. `KU_APP_PERMISSION=1` is kurier's side: it puts a
-fixture request through **the same gate** the agent's requests go through, so a screenshot shows the
-gate's behaviour rather than a dialog built for the screenshot.
+`session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
+wire** — so a screenshot shows kurier's ordering, labels, styling and focus rules acting on the full
+set the agent offered, `*_always` included. `KU_APP_PERMISSION=1` is kurier's side: it puts a fixture
+request through **the same gate** the agent's requests go through, so a screenshot shows the gate's
+behaviour rather than a dialog built for the screenshot.
 
 **Stop is not pointer-reachable while the permission dialog is up, and that is libadwaita's doing.**
 An `Adw.AlertDialog` grabs input on the window it is presented over, so the composer's Stop button
@@ -267,9 +274,28 @@ runtimes; the widget only renders.
 
 The three GTK facts behind the permission dialog are **measured, not read from the signal docs** —
 `Adw.Dialog` emits `closed` before `response`, `force_close()` emits neither, and with no
-`default_response` libadwaita focuses the *last added* response, which is the allow button whenever the
-agent sends it last. The probes that print the numbers, and the split between the two kinds of probe, are
-in [docs/dev-fixtures.md](docs/dev-fixtures.md#probes).
+`default_response` libadwaita focuses the *last added* response. The probes that print the numbers, and
+the split between the two kinds of probe, are in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#probes).
+
+**Kurier owns the button order, not just the button set** (`orderOptions`). The agent's order is chosen
+by the agent; the rank is `reject_once`, `allow_once`, `allow_always`, `reject_always`, stable within a
+kind, and the row appears **bottom-up from that**, so the first added is the bottom button and the last
+added is the topmost. Two measured libadwaita facts fix it: with no `default_response` **the focus goes
+to the *first* added response** (not the last — `Adw-1.gir` says otherwise and case 9 measures both
+directions), and the layout is bottom-up from the add order. So the first slot is a decline and the
+topmost button is a decline. `buildDialog` names `default_response` explicitly rather than letting the add
+order choose it, and `show()` grabs the focus — **case 10 builds a look-alike three ways** (grab in
+`map`, grab in an idle, no grab) and only the third reads `allow_once`, which is the whole justification
+for that grab. It is not observable from outside `PermissionDialog` (`present()` maps synchronously), so
+the widget probe measures the settled focus and every turn in between instead.
+
+**The button labels are kurier's four short sentences and the agent's own names are not on them.** The
+labels were once "kurier's word + the agent's name", which read "Always decline: Always decline in thi…"
+and was unreadable at the 360 px floor — a button is the decision, so its label has to fit one line. The
+agent's wording moved into the body as one caption line (`agentNames`), shown only when a name says
+something the kind does not. The terminal prompt follows the same rule: it prints `y = Allow once`, the
+option a `y` actually grants, in the same words as the button.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
 `Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is

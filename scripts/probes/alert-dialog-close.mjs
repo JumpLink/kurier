@@ -34,10 +34,13 @@
  *    Stop, a closing window and a dead agent all silently stop working — and its button would answer
  *    whatever question is open by then, which is an allow for a request nobody read. The guard is one
  *    comparison and it is the difference the case prints.
- * 7. **Where libadwaita puts the focus when `default_response` is unset** (case 9) — on the allow
- *    button. That is the fallback kurier has to override, because a focused `Gtk.Button` answers Enter
- *    and Space; what kurier produces instead is measured on the real widget by
- *    `app/tests/probes/permission-focus.ts`.
+ * 7. **Where libadwaita puts the focus when `default_response` is unset** (case 9) — on the **first**
+ *    added response, not the last as `Adw-1.gir` says. That is the fallback kurier has to make safe,
+ *    because a focused `Gtk.Button` answers Enter and Space; what kurier produces instead is measured on
+ *    the real widget by `app/tests/probes/permission-focus.ts`.
+ * 9. **Whether a `grab_focus` in the first frame beats that fallback** (case 10) — it does, and the
+ *    answer is the same whether the grab is synchronous or deferred. Which is why the comment in
+ *    `show()` says *a* grab is the mitigation and not that the synchronous one wins.
  *
  *   gjs -m scripts/probes/alert-dialog-close.mjs
  *
@@ -77,7 +80,15 @@ function buttonsUnder(widget, found = []) {
 }
 
 /** A dialog carrying the responses a real permission request carries, on a real parent window. */
-function build() {
+/**
+ * A dialog with `responses` added in the order given, so a case can vary the *order* and not only the
+ * set — which is what case 9 needs, because the two candidate rules ("first added" and "last added")
+ * agree on every single-order dialog.
+ *
+ * The default order is the one kurier uses, `reject_once` then `allow_once`, with the *allowing* one
+ * marked SUGGESTED — so every other case exercises the shape the app really builds.
+ */
+function build(...responses) {
   const window = new Gtk.Window({ title: 'probe', default_width: 640, default_height: 480 });
   // `height_request`, because a bare `Gtk.Label` reports a 13 px minimum and GTK warns about it on
   // every allocation — and this probe's whole job is that its output is clean.
@@ -87,9 +98,13 @@ function build() {
     body: 'body',
     extra_child: new Gtk.Label({ label: 'extra', height_request: 40 }),
   });
-  dialog.add_response('allow_once', 'Allow once');
-  dialog.set_response_appearance('allow_once', Adw.ResponseAppearance.SUGGESTED);
-  dialog.add_response('reject_once', 'Reject');
+  const order = responses.length > 0 ? responses : ['reject_once', 'allow_once'];
+  for (const id of order) {
+    dialog.add_response(id, id === 'allow_once' ? 'Allow once' : 'Reject');
+  }
+  if (order.includes('allow_once')) {
+    dialog.set_response_appearance('allow_once', Adw.ResponseAppearance.SUGGESTED);
+  }
   return { window, dialog };
 }
 
@@ -128,11 +143,27 @@ function watch(dialog, { deferOnClosed }) {
 }
 
 const CASES = [
-  ['1. a pressed button, settled on `closed` — the wiring that could never allow', { deferOnClosed: false }, (d) => pressButton(d, 'Allow once')],
-  ['2. the same press, settled on `response` with `closed` deferred — what kurier does', { deferOnClosed: true }, (d) => pressButton(d, 'Allow once')],
-  ['3. a pressed rejecting button, deferred — the answer a decline must reach', { deferOnClosed: true }, (d) => pressButton(d, 'Reject')],
+  [
+    '1. a pressed button, settled on `closed` — the wiring that could never allow',
+    { deferOnClosed: false },
+    (d) => pressButton(d, 'Allow once'),
+  ],
+  [
+    '2. the same press, settled on `response` with `closed` deferred — what kurier does',
+    { deferOnClosed: true },
+    (d) => pressButton(d, 'Allow once'),
+  ],
+  [
+    '3. a pressed rejecting button, deferred — the answer a decline must reach',
+    { deferOnClosed: true },
+    (d) => pressButton(d, 'Reject'),
+  ],
   ['4. `close()` — what Escape, Stop and a closing window do', { deferOnClosed: true }, (d) => d.close()],
-  ['5. `force_close()` — the teardown that emits nothing and would hang the turn', { deferOnClosed: true }, (d) => d.force_close()],
+  [
+    '5. `force_close()` — the teardown that emits nothing and would hang the turn',
+    { deferOnClosed: true },
+    (d) => d.force_close(),
+  ],
   [
     "6. `close_response` set to the agent's rejecting option (the plan's earlier rule)",
     { deferOnClosed: true },
@@ -159,7 +190,7 @@ const CASES = [
  * unguarded handler clears the widget's fields at that point and the second dialog becomes an orphan
  * that nothing can close — and whose button answers whatever question is open by then.
  */
-const SPECIAL = ['queued', 'focus'];
+const SPECIAL = ['queued', 'focus', 'grab-race'];
 
 let specialIndex = 0;
 
@@ -184,6 +215,7 @@ function next() {
     specialIndex += 1;
     if (which === 'queued') queuedCase();
     else if (which === 'focus') focusCase();
+    else if (which === 'grab-race') grabRaceCase();
     else summary();
     return;
   }
@@ -225,7 +257,9 @@ function queuedCase() {
 }
 
 function runQueued(guard, done) {
-  print(`\n8. two queued questions, answered in sequence — ${guard ? 'WITH' : 'WITHOUT'} the "is it still my dialog" guard`);
+  print(
+    `\n8. two queued questions, answered in sequence — ${guard ? 'WITH' : 'WITHOUT'} the "is it still my dialog" guard`,
+  );
   const window = new Gtk.Window({ title: 'probe', default_width: 640, default_height: 480 });
   window.set_child(new Gtk.Label({ label: 'underneath', height_request: 40 }));
   /** The widget's two fields, and nothing else. */
@@ -266,10 +300,11 @@ function runQueued(guard, done) {
   // libadwaita emits `response` at the *end* of the close animation, which is later than the press.
   window.present();
   const first = show('q1', 'Allow once');
-  const later = (ms, fn) => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
-    fn();
-    return GLib.SOURCE_REMOVE;
-  });
+  const later = (ms, fn) =>
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+      fn();
+      return GLib.SOURCE_REMOVE;
+    });
 
   later(200, () => {
     pressButton(current, 'Allow once');
@@ -281,7 +316,9 @@ function runQueued(guard, done) {
     // Long enough for q1's deferred `closed` handler to have run — it is scheduled from the `closed`
     // signal, which precedes the `response` this `then` is running from.
     later(400, () => {
-      print(`  after q1's deferred handler: the second dialog is ${current === null ? 'ORPHANED — close() would be a no-op for it' : 'still tracked'}`);
+      print(
+        `  after q1's deferred handler: the second dialog is ${current === null ? 'ORPHANED — close() would be a no-op for it' : 'still tracked'}`,
+      );
       print('  calling close() — what Stop, a closing window and a dead agent all do:');
       current?.close();
       later(300, () => {
@@ -298,29 +335,137 @@ function runQueued(guard, done) {
  * Case 9 — the *fallback* kurier has to override: where libadwaita puts the focus when
  * `default_response` is unset.
  *
- * This is the baseline, not the answer. `Adw-1.gir` says the default widget "will not be set" without
- * it and that "the last added response will be focused by default", and this prints what that is: the
- * allow button. A focused `Gtk.Button` is activated by Enter and by Space whether or not anything is
- * the default widget, so left alone this dialog allows on the first keypress of an Enter meant for the
- * composer. `PermissionDialog` therefore sets the focus itself — see `app/tests/probes/permission-focus.ts`,
- * which measures the result in the real widget rather than in a look-alike.
+ * **It is the FIRST added response, not the last — and `Adw-1.gir` says the opposite.** The GIR text
+ * reads "the last added response will be focused by default"; on libadwaita 1.9.3 that is wrong, and a
+ * single-order case cannot tell the two apart, which is why this case now builds the dialog **twice**,
+ * once with the responses added `A B C D` and once `D C B A`. Both land the focus on the *first* added.
+ * The first build is the one the old single-case probe had, and it happened to be consistent with both
+ * readings — the reason a comment could claim "last added" for as long as it did.
+ *
+ * So the claim kurier draws from this is about which slot has to be safe: **the first added response**,
+ * which is the one a focused button answers Enter for, and which is live for the frame between
+ * `present()` and `PermissionDialog`'s own `grab_focus`. A focused `Gtk.Button` is activated by Enter
+ * and by Space whether or not anything is the default widget, so left alone this dialog allows on the
+ * first keypress of an Enter meant for the composer. `orderOptions` makes the first slot a decline, and
+ * `PermissionDialog` sets the focus itself on top of that — see
+ * `app/tests/probes/permission-focus.ts`, which measures the result in the real widget.
+ *
+ * **The layout direction is measured here too**, because it decides which end is the topmost button:
+ * the responses are laid out **bottom-up from the add order**, so added `A B C D` they appear
+ * `D C B A` from the top. Read off `get_allocation().y` rather than off tree order, which is the add
+ * order and would have said the opposite.
  */
 function focusCase() {
   print('\n9. the fallback: focus with no `default_response` set, and no focus of our own');
-  const { window, dialog } = build();
-  print(`  get_default_response(): ${JSON.stringify(dialog.get_default_response())}`);
-  window.present();
-  dialog.present(window);
-  GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
-    const focused = dialog.get_focus();
-    const label = focused === null ? 'null' : (focused.get_label?.() ?? focused.constructor.name);
-    print(`  get_focus(): ${label}`);
-    print('  a focused Gtk.Button answers Enter and Space, so this is why kurier moves the focus itself.');
-    window.destroy();
-    next();
-    return GLib.SOURCE_REMOVE;
-  });
+  for (const ids of [
+    ['allow_once', 'reject_once'],
+    ['reject_once', 'allow_once'],
+  ]) {
+    const { window, dialog } = build(...ids);
+    print(`  add order: ${ids.join(', ')}`);
+    print(`  get_default_response(): ${JSON.stringify(dialog.get_default_response())}`);
+    window.present();
+    dialog.present(window);
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+      const focused = dialog.get_focus();
+      const label = focused === null ? 'null' : (focused.get_label?.() ?? focused.constructor.name);
+      print(`  get_focus(): ${label}`);
+      // Top-to-bottom from geometry, not from tree order: the tree is the add order and says nothing
+      // about which button a hand reaches for first.
+      const rows = buttonsUnder(dialog)
+        .filter((button) => button.get_label() !== null)
+        .map((button) => ({ y: button.get_allocation().y, label: String(button.get_label()) }))
+        .sort((a, b) => a.y - b.y);
+      print(`  rendered top->bottom: ${rows.map((row) => row.label).join(', ')}`);
+      window.destroy();
+      if (ids[0] === 'reject_once') {
+        print('  the FIRST added response holds the focus, and the LAST added is the topmost button.');
+        print('  a focused Gtk.Button answers Enter and Space, so kurier moves the focus itself —');
+        print('  and `orderOptions` puts a decline in the first slot so the race is harmless either way.');
+        next();
+      }
+      return GLib.SOURCE_REMOVE;
+    });
+  }
 }
+
+/**
+ * Case 10 — **is the focus on an allow during the frame before kurier's own idle runs?** The one
+ * question `app/tests/probes/permission-focus.ts` cannot answer about the real widget.
+ *
+ * `present()` maps synchronously, so that probe's timers all run *after* kurier's grab; it measures the
+ * settled focus and the turn-by-turn sequence, never this frame. A look-alike can, because here the
+ * grabbing is the probe's own choice: the same dialog is built twice, once grabbing the body
+ * synchronously inside `map` and once deferring to an idle, and the first frame of each is printed.
+ *
+ * **What it measures, in one line:** with two allows and no `default_response`, libadwaita focuses
+ * `allow_once` — and the question is whether kurier's `grab_focus` reaches the body before a stray Enter
+ * could reach the button. Synchronous inside `map`: the body, from the first sample. Deferred to an
+ * idle: the button. That difference is the whole justification for the synchronous grab in
+ * `PermissionDialog.show()`, and this is the case that would catch its removal.
+ */
+function grabRaceCase() {
+  print('\n10. the first frame: grab_focus inside `map`, versus deferred to an idle');
+  const STRATEGIES = ['inside map', 'deferred to an idle', 'no grab at all'];
+  for (const [position, strategy] of STRATEGIES.entries()) {
+    const window = new Gtk.Window({ title: 'probe', default_width: 640, default_height: 520 });
+    window.set_child(new Gtk.Label({ label: 'underneath', height_request: 40 }));
+    const dialog = new Adw.AlertDialog({ heading: 'no decline on offer', body: 'body' });
+    const body = new Gtk.TextView({ editable: false, cursorVisible: false, monospace: true });
+    body.get_buffer()?.set_text('the diff', -1);
+    // `max-content-height` is real (case 7), so this is the scroller the dialog actually uses.
+    dialog.set_extra_child(
+      new Gtk.ScrolledWindow({ child: body, max_content_height: 240, propagate_natural_height: true }),
+    );
+    // Two allows, nothing rejecting: no `default_response` can be named, and the fallback is the first
+    // added response — an allow.
+    dialog.add_response('allow_once', 'Allow once');
+    dialog.add_response('allow_always', 'Always allow');
+    dialog.connect('map', () => {
+      if (strategy === 'no grab at all') return;
+      if (strategy === 'inside map') body.grab_focus();
+      else
+        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+          body.grab_focus();
+          return GLib.SOURCE_REMOVE;
+        });
+    });
+    window.present();
+    dialog.present(window);
+    print(`  strategy: ${strategy}`);
+    // Sampled on a self-rescheduling 0 ms timeout, so consecutive samples are consecutive main-loop
+    // turns. Distinct values only — the transition is the interesting thing, not the settling.
+    const samples = [];
+    let turns = 0;
+    const tick = () => {
+      turns += 1;
+      const focused = dialog.get_focus();
+      const what = focused === null ? 'null' : (focused.get_label?.() ?? focused.constructor.name);
+      if (samples[samples.length - 1] !== what) samples.push(what);
+      const settled = samples.some((value) => value !== 'null');
+      const more = !(settled && turns >= 8) && turns < 40;
+      if (!more) {
+        print(`  focus per turn: ${samples.join(' -> ')}`);
+        const allowFirst = samples[0] === 'Allow once' || samples[0] === 'Always allow';
+        print(
+          allowFirst
+            ? '    FAILED: an allow button held the focus in the first frame'
+            : '    ok: the body held the focus in the first frame',
+        );
+        if (allowFirst) raceFailures += 1;
+        window.destroy();
+        if (position === STRATEGIES.length - 1) {
+          print('  read the three together: they are the same dialog with three grabbing strategies.');
+          next();
+        }
+      }
+      return more;
+    };
+    GLib.idle_add(GLib.PRIORITY_DEFAULT, tick);
+  }
+}
+
+let raceFailures = 0;
 
 function summary() {
   print('\nWhat the close response is, and what it is not:');
@@ -335,6 +480,11 @@ function summary() {
   print(`  max-content-height: ${scroller.max_content_height}`);
   print('\nAnd a signal with a plain-string argument is not callable:');
   print(`  typeof dialog.response: ${typeof build().dialog.response}`);
+  if (raceFailures > 0) {
+    print(`\ncase 10: ${raceFailures} strategy(ies) left an allow button focused in the first frame`);
+    loop.quit();
+    return;
+  }
   loop.quit();
 }
 

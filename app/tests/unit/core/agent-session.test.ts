@@ -469,7 +469,8 @@ export default async () => {
 
     await it('the staged request for KU_APP_PERMISSION goes through the same gate', async () => {
       // Not a dialog built for a screenshot: the real ask, with all four option kinds on the wire, so
-      // what a screenshot shows is the gate's filtering rather than a fixture's convenience.
+      // what a screenshot shows is the gate's behaviour rather than a fixture's convenience. All four
+      // reach the surface, in `orderOptions`' order — the `*_always` kinds are relayed, not filtered.
       const shown: string[] = [];
       const h = harness({
         onPermission: async (question) => {
@@ -478,8 +479,19 @@ export default async () => {
         },
       });
       const answer = await h.session.stagePermissionRequest();
-      expect(shown).toStrictEqual(['allow-once', 'reject-once']);
+      expect(shown).toStrictEqual(['reject-once', 'allow-once', 'allow-always', 'reject-always']);
       expect(answer).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'reject-once' } });
+    });
+
+    await it('an "always allow" pressed on the staged request goes back with that exact id', async () => {
+      // The pass-through end to end, through the controller and over the wire: kurier relays the agent's
+      // own option id and adds nothing. The agent is what remembers the decision, so this is not a
+      // promise kurier made.
+      const h = harness({
+        onPermission: async () => 'allow-always',
+      });
+      const answer = await h.session.stagePermissionRequest();
+      expect(answer).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'allow-always' } });
     });
 
     await it('the staged request records nothing — a question no agent asked is not history', async () => {

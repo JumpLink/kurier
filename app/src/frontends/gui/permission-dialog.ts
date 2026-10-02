@@ -29,6 +29,11 @@
  * and the note where the responses are added. `kind` decides both the words and the appearance, so an
  * agent cannot ship a button that reads "Decline" and allows.
  *
+ * **Every option the agent sent is a button, including the two `*_always` kinds**, in the order
+ * `orderOptions` gives rather than the order the agent listed them. The rest of what this dialog does
+ * — the fail-closed answer for a dismissal, the empty option set answered `cancelled` — is
+ * `core/permission.ts`, and so is the decision that `allow_once` is the only SUGGESTED response.
+ *
  * **The `rawInput` body is a `Gtk.TextView` in a `Gtk.ScrolledWindow`, not a label.** A label ellipsizes
  * or grows without bound, and a tool's raw input is unbounded — a diff can be thousands of lines. The
  * scroller's `max-content-height` is the cap (verified as a real property by
@@ -42,6 +47,7 @@ import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
 import {
+  agentNames,
   initialFocusResponseId,
   optionLabel,
   type PermissionQuestion,
@@ -154,37 +160,51 @@ export class PermissionDialog {
           return GLib.SOURCE_REMOVE;
         });
       });
-      // **The focus is kurier's decision, made after the dialog is on screen, and it is never an allow
-      // button.** libadwaita's own fallback is the *last added* response, which is whichever option
-      // the agent happened to send last — measured in `scripts/probes/alert-dialog-close.mjs`, case 9:
-      // a bare `Adw.AlertDialog` with `allow_once` added first comes up with the focus on the allow
-      // button. A focused `Gtk.Button` is activated by Enter and by Space, `default_response` or not,
-      // so that is a dialog where a person typing in the composer, pressing Enter as the dialog appears
-      // in that same instant, allows a tool call without reading it.
+      // **The focus is kurier's decision and it is never an allow button.** Two separate things decide
+      // the focus, and this handler owns both: the *fallback* libadwaita picks when `default_response`
+      // is unset, and the *actual* focus kurier assigns afterwards. See the `default_response` note in
+      // `buildDialog` for the measured numbers; the short version is that the fallback is the **first**
+      // added response, so `orderOptions` makes that slot a decline, and this handler then makes the
+      // real focus the narrowest decline or — with nothing to decline with — the diff body.
       //
-      // So: the rejecting option's button when the agent sent one (Enter then declines — the answer
-      // that fails closed), and otherwise the diff view, which is focusable, is not activatable and
-      // therefore does nothing on Enter. `initialFocusResponseId` is the pure half of that decision, in
-      // `core/`.
+      // **Synchronously inside `map`, and an idle afterwards, because that is what the measurement said.**
+      // **Inside `map`, then once more in an idle — and the measurement says a grab is what matters, not
+      // which kind.** Case 10 of `scripts/probes/alert-dialog-close.mjs` builds the same look-alike three
+      // ways with two allows and no `default_response`: grabbing synchronously inside `map`, deferring
+      // the grab to an idle, and not grabbing at all. The first sample of the first two is the body in
+      // both cases; the third is `Allow once`, and it stays there. So a grab is required and either form
+      // delivers it — an earlier version of this comment claimed the synchronous one *beats* the idle,
+      // and the numbers do not say that.
       //
-      // **After `map`, then one idle.** Grabbing focus in the same turn as `present()` is a race with
-      // libadwaita's own focus assignment, and losing it silently puts the allow button back. The
-      // probe measures the result in the real widget, after several frames:
-      // `app/tests/probes/permission-focus.ts`.
+      // **The synchronous form is kept anyway, for a structural reason rather than a measured one:** an
+      // idle is dispatched in priority order, so one libadwaita queues *after* ours would run after it.
+      // Grabbing inside `map` cannot be beaten that way. The second grab, in the idle, covers `map`
+      // firing before the dialog's final allocation and costs nothing.
+      //
+      // **What each measurement covers, because they do not overlap.** All of the above is a look-alike —
+      // `scripts/probes/`, the half of the split that cannot speak for this widget — and case 10 cannot
+      // be reproduced against `PermissionDialog` itself: `present()` maps synchronously, so by the time
+      // `app/tests/probes/permission-focus.ts` has a timer running, this grab has already happened and
+      // the pre-idle frame is not observable from outside. That probe covers the settled focus and the
+      // turn-by-turn sequence; neither result is stretched to answer the other.
       const focusId = initialFocusResponseId(question.view.options);
+      const focusNow = (): void => {
+        // The dialog may already be gone — a Stop in the same frame — and then there is nothing to
+        // focus and nothing to do.
+        if (this.#dialog !== dialog) return;
+        const target = focusId === null ? rawInput : responseButton(dialog, focusId);
+        target?.grab_focus();
+        // A focused selectable widget selects its text, and a selection over the diff reads as a
+        // grey block — it was visible in the first screenshot of this dialog. On a `Gtk.TextView` the
+        // selection belongs to the *buffer*, not to the widget: `GtkTextView.select_region` does not
+        // exist (it is a `Gtk.Label`/`Gtk.Entry` method, and calling it throws), so the empty range
+        // goes through `Gtk.TextBuffer.select_range` with two iters at offset 0.
+        if (target instanceof Gtk.TextView) deselect(target);
+      };
       dialog.connect('map', () => {
+        focusNow();
         GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-          // The dialog may already be gone — a Stop in the same frame — and then there is nothing to
-          // focus and nothing to do.
-          if (this.#dialog !== dialog) return GLib.SOURCE_REMOVE;
-          const target = focusId === null ? rawInput : responseButton(dialog, focusId);
-          target?.grab_focus();
-          // A focused selectable widget selects its text, and a selection over the diff reads as a
-          // grey block — it was visible in the first screenshot of this dialog. On a `Gtk.TextView` the
-          // selection belongs to the *buffer*, not to the widget: `GtkTextView.select_region` does not
-          // exist (it is a `Gtk.Label`/`Gtk.Entry` method, and calling it throws), so the empty range
-          // goes through `Gtk.TextBuffer.select_range` with two iters at offset 0.
-          if (target instanceof Gtk.TextView) deselect(target);
+          focusNow();
           return GLib.SOURCE_REMOVE;
         });
       });
@@ -310,6 +330,24 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
     );
   }
 
+  // The agent's own names for its options, as one caption line — and only when at least one of them says
+  // something the kurier labels do not. Agent text, so `useMarkup: false` like everything else here; and
+  // dimmed, because it is metadata about the buttons rather than part of the question. This is where the
+  // wording went when it came off the buttons, so nothing the agent told the person is lost.
+  const names = agentNames(view.options);
+  if (names !== null) {
+    body.append(
+      new Gtk.Label({
+        label: names,
+        useMarkup: false,
+        wrap: true,
+        selectable: true,
+        xalign: 0,
+        cssClasses: [CSS.dim],
+      }),
+    );
+  }
+
   // The raw input, verbatim, scrollable and capped. `readOnly` + `cursorVisible: false` because this
   // is a thing to read; editable text in an approval dialog invites an edit before an approval, and
   // the answer would be about a request kurier never received.
@@ -343,36 +381,57 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   // into the part of the dialog that reads as the app's own voice — and into the one string that is
   // the app's own voice, which is exactly the line not to cross.
   dialog.set_extra_child(body);
-  // **`add_response` per option, in the agent's own order, with no extra one.** There is no
+  // **`add_response` per option, in kurier's order, with no extra one.** There is no
   // `set_choices` on `Adw.AlertDialog` — `add_responses` is the batch form and takes no appearances,
-  // so the loop is where the appearance belongs anyway. An allowing option is `SUGGESTED`: that is
-  // emphasis, and it is the only emphasis kurier ever applies to a button, because inventing it on a
-  // question kurier does not own is editorialising. A rejecting option keeps the default appearance,
-  // which is what the plan asks for and what libadwaita's own guidance says for a negative response.
+  // so the loop is where the appearance belongs anyway. The order is `view.options`'s, which
+  // `orderOptions` in `core/` already decided; see its comment for the measured reason.
   //
-  // **The label is `optionLabel(option)`, not `option.name`, and the appearance is keyed on `kind`.**
-  // Both come from the same place on purpose: an option's `name` is the agent's to choose, and ACP
-  // lets an agent call its `allow_once` option "Decline". Printing that verbatim gives a
-  // suggested-looking button reading "Decline" that allows, and the person has no way to tell.
-  // `optionLabel` puts kurier's own word — "Allow once" or "Decline" — in front, derived from `kind`,
-  // and keeps the agent's name only when it adds something; it also doubles underscores, because
+  // **The label is `optionLabel(option)` — kurier's own sentence for the kind, and *only* that.** Both
+  // the words and the appearance come from the same place on purpose: an option's `name` is the
+  // agent's to choose, and ACP lets an agent call its `allow_once` option "Decline". Printing that
+  // verbatim gives a suggested-looking button reading "Decline" that allows, and the person has no way
+  // to tell. *Appending* it — the earlier "Allow once: Allow once" shape — fixed that and cost the
+  // button row its legibility: a screenshot read "Always decline: Always decline in thi…", the words
+  // twice with the ellipsis inside the repeat, and at kurier's own 360 px floor it was unreadable. So
+  // the buttons carry four short sentences and the agent's wording moves into the body as one caption
+  // line (`agentNames`), where it can wrap. `optionLabel` still doubles underscores, because
   // `add_response` parses mnemonics and an agent must not choose kurier's Alt accelerator. The
-  // decision and the label therefore cannot disagree: they are the same `kind`.
+  // decision and the label cannot disagree: they are the same `kind`.
   //
-  // **`default_response` is deliberately not set, and that is not the same as leaving focus alone.**
-  // It would decide what the dialog's *default widget* is, and libadwaita's fallback when it is unset
-  // is the last added response — which is whichever option the agent sent last, so an agent that
-  // orders `allow_once` last gets a dialog whose first Enter allows. So kurier sets neither the default
-  // nor the focus implicitly: `show()` puts the focus itself, on the rejecting option's button, from
-  // `initialFocusResponseId` in `core/permission.ts`. The fallback this replaces is measured in
-  // `scripts/probes/alert-dialog-close.mjs` case 9 and the result kurier produces is measured on this
-  // widget by `app/tests/probes/permission-focus.ts`.
+  // **`default_response` IS set, to the decline, and that is the fix for the first frame.**
+  //
+  // With it unset, libadwaita focuses the **first** added response — measured, and it is *not* the
+  // "last added" `Adw-1.gir` claims (`scripts/probes/alert-dialog-close.mjs` case 9 prints both
+  // directions). `orderOptions` puts `reject_once` first so that fallback is a decline, and setting
+  // `default_response` to the decline makes the two agree explicitly rather than by coincidence.
+  //
+  // **The interesting case is an agent that offers no decline at all.** Then there is no safe response
+  // to name, libadwaita's fallback lands on `allow_once` — the first allow — and only kurier's own
+  // `grab_focus` stands between that and a stray Enter. Measured (case 10): a look-alike with two allows
+  // and no `default_response` that does *not* grab reads `Allow once` at its first sample and stays
+  // there, while one that grabs — inside `map` or in an idle — reads the body. So the mitigation for
+  // that case is not a different default but the grab in `show()`, which is why that grab is there.
+  // **`allow_once` is SUGGESTED and `allow_always` is not, which is the one styling decision this loop
+  // makes.** SUGGESTED is emphasis, and libadwaita reads "emphasised" as "this is what you want to
+  // press" — so marking the permanent grant as the suggested one would be kurier *recommending* it,
+  // on a question kurier does not own. Two SUGGESTED buttons would be worse than none: the pattern is
+  // for exactly one response, and two of them make it unclear which. So the ordinary allow carries the
+  // emphasis and "Always allow" keeps the default appearance — visible, pressable, unendorsed. Equally
+  // it is **not** `DESTRUCTIVE`: that appearance means "this undoes something", which is a claim about
+  // the tool call rather than about the button, and a permanent *allow* is not a destructive action.
+  // `reject_always` is left plain for the same reason `allow_always` is — the kind is not the damage.
+  //
+  // `view.options` arrives in `orderOptions`' order, so the *first* response added — the one libadwaita
+  // would focus if kurier lost the focus race — is a decline when a decline was offered at all.
   for (const option of view.options) {
     dialog.add_response(option.optionId, optionLabel(option));
-    if (option.kind.startsWith('allow')) {
+    if (option.kind === 'allow_once') {
       dialog.set_response_appearance(option.optionId, Adw.ResponseAppearance.SUGGESTED);
     }
   }
+  // The default is named here rather than left to the add order, so the two agree on purpose.
+  const declineId = initialFocusResponseId(view.options);
+  if (declineId !== null) dialog.set_default_response(declineId);
   return { dialog, rawInput: rawView };
 }
 

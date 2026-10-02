@@ -158,10 +158,9 @@ let nextRequestId = 1_000_000;
  * Ask the client to run a tool, and wait for what it says.
  *
  * **A request the agent makes of the client, in the direction the schema has it.** The options are
- * all four `session/request_permission` kinds, deliberately: the dialog is supposed to show two of
- * them, and a fixture that only offered `allow_once`/`reject_once` would let a dialog that renders
- * `allow_always` pass against a stand-in that never sent one. Every option the real path has to
- * filter, this sends.
+ * every `session/request_permission` kind kurier can show, by default all four: a fixture that only
+ * offered `allow_once`/`reject_once` would let a dialog that renders `allow_always` — and the ordering,
+ * styling and focus rules that go with it — pass against a stand-in that never sent one.
  *
  * Resolves with whatever came back, `null` for an error answer — **including a `cancelled` outcome,
  * which is a real answer and not a failure here.** That is the point: `KU_STANDIN_PERMISSION=1` plus
@@ -190,15 +189,46 @@ function askPermission(sessionId) {
           content: "export const greeting = 'hello from the stand-in agent';\n",
         },
       },
-      options: [
-        { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
-        { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
-        { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
-        { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
-      ],
+      options: permissionOptions(),
     },
   });
   return answer;
+}
+
+/**
+ * The options this permission request carries, on the wire in the order a real agent would send them.
+ *
+ * **The knob is for the *order* and for the *set*, not for whether "always" exists.** `KU_STANDIN_PERMISSION_ONCE=1`
+ * sends only the two `*_once` kinds — which is what an agent that offers no lasting grant looks like,
+ * and the one shape kurier's dialog has no `reject` to fall back on in a two-allow list. `KU_STANDIN_PERMISSION_ALWAYS_FIRST=1`
+ * lists the two `*_always` options *first*, the order that used to decide where libadwaita put the
+ * focus, so a screenshot can show kurier's order winning rather than the agent's.
+ *
+ * Default all four, in the order a real agent sends them (`opencode acp` included), so the plain
+ * `KU_STANDIN_PERMISSION=1` photographs the dialog kurier actually shows. `reject_always` never goes
+ * missing from the default: without a rejecting option the dialog has nothing safe to focus, and that
+ * is a state worth being able to reach — which is what `KU_STANDIN_PERMISSION_ONCE=1` plus
+ * `KU_STANDIN_PERMISSION_NO_REJECT=1` is for.
+ */
+function permissionOptions() {
+  const allowOnce = { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' };
+  const allowAlways = {
+    optionId: 'allow_always',
+    name: 'Always allow in this session',
+    kind: 'allow_always',
+  };
+  const rejectOnce = { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' };
+  const rejectAlways = {
+    optionId: 'reject_always',
+    name: 'Always decline in this session',
+    kind: 'reject_always',
+  };
+  if (flag('KU_STANDIN_PERMISSION_ONCE')) return [allowOnce, rejectOnce];
+  if (flag('KU_STANDIN_PERMISSION_ALWAYS_FIRST')) {
+    return [allowAlways, rejectAlways, allowOnce, rejectOnce];
+  }
+  if (flag('KU_STANDIN_PERMISSION_NO_REJECT')) return [allowOnce, allowAlways];
+  return [allowOnce, allowAlways, rejectOnce, rejectAlways];
 }
 
 /** Match an incoming answer to the request that is waiting for it. */

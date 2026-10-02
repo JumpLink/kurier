@@ -772,9 +772,12 @@ export class AgentSession {
    * request no agent made, because the transcript is a record of what happened and this did not.
    *
    * **The option ids are the schema's own kinds with fixture ids**, because the *kinds* are what the
-   * gate filters on and a fixture with invented kinds would exercise nothing. Both spellings of
-   * "always" are on the wire here, which is the point: the dialog must not show them, because kurier
-   * keeps nothing and so cannot honour them.
+   * projection reads and a fixture with invented kinds would exercise nothing. All four kinds are on
+   * the wire here, which is the point: a dialog photographed with only two buttons would not show that
+   * kurier relays the `*_always` kinds, nor the three things that makes them safe — that they are added
+   * in `orderOptions`' order (`reject_once` first, so libadwaita's own focus fallback is a decline),
+   * that only `allow_once` carries `SUGGESTED`, and that the labels are kurier's four short sentences
+   * with the agent's own wording demoted to one caption line in the body.
    *
    * Resolves with the answer that was reached, so a caller can log it; nothing in the window waits on
    * it, and no protocol object is sent anywhere — there is no agent on the wire for this one.
