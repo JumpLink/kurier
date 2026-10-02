@@ -183,8 +183,8 @@ export default async () => {
     await it('folds cwd into --directory and drops it from the returned command', async () => {
       // cwd is now a property of the HOST process. Left on the returned command it would also be
       // applied to the sandbox-side flatpak-spawn, which fails ENOENT on a host-only path.
-      const rewritten = toHostCommand({ ...OPENCODE, cwd: '/home/jumplink/proj' }, SANDBOXED);
-      expect(rewritten.args).toContain('--directory=/home/jumplink/proj');
+      const rewritten = toHostCommand({ ...OPENCODE, cwd: '/home/someone/proj' }, SANDBOXED);
+      expect(rewritten.args).toContain('--directory=/home/someone/proj');
       expect(rewritten.cwd).toBe(undefined);
     });
 
