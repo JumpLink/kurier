@@ -2,7 +2,7 @@
  * From "which agent" to the `AgentCommand` that starts it — pure over detections.
  *
  * Three questions, kept apart: an **explicit** id (`--agent`, `KU_APP_AGENT`) wins and is the launcher as
- * written; **no choice** goes through `resolveAgent` (host install, else the bundled copy); a **recorded**
+ * written; **no choice** goes through `resolveAgent` (the setting, else host install, else the bundled copy); a **recorded**
  * agent (resume, cancel) is the session's own id, never a re-resolution to some other agent.
  *
  * A bundled detection becomes a `bundledCommand`: the program under `BUNDLED_PREFIX`, run in the sandbox,
@@ -13,6 +13,7 @@ import { dirname } from 'node:path';
 
 import { BUNDLED_AGENTS, bundledProgram, type BundledAgent } from './catalog.ts';
 import { resolveAgent, type AgentDetection } from './detect.ts';
+import type { AgentChoice } from '../settings.ts';
 import { isolationEnv, type IsolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
 import type { AgentCommand } from './stdio.ts';
@@ -82,13 +83,37 @@ function resolved(detection: AgentDetection, context: ResolveContext): ResolvedA
   return null;
 }
 
+/** The default agent and what to tell the person about how it was chosen. */
+export interface DefaultResolution {
+  readonly agent: ResolvedAgent | null;
+  /** The unavailable-setting sentence (`resolveAgent`), or `null`. The caller shows it. */
+  readonly note: string | null;
+}
+
 /**
- * The agent to start when the person said nothing. `null` means there is none: the caller prints
- * `NO_AGENT_MESSAGE`.
+ * The agent to start when the person said nothing: the setting, else host, else bundled. `agent: null`
+ * means there is none — the caller prints `NO_AGENT_MESSAGE` — and `note` may still say why the setting
+ * could not be honoured.
  */
-export function resolveDefault(context: ResolveContext): ResolvedAgent | null {
-  const chosen = resolveAgent({ setting: null, detections: context.detections });
-  return chosen ? resolved(chosen, context) : null;
+export function resolveDefaultWithNote(
+  context: ResolveContext,
+  setting: AgentChoice | null,
+): DefaultResolution {
+  const { detection, note } = resolveAgent({
+    setting,
+    detections: context.detections,
+    bundledAvailable: context.bundledAvailable,
+    ...(context.catalog ? { catalog: context.catalog } : {}),
+  });
+  return { agent: detection ? resolved(detection, context) : null, note };
+}
+
+/** `resolveDefaultWithNote` without the note, for a caller with nothing to report it to. */
+export function resolveDefault(
+  context: ResolveContext,
+  setting: AgentChoice | null = null,
+): ResolvedAgent | null {
+  return resolveDefaultWithNote(context, setting).agent;
 }
 
 /** The agent a session recorded, or the reason it cannot be started. */

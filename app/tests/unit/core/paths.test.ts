@@ -3,7 +3,7 @@ import { describe, expect, it } from '@gjsify/unit';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { dataDir, sessionsFile, xdgDataHome } from '../../../src/core/paths.ts';
+import { dataDir, sessionsFile, settingsFile, xdgConfigHome, xdgDataHome } from '../../../src/core/paths.ts';
 
 const XDG_DEFAULT = join(homedir(), '.local', 'share');
 
@@ -40,6 +40,26 @@ export default async () => {
     await it('the default path ends in kurier/sessions.json', async () => {
       expect(sessionsFile({})).toBe(join(XDG_DEFAULT, 'kurier', 'sessions.json'));
       expect(sessionsFile({}).endsWith(join('kurier', 'sessions.json'))).toBe(true);
+    });
+  });
+
+  await describe('settingsFile', async () => {
+    await it('honors KURIER_SETTINGS_FILE', async () => {
+      expect(settingsFile({ KURIER_SETTINGS_FILE: '/tmp/my-settings.json' })).toBe('/tmp/my-settings.json');
+    });
+
+    await it('lives under the config home, not the data home', async () => {
+      expect(settingsFile({ XDG_CONFIG_HOME: '/custom/config', XDG_DATA_HOME: '/custom/data' })).toBe(
+        '/custom/config/kurier/settings.json',
+      );
+    });
+
+    await it('defaults to ~/.config/kurier/settings.json', async () => {
+      expect(settingsFile({})).toBe(join(homedir(), '.config', 'kurier', 'settings.json'));
+    });
+
+    await it('ignores a relative XDG_CONFIG_HOME', async () => {
+      expect(xdgConfigHome({ XDG_CONFIG_HOME: 'relative' })).toBe(join(homedir(), '.config'));
     });
   });
 };

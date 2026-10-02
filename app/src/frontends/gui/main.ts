@@ -28,8 +28,9 @@ import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/sessi
 
 import { chooseAgent } from '../../core/agents/dev-agent.ts';
 import { gatherResolveContext } from '../../core/agents/probe.ts';
-import { NO_AGENT_MESSAGE, resolveDefault } from '../../core/agents/resolve.ts';
-import { sessionsFile } from '../../core/paths.ts';
+import { NO_AGENT_MESSAGE, resolveDefaultWithNote } from '../../core/agents/resolve.ts';
+import { sessionsFile, settingsFile } from '../../core/paths.ts';
+import { readSettings } from '../../core/settings.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
 import { MainWindow } from './window.ts';
@@ -47,6 +48,13 @@ void Gtk;
 const hooks = readHooks();
 
 /**
+ * What the settings said about themselves: an unreadable file, or a choice that is not available here.
+ * **Carried as values, printed to the terminal for now** — the window shows them in a later slice, and
+ * until then a person watching the terminal is the only one who can be told.
+ */
+const settingsNotes: string[] = [];
+
+/**
  * Which agent this window will start on its first prompt.
  *
  * **Resolved once, here, and handed to the window as an `AgentCommand`.** The alternative — the window
@@ -54,14 +62,21 @@ const hooks = readHooks();
  * and `hooks.ts` exists precisely so that every environment read happens once at startup and can be
  * reasoned about as a whole. An unknown id prints its line here, where a person watching the terminal
  * will see it, and falls back rather than refusing to start. With no hook the agent is resolved as the CLI
- * resolves it: the person's own install, else the bundled copy.
+ * resolves it: the saved setting if it is available, else the person's own install, else the bundled copy.
  */
 const agent = chooseAgent(hooks.agent, () => {
+  const { settings, problem } = readSettings(settingsFile());
+  if (problem) settingsNotes.push(problem);
   // No `--version` spawn: the window must not wait on a child before it appears.
-  const found = resolveDefault(gatherResolveContext(process.env, false));
+  const { agent: found, note } = resolveDefaultWithNote(
+    gatherResolveContext(process.env, false),
+    settings.agent,
+  );
+  if (note) settingsNotes.push(note);
   if (!found) console.log(`kurier: ${NO_AGENT_MESSAGE}`);
   return found;
 });
+for (const note of settingsNotes) console.log(`kurier: ${note}`);
 if (agent.note) console.log(`kurier: ${agent.note}`);
 
 const status = await runAdwaitaApp({

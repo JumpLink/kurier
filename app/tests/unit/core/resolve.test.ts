@@ -17,6 +17,7 @@ import {
   describeResolved,
   NO_AGENT_MESSAGE,
   resolveDefault,
+  resolveDefaultWithNote,
   resolveRecorded,
   type ResolveContext,
 } from '../../../src/core/agents/resolve.ts';
@@ -127,6 +128,66 @@ export default async () => {
     await it('is null for a detection whose launcher or catalog entry is missing', async () => {
       expect(resolveDefault(context([detection('ghost', 'host')]))).toBe(null);
       expect(resolveDefault(context([detection('ghost', 'bundled')]))).toBe(null);
+    });
+  });
+
+  await describe('resolveDefaultWithNote (the setting)', async () => {
+    await it('a host setting runs the host install, no note', async () => {
+      const result = resolveDefaultWithNote(context([detection('alpha', 'host', '1.0.0')], ['alpha']), {
+        id: 'alpha',
+        source: 'host',
+      });
+      expect(result.agent!.source).toBe('host');
+      expect(result.agent!.command.bundled).toBe(undefined);
+      expect(result.note).toBe(null);
+    });
+
+    await it('a bundled setting runs the bundled copy even when a host install shadows it', async () => {
+      const result = resolveDefaultWithNote(context([detection('alpha', 'host', '1.0.0')], ['alpha']), {
+        id: 'alpha',
+        source: 'bundled',
+      });
+      expect(result.agent!.source).toBe('bundled');
+      expect(result.agent!.command.bundled).toBe(true);
+      expect(result.agent!.version).toBe('9.9.9');
+      expect(result.agent!.isolation).toStrictEqual(isolationDirs(DATA, 'alpha'));
+      expect(result.note).toBe(null);
+    });
+
+    await it('an unavailable bundled setting falls to the host install and says so', async () => {
+      const result = resolveDefaultWithNote(context([detection('alpha', 'host')]), {
+        id: 'alpha',
+        source: 'bundled',
+      });
+      expect(result.agent!.source).toBe('host');
+      expect(result.note).toContain('the bundled alpha');
+      expect(result.note).toContain('using alpha (host) instead');
+    });
+
+    await it('an unavailable host setting falls to the bundled copy and says so', async () => {
+      const result = resolveDefaultWithNote(context([detection('alpha', 'bundled')], ['alpha']), {
+        id: 'alpha',
+        source: 'host',
+      });
+      expect(result.agent!.source).toBe('bundled');
+      expect(result.note).toContain('your own alpha');
+    });
+
+    await it('with nothing available the agent is null and the note remains', async () => {
+      const result = resolveDefaultWithNote(context([detection('alpha', 'none')]), {
+        id: 'alpha',
+        source: 'host',
+      });
+      expect(result.agent).toBe(null);
+      expect(result.note).not.toBe(null);
+    });
+
+    await it('resolveDefault takes the setting as a second argument', async () => {
+      const found = resolveDefault(context([detection('alpha', 'host')], ['alpha']), {
+        id: 'alpha',
+        source: 'bundled',
+      });
+      expect(found!.source).toBe('bundled');
     });
   });
 

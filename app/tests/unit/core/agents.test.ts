@@ -14,7 +14,7 @@ import {
 } from '../../../src/core/agents/launcher.ts';
 import type { SandboxFacts } from '../../../src/core/agents/sandbox.ts';
 import type { AgentDetection } from '../../../src/core/agents/detect.ts';
-import { agentsReport } from '../../../src/frontends/cli/agents.ts';
+import { agentsReport, settingsReport } from '../../../src/frontends/cli/agents.ts';
 
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };
 const NOT_SANDBOXED: SandboxFacts = { flatpakInfoExists: false };
@@ -178,6 +178,26 @@ export default async () => {
       expect(lines[1]!.includes('NOT FOUND')).toBe(true);
       expect(lines[1]!.includes('bundled')).toBe(false);
       expect(lines[lines.length - 1]!.startsWith('kurier would use: none')).toBe(true);
+    });
+  });
+
+  await describe('kurier agents — the setting lines', async () => {
+    await it('names the setting and where the file is', async () => {
+      const lines = settingsReport(
+        '/synthetic/config/kurier/settings.json',
+        { version: 1, agent: { id: 'opencode', source: 'bundled' } },
+        null,
+      );
+      expect(lines).toStrictEqual([
+        'setting: the bundled opencode',
+        'settings file: /synthetic/config/kurier/settings.json',
+      ]);
+    });
+
+    await it('says "none" for no setting, and carries a file problem', async () => {
+      const lines = settingsReport('/synthetic/s.json', { version: 1, agent: null }, 'bad — using defaults');
+      expect(lines[0]).toBe('setting: none (host, else bundled)');
+      expect(lines[2]).toBe('settings problem: bad — using defaults');
     });
   });
 };

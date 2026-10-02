@@ -30,6 +30,7 @@ import isolation from './unit/core/isolation.test.ts';
 import resolve from './unit/core/resolve.test.ts';
 import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
+import settings from './unit/core/settings.test.ts';
 import scroll from './unit/core/scroll.test.ts';
 import sessionGroups from './unit/core/session-groups.test.ts';
 import transcriptItems from './unit/core/transcript-items.test.ts';
@@ -67,6 +68,7 @@ run({
   resolve,
   devAgent,
   paths,
+  settings,
   scroll,
   sessionGroups,
   transcriptItems,

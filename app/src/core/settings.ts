@@ -1,0 +1,175 @@
+/**
+ * What a person chose, kept between runs: today only which agent to start.
+ *
+ * **No secret can live here, by construction.** `parseSettings` is an allowlist — `version`, `agent`,
+ * and inside `agent` an `id` and a `source` — so a `token`, `apiKey` or `password` is rejected as an
+ * unknown field (and named as secret-looking, so the message says why). kurier stores no credential
+ * (AGENTS.md § Privacy); a setting is a preference, and the file is `derived`: choosing again
+ * recreates it.
+ *
+ * **A bad file never stops startup.** `readSettings` returns the defaults plus a `problem` the caller
+ * reports; only a write that fails throws, because that one is a person's explicit action.
+ *
+ * `AgentChoice` names a launcher id *and* a source, so "the bundled opencode" and "my opencode" are two
+ * different choices: they keep separate logins and histories (`core/agents/isolation.ts`).
+ */
+
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
+
+export type AgentChoiceSource = 'host' | 'bundled';
+
+export interface AgentChoice {
+  readonly id: string;
+  readonly source: AgentChoiceSource;
+}
+
+export interface Settings {
+  readonly version: 1;
+  readonly agent: AgentChoice | null;
+}
+
+export const SETTINGS_VERSION = 1;
+
+export const DEFAULT_SETTINGS: Settings = { version: SETTINGS_VERSION, agent: null };
+
+export type ParsedSettings = { readonly settings: Settings } | { readonly problem: string };
+
+const ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/i;
+const SECRET_LOOKING = /token|secret|password|passwd|credential|auth|api[-_]?key|key/i;
+
+function unknownField(path: string, key: string): string {
+  return SECRET_LOOKING.test(key)
+    ? `unknown field "${path}${key}" — settings hold no credential, so a secret-looking field is never accepted`
+    : `unknown field "${path}${key}"`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** "the bundled opencode" / "your own opencode" — one phrase, so every message names a choice alike. */
+export function describeChoice(choice: AgentChoice): string {
+  return choice.source === 'bundled' ? `the bundled ${choice.id}` : `your own ${choice.id}`;
+}
+
+/**
+ * The settings in a file's text. Pure: a clear `problem` for anything this version does not know —
+ * invalid JSON, an unknown version, an unknown field — never a throw.
+ */
+export function parseSettings(raw: string): ParsedSettings {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    return { problem: `not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (!isRecord(value)) return { problem: 'not a settings object' };
+  for (const key of Object.keys(value)) {
+    if (key !== 'version' && key !== 'agent') return { problem: unknownField('', key) };
+  }
+  if (value['version'] !== SETTINGS_VERSION) {
+    return {
+      problem: `settings version ${JSON.stringify(value['version'])} is not known (this kurier reads version ${SETTINGS_VERSION})`,
+    };
+  }
+  const agent = value['agent'];
+  if (agent === undefined || agent === null) return { settings: DEFAULT_SETTINGS };
+  if (!isRecord(agent)) return { problem: '"agent" must be an object with an id and a source, or null' };
+  for (const key of Object.keys(agent)) {
+    if (key !== 'id' && key !== 'source') return { problem: unknownField('agent.', key) };
+  }
+  const { id, source } = agent;
+  if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+    return { problem: '"agent.id" must be a launcher id such as "opencode"' };
+  }
+  if (source !== 'host' && source !== 'bundled') {
+    return { problem: '"agent.source" must be "host" or "bundled"' };
+  }
+  return { settings: { version: SETTINGS_VERSION, agent: { id, source } } };
+}
+
+/**
+ * `<id>`, `<id>:host`, `<id>:bundled` — the spelling `kurier agents --use` takes. A bare id means the
+ * person's own install. `none` clears the choice. `known` limits the ids a person may *write*; the
+ * file itself may still name an id this build lacks, and that is reported at resolution, not here.
+ */
+export function parseChoiceSpec(
+  spec: string,
+  known: readonly string[],
+): { readonly choice: AgentChoice | null } | { readonly problem: string } {
+  const text = spec.trim();
+  if (text === 'none') return { choice: null };
+  const [id = '', source = 'host', ...rest] = text.split(':');
+  if (rest.length > 0 || (source !== 'host' && source !== 'bundled')) {
+    return { problem: `"${spec}" is not <id>, <id>:host or <id>:bundled` };
+  }
+  if (!known.includes(id)) {
+    return { problem: `"${id}" is not an agent launcher — try one of: ${known.join(', ')}` };
+  }
+  return { choice: { id, source } };
+}
+
+export interface SettingsRead {
+  readonly settings: Settings;
+  /** Why the file was not used, or `null`. Defaults stand in whenever this is set. */
+  readonly problem: string | null;
+}
+
+/** The settings at `path`. A missing file is the defaults with no problem; a bad one is the defaults and a problem. */
+export function readSettings(path: string): SettingsRead {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      return { settings: DEFAULT_SETTINGS, problem: null };
+    return {
+      settings: DEFAULT_SETTINGS,
+      problem: `${path} could not be read (${error instanceof Error ? error.message : String(error)}) — using defaults`,
+    };
+  }
+  const parsed = parseSettings(raw);
+  if ('problem' in parsed) {
+    return { settings: DEFAULT_SETTINGS, problem: `${path}: ${parsed.problem} — using defaults` };
+  }
+  return { settings: parsed.settings, problem: null };
+}
+
+/**
+ * Write the settings: a sibling temp file, fsync, rename — the session store's recipe, so a crash leaves
+ * the old file or the new one. File `0600`, a directory kurier creates `0700`. An existing directory is
+ * left alone: `KURIER_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
+ */
+export function writeSettings(path: string, settings: Settings): void {
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    chmodSync(dir, 0o700);
+  }
+  const temp = join(dir, `.settings-${process.pid}-${Date.now()}.tmp`);
+  try {
+    writeFileSync(temp, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });
+    const handle = openSync(temp, 'r+');
+    try {
+      fsyncSync(handle);
+    } finally {
+      closeSync(handle);
+    }
+    renameSync(temp, path);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
+}

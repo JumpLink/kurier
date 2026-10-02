@@ -1,18 +1,20 @@
 /**
  * Which agent a command starts — the shared step of `start`, `resume`, `cancel` and `auth`.
  *
- * An explicit `--agent` is the launcher as written, as before. With none, `resolveDefault` picks the
- * person's own install, else the bundled copy. A session that recorded its agent gets that agent back
+ * An explicit `--agent` is the launcher as written, as before. With none, `resolveDefaultWithNote` picks the
+ * available setting, else the person's own install, else the bundled copy. A session that recorded its agent gets that agent back
  * (`resolveRecorded`), never a fresh resolution. Each function prints its reason and sets the exit code
  * when it has nothing to return, so a handler only has to stop.
  */
 
 import { requireLauncher } from '../../core/agents/launcher.ts';
+import { settingsFile } from '../../core/paths.ts';
+import { readSettings } from '../../core/settings.ts';
 import { gatherResolveContext } from '../../core/agents/probe.ts';
 import {
   describeResolved,
   NO_AGENT_MESSAGE,
-  resolveDefault,
+  resolveDefaultWithNote,
   resolveRecorded,
   type ResolvedAgent,
   type ResolvedSource,
@@ -31,7 +33,10 @@ export function agentForNew(explicit: string | undefined): ResolvedAgent | null 
   if (explicit) {
     return { command: requireLauncher(explicit), source: 'host', version: null, isolation: null };
   }
-  const found = resolveDefault(gatherResolveContext());
+  const { settings, problem } = readSettings(settingsFile());
+  if (problem) err(`  ${problem}`);
+  const { agent: found, note } = resolveDefaultWithNote(gatherResolveContext(), settings.agent);
+  if (note) err(`  ${note}`);
   if (!found) {
     err(NO_AGENT_MESSAGE);
     process.exitCode = 1;

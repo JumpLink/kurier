@@ -140,7 +140,7 @@ export interface MainWindowOptions {
    * error page instead of killing the app before there is a window to say why.
    */
   readonly loadSessions: () => readonly SessionRecord[];
-  /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else host install, else bundled. */
+  /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else the available setting, else host install, else bundled. */
   readonly agent: AgentCommand;
   /** Persist streamed transcript lines. Called once per arriving batch, in order. */
   readonly appendTurns?: (sessionId: string, entries: TranscriptEntry[]) => void;

@@ -37,7 +37,7 @@ export interface KurierHooks extends FrameworkHooks {
   session?: string;
 
   /**
-   * `KU_APP_AGENT` — which agent this window talks to. Unset means what the CLI resolves: the person's own install, else the bundled copy.
+   * `KU_APP_AGENT` — which agent this window talks to. Unset means what the CLI resolves: the saved setting if available, else the person's own install, else the bundled copy.
    *
    * Not an `AgentCommand` and not a path: an *agent id*, resolved in `core/agents/dev-agent.ts`. The
    * two accepted values are a real launcher (`opencode`) and `stand-in`, the dev fixture — and the

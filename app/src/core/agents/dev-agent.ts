@@ -67,7 +67,7 @@ export function standInCommand(script: string = standInScriptPath()): AgentComma
   };
 }
 
-export interface AgentChoice {
+export interface DevAgentChoice {
   readonly command: AgentCommand;
   /** A line the caller should print, or `null` when there is nothing to explain. */
   readonly note: string | null;
@@ -84,10 +84,10 @@ export interface AgentChoice {
 export function chooseAgent(
   id: string | undefined | null,
   resolveDefault: () => ResolvedAgent | null = () => null,
-): AgentChoice {
+): DevAgentChoice {
   const wanted = id?.trim();
   if (!wanted) {
-    // No explicit choice: the person's own install, else the bundled copy. With neither, the launcher
+    // No explicit choice: the available setting, else the person's own install, else the bundled copy. With neither, the launcher
     // stays the command, so the window starts and its composer says why the agent will not (the same
     // failure as before the bundled copy existed).
     const found = resolveDefault();

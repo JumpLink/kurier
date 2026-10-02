@@ -11,11 +11,19 @@
 import type { CommandModule } from 'yargs';
 
 import { resolveAgent, detectAgents, type AgentDetection } from '../../core/agents/detect.ts';
-import { DEFAULT_AGENT, LAUNCHERS } from '../../core/agents/launcher.ts';
+import { DEFAULT_AGENT, LAUNCHERS, launcherIds } from '../../core/agents/launcher.ts';
 import { gatherAgentFacts } from '../../core/agents/probe.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
+import { settingsFile } from '../../core/paths.ts';
+import {
+  describeChoice,
+  parseChoiceSpec,
+  readSettings,
+  writeSettings,
+  type Settings,
+} from '../../core/settings.ts';
 
-import { err, out } from './output.ts';
+import { err, out, pickArgv } from './output.ts';
 
 const SOURCE_LABEL = { host: 'host', bundled: 'bundled', none: 'not found' } as const;
 
@@ -55,14 +63,54 @@ export function agentsReport(
   return lines;
 }
 
+/** Where the setting lives and what it says, as text. Pure: the file's content is an argument. */
+export function settingsReport(file: string, settings: Settings, problem: string | null): string[] {
+  const lines = [`setting: ${settings.agent ? describeChoice(settings.agent) : 'none (host, else bundled)'}`];
+  lines.push(`settings file: ${file}`);
+  if (problem) lines.push(`settings problem: ${problem}`);
+  return lines;
+}
+
 const command: CommandModule = {
   command: 'agents',
   describe: 'list the agent launchers kurier knows how to start',
-  builder: (yargs) => yargs.strict(),
-  handler: () => {
-    const detections = detectAgents(gatherAgentFacts());
-    const chosen = resolveAgent({ setting: null, detections });
+  builder: (yargs) =>
+    yargs
+      .option('use', {
+        type: 'string',
+        describe: 'remember which agent to start: <id>, <id>:host, <id>:bundled, or none to clear',
+      })
+      .strict(),
+  handler: (argv) => {
+    const file = settingsFile();
+    const use = pickArgv<string>(argv as Record<string, unknown>, 'use');
+    if (use !== undefined) {
+      const parsed = parseChoiceSpec(use, launcherIds());
+      if ('problem' in parsed) {
+        err(parsed.problem);
+        process.exitCode = 1;
+        return;
+      }
+      try {
+        writeSettings(file, { version: 1, agent: parsed.choice });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? 'unknown error';
+        err(`could not write ${file}: ${code}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+    const { settings, problem } = readSettings(file);
+    const facts = gatherAgentFacts();
+    const detections = detectAgents(facts);
+    const { detection: chosen, note } = resolveAgent({
+      setting: settings.agent,
+      detections,
+      bundledAvailable: (id) => facts.find((fact) => fact.id === id)?.bundledExists === true,
+    });
     for (const line of agentsReport(LAUNCHERS, detections, chosen)) out(line);
+    for (const line of settingsReport(file, settings, problem)) out(line);
+    if (note) err(note);
     err('* the default for --agent');
   },
 };

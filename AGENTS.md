@@ -52,7 +52,12 @@ fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/R
 `detectAgents` ignores a host hit under the prefix; `resolveAgent` takes the setting, else the first
 host install, else the first bundled copy (`core/agents/detect.ts`, pure over facts gathered by
 `probe.ts`). The catalog's `env` is flags only, never a credential.
-With no `--agent`/`KU_APP_AGENT`, every command and the window use that resolution; `resume` and `cancel`
+The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `core/settings.ts`, in
+`$XDG_CONFIG_HOME/kurier/settings.json` (`KURIER_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
+precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
+unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
+`kurier agents --use <id>[:bundled|host]|none` writes it.
+With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
 `toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under
 `<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real

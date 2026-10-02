@@ -11,6 +11,7 @@
  * to prevent. Its `--version` is dropped with it.
  */
 
+import { describeChoice, type AgentChoice } from '../settings.ts';
 import { BUNDLED_AGENTS, BUNDLED_PREFIX, bundledProgram, type BundledAgent } from './catalog.ts';
 
 /** What the machine said about one launcher id. */
@@ -63,23 +64,54 @@ export function detectAgents(
   });
 }
 
+export interface Resolution {
+  readonly detection: AgentDetection | null;
+  /** Said when the setting named something unavailable: what was asked, and what runs instead. */
+  readonly note: string | null;
+}
+
 /**
  * The agent kurier would use now: the setting if that agent is available, else the first host install,
  * else the first bundled copy, else `null`.
+ *
+ * A setting names an id *and* a source. `host` is available when the id was found on the person's PATH;
+ * `bundled` when the shipped copy exists — even if a host install of the same id shadows it in
+ * `detections`, which is why `bundledAvailable` is asked separately. **A setting that cannot be honoured is
+ * never skipped quietly:** the fallback is chosen and `note` says what was asked and what runs instead.
  *
  * A person's own install comes before the bundled one because it is the one that carries their login and
  * config; kurier cannot tell whether either is logged in and does not try (AGENTS.md § Privacy).
  */
 export function resolveAgent(input: {
-  readonly setting: string | null;
+  readonly setting: AgentChoice | null;
   readonly detections: readonly AgentDetection[];
-}): AgentDetection | null {
+  readonly bundledAvailable?: (id: string) => boolean;
+  readonly catalog?: readonly BundledAgent[];
+}): Resolution {
   const { setting, detections } = input;
-  const chosen = setting === null ? undefined : detections.find((entry) => entry.id === setting);
-  if (chosen && chosen.source !== 'none') return chosen;
-  return (
+  const found = (id: string) => detections.find((entry) => entry.id === id);
+  const bundledAvailable = input.bundledAvailable ?? ((id: string) => found(id)?.source === 'bundled');
+  if (setting) {
+    const detected = found(setting.id);
+    if (setting.source === 'host' && detected?.source === 'host') return { detection: detected, note: null };
+    const entry = (input.catalog ?? BUNDLED_AGENTS).find((candidate) => candidate.id === setting.id);
+    if (setting.source === 'bundled' && entry && bundledAvailable(setting.id)) {
+      return {
+        detection: { id: entry.id, source: 'bundled', path: bundledProgram(entry), version: entry.version },
+        note: null,
+      };
+    }
+  }
+  const fallback =
     detections.find((entry) => entry.source === 'host') ??
     detections.find((entry) => entry.source === 'bundled') ??
-    null
-  );
+    null;
+  if (!setting) return { detection: fallback, note: null };
+  const asked = `your setting names ${describeChoice(setting)}, which is not available here`;
+  return {
+    detection: fallback,
+    note: fallback
+      ? `${asked} — using ${fallback.id} (${fallback.source}) instead; choose again with \`kurier agents --use\``
+      : `${asked}, and no other agent is available either`,
+  };
 }
