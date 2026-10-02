@@ -69,7 +69,7 @@ import type { AgentCommand } from '../../core/agents/stdio.ts';
 import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
-import { failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
+import { failureAction, failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
 import { agentStatus } from '../../core/turn.ts';
 import {
   APP_NAME,
@@ -173,7 +173,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   readonly #permissions: PermissionDialog;
   /**
-   * The modal a start failure earns. Plan §6's auth trap and its reattach refusal.
+   * The modal a failure earns: plan §6's auth trap, its reattach refusal, and a provider refusal after
+   * a prompt was sent (issue #2, which offers a different model).
    *
    * **Its own field, and only ever raised from `#onSnapshot`.** What to say is `core/failure.ts`'s
    * decision; all this file does is notice that the controller reported a failure *of a kind that has
@@ -225,19 +226,27 @@ export class MainWindow extends Adw.ApplicationWindow {
   #permissionTicks = 0;
 
   /**
-   * `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`, and the one timer that runs both.
+   * `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`, and the one timer that runs all
+   * three.
    *
-   * **One state object and one timer for two hooks, because they are one photograph.** "The person
-   * closes the dialog" and "the person opens another conversation" are the same moment seen from two
-   * sides, and running them from two timers would let the second one fire in between and photograph a
-   * walk that nobody made.
+   * **One state object and one timer for the failure-dialog hooks, because they are one photograph.**
+   * "The person closes the dialog", "the person picks another model" and "the person opens another
+   * conversation" are the same moment seen from three sides, and running them from three timers would
+   * let the second one fire in between and photograph a walk that nobody made.
    *
    * `waiting` is the half that is not a timestamp: the hooks do nothing until a failure is *on
    * screen*, because a dismissal before the dialog exists dismisses nothing and a session switch
    * before the failure is just a different starting point.
    */
-  #failureHooks: { dismiss: boolean; switchTo: string[]; waiting: boolean; source: number | null } = {
+  #failureHooks: {
+    dismiss: boolean;
+    chooseModel: boolean;
+    switchTo: string[];
+    waiting: boolean;
+    source: number | null;
+  } = {
     dismiss: false,
+    chooseModel: false,
     switchTo: [],
     waiting: false,
     source: null,
@@ -483,9 +492,10 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /**
-   * Put up the dialog a start failure has earned — **once per failure, and never a stale one.**
+   * Put up the dialog a failure has earned — **once per failure, and never a stale one.**
    *
-   * Two decisions, both made in `core/failure.ts` and both about as easy to get wrong as they look:
+   * Three decisions, all of them made in `core/failure.ts` and all about as easy to get wrong as they
+   * look:
    *
    * - `failureToShow(attachment, shown)` — is this failure still owed a dialog? It is `null` for a
    *   failure this window has already shown (identity, not "is one open": a dismissal closes the dialog
@@ -494,6 +504,10 @@ export class MainWindow extends Adw.ApplicationWindow {
    * - `staleDialog(shown, attachment)` — is a dialog that is up now about something the window has
    *   moved on from? A dialog is modal, so one left up over an attached agent or another session both
    *   lies and blocks the window.
+   * - `failureAction(notice, { modelChoice })` — may the dialog carry its button? The `'model'` notice
+   *   (a provider refusal, issue #2) offers "Choose another model", and it may only if the agent
+   *   reported a model option at all. Without one the button would open nothing, so the dialog is
+   *   built with Close alone and the sentence still says what to do instead.
    *
    * **`#shownFailure` is only forgotten when a dialog is genuinely closed as stale.** Clearing it on
    * every session switch would put the *same* auth dialog straight back up, because the attachment is
@@ -509,7 +523,32 @@ export class MainWindow extends Adw.ApplicationWindow {
     const notice: FailureNotice | null = failureToShow(attachment, this.#shownFailure);
     if (notice === null) return;
     this.#shownFailure = attachment;
-    this.#failures.show(notice, this);
+    const action = failureAction(notice, { modelChoice: this.#config.hasModelControl() });
+    this.#failures.show(
+      notice,
+      this,
+      action === 'choose-model' ? { onChooseModel: () => this.#openModelDropdown() } : {},
+    );
+  }
+
+  /**
+   * Open the model dropdown, for the failure dialog's "Choose another model".
+   *
+   * **Through the row's own method and nothing else** — no `set_selected`, no request, no value. A
+   * dialog that picked a model on the person's behalf would be kurier deciding configuration for the
+   * agent, which is the "always allow" mistake in different clothes; what this does is put the list in
+   * front of them.
+   *
+   * **One line in the log either way, and that is deliberate.** The pointer cannot press this button —
+   * `ActivateWidget` on an `Adw.AlertDialog` response reports `true` and emits no `response` (measured,
+   * `scripts/probes/alert-dialog-close.mjs`), which is why the whole dismissal half of a failure dialog
+   * needed a hook. So a screenshot run has to be able to say afterwards whether the button reached the
+   * dropdown or whether there was no model option to open, and "no log line" would not distinguish
+   * "worked" from "never ran".
+   */
+  #openModelDropdown(): void {
+    const opened = this.#config.openModelDropdown();
+    console.log(`kurier: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
   }
 
   /**
@@ -694,14 +733,15 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /**
-   * Arm `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`.
+   * Arm `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`.
    *
-   * **Both are about one control that nothing outside the process can press.** `ActivateWidget` on the
-   * failure dialog's response button reports `true` and dismisses nothing, and neither can a pointer
-   * (measured; `hooks.ts` has the three-way result), so the sidebar row and the dialog's own Close
-   * are the last two pointer-only controls in this window. A guard that cannot be observed is a guard
-   * that has not been checked, and the guard in question is the one that decides whether a failure is
-   * shown once or on every state move.
+   * **All three are about controls that nothing outside the process can press.** `ActivateWidget` on the
+   * failure dialog's response button reports `true` and dismisses nothing, `Adw.AlertDialog` has no
+   * callable `response()`, and neither can a pointer (measured; `hooks.ts` has the three-way result), so
+   * the sidebar row, the dialog's own Close and the dialog's model button are the last three
+   * pointer-only controls in this window. A guard that cannot be observed is a guard that has not been
+   * checked, and the guards in question are the ones that decide whether a failure is shown once or on
+   * every state move, and whether its one button reaches the dropdown it names.
    *
    * **Armed but idle until a failure is on screen** — see `#failureHooksStep`. Nothing here runs at
    * startup, so a run that sets these hooks and never fails is a run that did what it was asked and
@@ -709,8 +749,9 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #applyFailureHooks(hooks: KurierHooks): void {
     const switchTo = hooks.switchTo ?? [];
-    if (hooks.dismissFailure !== true && switchTo.length === 0) return;
+    if (hooks.dismissFailure !== true && hooks.chooseModel !== true && switchTo.length === 0) return;
     this.#failureHooks.dismiss = hooks.dismissFailure === true;
+    this.#failureHooks.chooseModel = hooks.chooseModel === true;
     this.#failureHooks.switchTo = [...switchTo];
     this.#failureHooks.waiting = true;
     this.#failureHooks.source = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FAILURE_HOOK_STEP_MS, () =>
@@ -730,8 +771,14 @@ export class MainWindow extends Adw.ApplicationWindow {
    * **The dismissal is the dialog's own `close()`, and that *is* the person's Close.** This dialog has
    * one response, and `scripts/probes/alert-dialog-close.mjs` (case 1) measures that an external
    * `close()` emits `closed` and then `response("close")` — the same pair with the same argument the
-   * button produces. There is no second way to dismiss it: `Adw.AlertDialog` has no callable
-   * `response()`, which the same probe records.
+   * button produces. That is still right on the `'model'` dialog, which has a second response: the
+   * dismissal reports `"close"` and never the remedy.
+   *
+   * **The other arm is a press, and it goes through the dialog too.** `KU_APP_CHOOSE_MODEL` calls
+   * `FailureDialog.chooseModel()`, which emits the `response` signal libadwaita's own handler answers
+   * to — so the modal takes itself down and the dropdown opens in libadwaita's order. Calling
+   * `ConfigRow.openModelDropdown()` directly would photograph a popover with the modal still up, which
+   * is not a state a person can be in.
    */
   #failureHooksStep(): boolean {
     const hooks = this.#failureHooks;
@@ -748,6 +795,26 @@ export class MainWindow extends Adw.ApplicationWindow {
         // session switch causes, and a walk that began in the same tick would be photographed with
         // the dialog never having been visibly closed.
         return GLib.SOURCE_CONTINUE;
+      }
+      if (hooks.chooseModel) {
+        // **One press, and the log says whether it happened.** `chooseModel` answers `false` for a
+        // dialog that is not up or that carries no such response — which is the state this run *should*
+        // be in with `KU_STANDIN_CONFIG` unset, and a screenshot in that state has to be recognisable
+        // as "the button was never offered" rather than as a broken fixture.
+        const pressed = this.#failures.chooseModel();
+        console.log(
+          `kurier: KU_APP_CHOOSE_MODEL — ${
+            pressed ? 'pressing Choose another model' : 'the dialog offers no such button'
+          }`,
+        );
+        hooks.chooseModel = false;
+        // **The timer stops here**, so a `KU_APP_SWITCH` walk in the same run is not photographed over
+        // an open popover: one press is the whole photograph, and the walk would close the session the
+        // dropdown is standing in. The popover appears inside that call and paints on the next frame.
+        if (pressed) {
+          hooks.source = null;
+          return GLib.SOURCE_REMOVE;
+        }
       }
     }
     const next = hooks.switchTo.shift();

@@ -39,6 +39,7 @@
  * | `KU_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
  * | `KU_STANDIN_USAGE`          | unset   | Push a `usage_update` after the answer, cost and all.                     |
  * | `KU_STANDIN_AUTH`           | unset   | Refuse `session/load` with `-32000` — trap 1, the auth dialog.        |
+ * | `KU_STANDIN_PROMPT_AUTH`    | unset   | Refuse `session/prompt` with the same `-32000` — issue #2, the model dialog. |
  * | `KU_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
  *
  * ```sh
@@ -77,6 +78,7 @@ const CONFIG_REFUSE = flag('KU_STANDIN_CONFIG_REFUSE');
 const CONFIG_PUSH = flag('KU_STANDIN_CONFIG_PUSH', true);
 const USAGE = flag('KU_STANDIN_USAGE');
 const AUTH = flag('KU_STANDIN_AUTH');
+const PROMPT_AUTH = flag('KU_STANDIN_PROMPT_AUTH');
 const NO_RESUME = flag('KU_STANDIN_NO_RESUME');
 
 /**
@@ -314,6 +316,22 @@ async function runTurn(id, sessionId, prompt) {
   const token = { cancelled: false, released: null };
   turn = token;
   try {
+    if (PROMPT_AUTH) {
+      // **Issue #2's exact wire shape, and the reason this knob exists at all.** Measured 2026-10-02
+      // against `opencode acp` 2.0.19 with no login: the anonymous default model
+      // `opencode/fledge-alpha-free` is geo-blocked from Germany (HTTP 403), and opencode reports any
+      // provider 403 on `session/prompt` as `-32000 "Authentication required: provider authentication
+      // required"` — the same class and the same code as the login trap this script's `KU_STANDIN_AUTH`
+      // produces at `session/load`. Nothing on the wire distinguishes them except that one has a prompt
+      // behind it, which is what `failureKind`'s `promptSent` reads.
+      //
+      // **Nothing streams first.** The measured turn carries no `stopReason` and no text at all, and a
+      // fixture that echoed the prompt or wrote a thought before refusing would make the window look as
+      // though the agent had started answering — which is the state a screenshot of this dialog must not
+      // be taken in.
+      process.stderr.write('stand-in: the provider refused the turn\n');
+      return replyError(id, -32_000, 'Authentication required: provider authentication required');
+    }
     if (ECHO) {
       // Real agents echo the prompt back as `user_message_chunk`, and kurier drops its own echo: the
       // surface draws the prompt the instant Send is pressed. Echoing here keeps that path exercised.

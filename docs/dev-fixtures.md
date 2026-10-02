@@ -6,14 +6,12 @@ that press controls a pointer would, and the probes that measure libadwaita. Mov
 listing belongs in `docs/` and is linked from the rule that needs it. The rules stay in `AGENTS.md`; only
 the tables and the copy-paste lines moved, and nothing was shortened on the way.
 
-The one rule that is *not* here, because it changes behaviour rather than describing it: **a hook set
-to `0` or `false` is off** — unset, empty, `0` and `false` all mean not set, in kurier and in the
-stand-in alike, so there is one rule for "is this on" in the repo
-(`frontends/gui/hook-value.ts`, tested on both runtimes).
+The rules that *change behaviour* rather than describe it are deliberately **not** here — they
+belong beside the code they change, so they live in `AGENTS.md` § Run / build / test: **a hook set to
+`0` or `false` is off**, and **`KU_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed
+sentences. Everything below is the knob list, the copy-paste line and the measurement behind each one.
 
 ## Watching a turn without a model
-
-### Watching a turn without a model
 
 `scripts/stand-in-agent.mjs` is a real ACP peer over stdio — real framing, real method names, the
 `fork` marker `opencode acp` sends and the v1 schema does not define. It answers without a model, a
@@ -48,10 +46,10 @@ case 9 of `alert-dialog-close.mjs` prints the two GTK facts):
 
 The screen order is the reverse of the add order — libadwaita fills the row bottom-up — so the first
 added is the **bottom** button and the last added is the **topmost**, the one a hand reaches first. The
-focus goes to the bottom one, `Decline`, and the topmost is a decline too. **The button labels are
-kurier's four short sentences; the stand-in's own names ("Always allow in this session") appear once,
-as a caption line in the body** — they used to be appended to the button, which read "Always decline:
-Always decline in thi…" and was unreadable at the 360 px floor.
+focus goes to the bottom one, `Decline`, and the topmost is a decline too. **The stand-in's own names
+("Always allow in this session") are what such a screenshot shows exactly once, as a caption line in the
+body** — the label rule itself, and why the names sit there rather than on a button, is in `AGENTS.md`
+§ Run / build / test.
 
 Three knobs reach the shapes around this, and **all three are off unless set** (same rule as every other
 hook here):
@@ -71,14 +69,11 @@ KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 KU_STANDIN_PERMI
   ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
 ```
 
-`KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. A hook set to `0` or `false`
-is **off** — unset, empty, `0` and `false` all mean not set, in kurier and in the stand-in alike, so
-there is one rule for "is this on" in the repo.
-
-`KU_STANDIN_CHUNKS` takes a **prefix** of the stand-in's four fixed sentences, so its default is `4`
-and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply that is
-still arriving, where the newest bubble is below the fold — and the default was `5` against a list of
-four, which read as a knob that could grow and could not.
+`KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. The two rules about *reading* a
+knob — what `KU_STANDIN_CHUNKS` does with a number, and that both spellings of "off" are off — are stated
+once, in `AGENTS.md` § Run / build / test, and the front matter above says why they are not here again.
+What a fixture needs from them is only that the stand-in's `flag()` and kurier's
+`frontends/gui/hook-value.ts` read one value the same way, which is tested on both runtimes.
 
 **The config row, in the same spirit: one flag, and the values it carries.** `KU_STANDIN_CONFIG=1`
 makes the stand-in report a model / effort / mode row and answer `session/set_config_option` with the
@@ -142,10 +137,10 @@ re-binds nothing (selecting a session starts nothing, plan §6), so there is not
 that dies takes the cache with it, because live dropdowns over a process that has exited are controls
 pointing at nothing.
 
-**Three stand-in knobs for the states no real agent in reach produces**, same off-rule as `flag()`
-(`KU_STANDIN_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`). They exist because each of the
-three is a failure or a line that a healthy agent produces in the middle of a conversation, and
-kurier's surface has a decision for each that nothing else here reaches:
+**Four stand-in knobs for the states no real agent in reach produces**, same off-rule as `flag()`
+(`KU_STANDIN_AUTH` / `KU_STANDIN_PROMPT_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`). They exist
+because each of the four is a failure or a line that a healthy agent produces in the middle of a
+conversation, and kurier's surface has a decision for each that nothing else here reaches:
 
 ```sh
 # trap 1: initialize succeeds, session/load answers -32000 → the auth dialog naming `kurier auth`
@@ -154,10 +149,152 @@ KU_STANDIN_AUTH=1
 # trap 2: neither loadSession nor resume → the refusal dialog, not an empty transcript
 KU_STANDIN_NO_RESUME=1
 
+# issue #2: session/prompt answers the *same* -32000 → the model dialog, not the auth one
+KU_STANDIN_PROMPT_AUTH=1
+
 # a usage_update with the cost a double really carries → the rounded line in the transcript
 KU_STANDIN_USAGE=1
 ```
 
+### `KU_STANDIN_PROMPT_AUTH=1` — the same error code, a different kind
+
+**The one knob that is not a trap but a misreport.** Measured 2026-10-02 against `opencode acp` 2.0.19
+with **no login**: the anonymous default model `opencode/fledge-alpha-free` is geo-blocked from Germany
+(HTTP 403), and opencode answers any provider 403 on `session/prompt` with
+`-32000 "Authentication required: provider authentication required"` — the same class and the same
+code as `KU_STANDIN_AUTH`'s answer at `session/load`. Nothing on the wire separates the two except that
+one has a prompt behind it, which is what `failureKind`'s `promptSent` reads. Upstream:
+<https://github.com/JumpLink/kurier/issues/2>.
+
+**Nothing streams first.** The measured turn carries no `stopReason` and no text at all, so a fixture
+that echoed the prompt or wrote a thought before refusing would photograph a window that looks as though
+the agent had started answering. `KU_STANDIN_CONFIG=1` is what puts a model dropdown on the row, and the
+dialog's **Choose another model** button is only there when it is.
+
+```sh
+# the model-refusal dialog, over the real chain, with a model list behind it
+KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_PROMPT_AUTH=1 \
+  KU_APP_SESSION=fixture-2 KU_APP_THINKING=1 KU_APP_PROMPT=hi \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# the same refusal with no configuration row → the dialog still appears, Close only
+KU_APP_AGENT=stand-in KU_STANDIN_PROMPT_AUTH=1 \
+  KU_APP_SESSION=fixture-2 KU_APP_THINKING=1 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+**The dropdown opening is the state only a button can reach,** like the dialog's own dismissal: a
+`Gtk.DropDown` is a widget the devtools plane cannot operate (`hooks.ts`), and `ActivateWidget` on an
+`Adw.AlertDialog` response reports `true` and emits no `response`. There is no hook for pressing it —
+the button is pressed from inside the process, by `ConfigRow.openModelDropdown()`, and the run's log
+line `the model dropdown is open` (or `… is not on the row — nothing to open`) is what says afterwards
+whether it reached. `scripts/probes/` has the measurement behind the one call that does it:
+`gtk_drop_down_get_popup()` is not introspectable on GTK 4.22.5, so the widget calls `activate()` —
+see `activateDropdown` in `frontends/gui/config-row.ts`.
+
+
+## The five pointer-only controls
+
+Five states are unreachable from outside the process, and each has one hook. They are read at startup by
+`readHooks` (`frontends/gui/hooks.ts`) and passed down rather than read at the point of use, so a hook
+cannot be flipped between two states inside one run.
+
+| Variable | What it presses |
+| --- | --- |
+| `KU_APP_STOP=1` | the composer's **Stop**, once the turn is running |
+| `KU_APP_STOP_ESCAPE=1` | the open permission dialog, the way Escape does |
+| `KU_APP_DISMISS_FAILURE=1` | the failure dialog's own **Close** |
+| `KU_APP_CHOOSE_MODEL=1` | the `'model'` failure dialog's **Choose another model** (issue #2) |
+| `KU_APP_SWITCH=id[,id…]` | `#open` — sessions in turn, once a failure is on screen |
+
+`KU_APP_STOP_ESCAPE` records a dismissal as `not-answered: dismissed`, sends `cancelled` over the wire,
+and stops nothing else — the two strings are not the same, so the hook passes the reason and not the
+outcome. `KU_APP_CHOOSE_MODEL` presses the one button **issue #2** exists for: the `'model'` dialog's
+second response has no shortcut, because `Adw.AlertDialog` has no callable `response()` at all.
+
+```sh
+# Stop, mid-turn
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_APP_STOP=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# Escape on an open permission dialog, and nothing else
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 KU_APP_STOP_ESCAPE=1 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# Close on the refusal dialog, then the session moving on underneath it
+KU_APP_AGENT=stand-in KU_STANDIN_NO_RESUME=1 KU_APP_DISMISS_FAILURE=1 KU_APP_SWITCH=fixture-1,fixture-2 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# issue #2: the model dialog's button, with a model list behind it
+KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_PROMPT_AUTH=1 KU_APP_CHOOSE_MODEL=1 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+**Why a hook for each, measured rather than assumed.** `ActivateWidget` on an `Adw.AlertDialog` response
+button reports `true` and emits no `response` (the permission dialog too, so it is libadwaita),
+`SendKey` answers `false` for Escape, nothing in devtools moves a `Gtk.ListBox` selection, and a real
+pointer cannot stand in: under Wayland `XTestFakeMotionEvent` does not move it, and under
+`GDK_BACKEND=x11` a dialog is mapped but never painted. **The failure dialog's close-response is
+`close`, so `close()`, Escape and pressing Close are the same call** — `scripts/probes/alert-dialog-close.mjs`
+case 1 measures it, and the fourth fact it prints is in [## Probes](#probes); the same case records that
+`Adw.AlertDialog` has no callable `response()` at all, which is why `KU_APP_CHOOSE_MODEL` emits the signal
+itself.
+
+The two rules these five all follow — each hook goes **through the surface** rather than around it, and a
+hook's value is read by `frontends/gui/hook-value.ts` and not by `hooks.ts` — are stated once, with the
+reason for each, in `AGENTS.md` § Run / build / test.
+
+## The permission dialog
+
+**The three GTK facts behind it are measured, not read from the signal docs**: `Adw.Dialog` emits
+`closed` **before** `response` (so a dialog that settles on `closed` can never allow anything),
+`force_close()` emits neither (so it would hang the turn), and with no `default_response` libadwaita
+focuses the **first added** response — not the last, which is what `Adw-1.gir` says. The probes that
+print the numbers, and the split between the two kinds of probe, are in [## Probes](#probes).
+
+**The rank behind the order** (`orderOptions`) is `reject_once`, `allow_once`, `allow_always`,
+`reject_always`, stable within a kind, and the row appears **bottom-up from that** — the order on screen
+is the mirror of the order kurier adds in. The rules that follow from it (both end slots a decline,
+`buildDialog` naming `default_response`, `show()` grabbing the focus, and the four short button labels
+with the agent's wording moved into the body's caption line `agentNames`) are in `AGENTS.md` § Run /
+build / test; what is measured here is why they hold — case 9 prints both the focus and the layout
+direction, and case 10 builds a look-alike three ways (grab in `map`, grab in an idle, no grab) of which
+**only the third reads `allow_once`**, so **a grab is what matters, not which kind of grab**.
+
+**Stop is not pointer-reachable while the permission dialog is up, and that is libadwaita's doing.** An
+`Adw.AlertDialog` grabs input on the window it is presented over, so the composer's Stop button cannot
+be clicked from underneath it — measured under `GDK_BACKEND=x11` with a real `XWarpPointer` click at the
+button's coordinates: the click is swallowed and the turn keeps running. The controller enforces Stop's
+rule anyway (`stop()` settles the open question `cancelled` first), so the fail-closed behaviour does
+not depend on the pointer; the dialog's own **Decline** covers the case a person can reach, answering
+`reject_once` and letting the turn continue. A dialog is the right place for the answer to "may this
+run?", not for "end this turn".
+
+**`KU_APP_PERMISSION` is a fallback, not a competitor**, and the wait is a poll rather than a fixed
+delay (`window.ts`): with `KU_STANDIN_PERMISSION=1` the agent's question is the better thing to
+photograph and it arrives an unpredictable moment after the prompt goes out, so a fixed delay would
+either beat it or lose to it. It stages only once the gate has not been asked; with no turn running
+that is the first tick, because there is no agent that could ask.
+
+```bash
+# the agent's own question, mid-turn, over the real chain
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+
+# just the dialog, with no agent at all
+KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+## The window floor
+
+The floor itself — 360 px, `WINDOW_MIN_WIDTH_PX` — is stated once, in `AGENTS.md`, along with whose
+limit it is. What is here is how to reproduce it, and what it costs elsewhere: the same 360 px is what
+forces one control per line in the config row above.
+
+```sh
+gjs -m scripts/probes/window-min-width.mjs        # the sweep, with no floor of its own
+gjs -m scripts/probes/window-min-width.mjs 320    # what a different floor does
+```
+
+Pass a number to reproduce a different floor, or nothing to see what the window does without one.
 
 ## Probes
 
@@ -172,16 +309,15 @@ DISPLAY=:0 ./node_modules/.bin/gjsify run /tmp/focus.gjs.mjs
 
 The split exists because a look-alike cannot answer a question about our widget — the first version of
 the permission dialog left libadwaita's focus fallback in place, and the plain probe said the focus was
-on the allow button while the app's own screenshot showed a highlighted label instead. Three GTK facts
-behind the dialog are measured rather than read from the signal docs: `Adw.Dialog` emits `closed`
-**before** `response` (so a dialog that settles on `closed` can never allow anything), `force_close()`
-emits neither signal (so it would hang the turn), and with no `default_response` set libadwaita focuses
-the **first added** response — which is *not* what `Adw-1.gir` says ("the last added response will be
-focused by default"). Case 9 of `alert-dialog-close.mjs` builds the dialog twice, `allow_once, reject_once`
-and `reject_once, allow_once`, because the two readings agree on every single-order dialog: measured both
-ways on libadwaita 1.9.3, the focus follows the **first** add. The same case prints the layout direction
-from `get_allocation().y` — the row is filled **bottom-up from the add order**, so the last added
-response is the *topmost* button — which is why `orderOptions` puts a decline in both end slots.
+on the allow button while the app's own screenshot showed a highlighted label instead.
+
+**The focus case measures both readings of `default_response`.** Case 9 of `alert-dialog-close.mjs`
+builds the dialog twice, `allow_once, reject_once` and `reject_once, allow_once`, because the two
+readings agree on every single-order dialog: measured both ways on libadwaita 1.9.3, the focus follows
+the **first** add — which is *not* what `Adw-1.gir` says ("the last added response will be focused by
+default"). The same case prints the layout direction from `get_allocation().y` — the row is filled
+**bottom-up from the add order**, so the last added response is the *topmost* button — which is why
+`orderOptions` puts a decline in both end slots.
 
 The permission-focus probe carries six cases for this, four of them with the `*_always` kinds, and its
 allow-button test matches the *rendered* label of **any** allowing kind rather than `allow_once` alone: a
@@ -197,7 +333,7 @@ one.
 built three times — grabbing synchronously inside `map`, deferring the grab to an idle, and not grabbing
 at all. The first sample is the body in the first two and `Allow once` in the third, which stays there.
 So **a grab is what matters**, not which kind; the synchronous form is kept because an idle libadwaita
-queues after ours would run after ours, which is a structural argument and not a measured one. That
+queues after ours, which is a structural argument and not a measured one. That
 case cannot be reproduced against `PermissionDialog` at all: `present()` maps synchronously, so by the
 time `permission-focus.ts` has a timer running, kurier's grab has already happened and the pre-idle frame
 is not observable from outside. The widget probe therefore covers the **settled** focus and the
@@ -208,3 +344,66 @@ The fourth fact is the failure dialog's: an external `close()` emits `closed` an
 on that dialog "the person pressed Close" and "the window closed it" are the same call, and there is
 nothing to simulate. `Adw.AlertDialog` has no callable `response()` at all; the signal is reachable only
 through `emit`, which is what `AdwAlertDialog` does internally.
+
+**That measurement still holds now that the `'model'` dialog has a second response, and it is why.**
+`FailureDialog` names its dismissal `close`, and `close` is libadwaita's default `close-response` — so
+`close()`, Escape and pressing Close all arrive as `response("close")`, and never as the remedy. So
+`KU_APP_DISMISS_FAILURE` still photographs a *dismissed* dialog on the one dialog that has something to
+dismiss, and the window's single `close()` still takes down whichever dialog is up. The rule was "one
+response, so there is one dismissal"; the rule that survives is the stronger one, "the dismissal is the
+response named `close`".
+
+*The GUI run recipe — detached start, `GJSIFY_DEVTOOLS=1`, a synthetic `KURIER_SESSIONS_FILE`,
+`KU_APP_SESSION` — is in `AGENTS.md` § Run / build / test, where it belongs: it is how the work is
+run, not a fixture.*
+
+### GTK Behaviour (moved from AGENTS.md)
+
+**The GUI is looked at, not believed:** start it detached (a foreground GJS process is killed by the
+agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on `/eu/jumplink/Kurier/devtools`
+(`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>` so no real conversation ends up in a
+screenshot, and `KU_APP_SESSION=<id>` to open a session without a pointer. GTK behaviour a comment
+relies on gets a probe in `scripts/probes/` that prints the numbers the comment quotes.
+
+**Three GTK facts behind the permission dialog, measured not read from signal docs:**
+- `Adw.Dialog` emits `closed` before `response`, so a dialog that settles on `closed` can never allow anything
+- `force_close()` emits neither signal (so it would hang the turn)
+- With no `default_response` set, libadwaita focuses the **first added** response — contrary to
+  `Adw-1.gir` which says "the last added response will be focused by default"
+
+**Kurier owns the button order, not just the button set** (`orderOptions`). The agent's order is chosen
+by the agent; the rank is `reject_once`, `allow_once`, `allow_always`, `reject_always`, stable within a
+kind, and the row appears **bottom-up from that**, so the first added is the bottom button and the last
+added is the topmost. Two measured libadwaita facts fix it: with no `default_response` **the focus goes
+to the *first* added response** (not the last — `Adw-1.gir` says otherwise and case 9 measures both
+directions), and the layout is bottom-up from the add order. So the first slot is a decline and the
+topmost button is a decline. `buildDialog` names `default_response` explicitly rather than letting the
+add order choose it, and `show()` grabs the focus — **case 10 builds a look-alike three ways** (grab in
+`map`, grab in an idle, no grab) and only the third reads `allow_once`, which is the whole justification
+for that grab. It is not observable from outside `PermissionDialog` (`present()` maps synchronously), so
+the widget probe measures the settled focus and every turn in between instead.
+
+**The button labels are kurier's four short sentences and the agent's own names are not on them.** A
+button is the decision, so its label has to fit one line — the labels were once "kurier's word + the
+agent's name" and read "Always decline: Always decline in thi…" at the 360 px floor. The agent's wording
+moved into the body as one caption line (`agentNames`), shown only when a name says something the kind
+does not. The terminal prompt follows the same rule: it prints `y = Allow once`, the option a `y` actually
+grants, in the same words as the button.
+
+**The phone floor is 360 px** (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
+`Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is
+unusable, and `gjs -m scripts/probes/window-min-width.mjs [floor]` prints the sweep that says so; pass a
+number to reproduce a different floor, or nothing to see what the window does without one.
+
+**GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
+question. Both runtimes, as in postbote and beifahrer:
+
+- **Node**: fast, injected `Transport` and `FixtureAgent` (`app/tests/support/fixture-agent.ts`), no
+  subprocess. The fixture is a real ACP peer, not a mock — it speaks the protocol including the
+  inconvenient parts (a `_meta` bag it invented, a mid-turn `request_permission`, a paginated
+  `session/list`), so a client that only passes against a polite peer is not tested.
+- **GJS**: one integration test that proves the real stdio chain against a real agent
+  (`kurier-cli test:real-agent`).
+
+If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
+entire point of the `packages/acp` ↔ `app` split.

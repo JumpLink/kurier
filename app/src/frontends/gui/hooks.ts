@@ -168,6 +168,24 @@ export interface KurierHooks extends FrameworkHooks {
    * not an entry, so `KU_APP_SWITCH=,` asks for no session at all rather than for one called `''`.
    */
   switchTo?: string[];
+
+  /**
+   * `KU_APP_CHOOSE_MODEL` — press the `'model'` failure dialog's **Choose another model**, once it is up.
+   *
+   * **The fifth pointer-only control, and the one that needed a new hook rather than an old one.**
+   * `KU_APP_DISMISS_FAILURE` presses Close through `FailureDialog.close()`, which is the same call a
+   * dismissal makes. This dialog's other response has no such shortcut: `Adw.AlertDialog` has no
+   * callable `response()` at all, and `ActivateWidget` on its button reports `true` and emits nothing
+   * (both measured — `scripts/probes/alert-dialog-close.mjs`). So the state only the button reaches —
+   * the config row's model dropdown, popped down and ready to pick from, which is the whole answer the
+   * dialog exists to give — had no way to be looked at.
+   *
+   * **Through `FailureDialog.chooseModel()`, not around the dialog.** That emits the same `response`
+   * signal libadwaita's own handler answers to, so the modal closes itself and the dropdown opens in
+   * libadwaita's own order. A hook that called `ConfigRow.openModelDropdown()` directly would
+   * photograph a dropdown with the modal still up — a state a person cannot be in.
+   */
+  chooseModel?: boolean;
 }
 
 /**
@@ -207,6 +225,9 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     // A list, read here because a variable's syntax is read here: the decision of *which* session to
     // open is the window's `#open`, and the order is the variable's own.
     switchTo: hookList(env, 'SWITCH'),
+    // A flag for the same reason `DISMISS_FAILURE` is one: it changes the state under test, so it has to
+    // honour its own off-switch. `KU_APP_CHOOSE_MODEL=0` must leave the dialog up, not press it.
+    chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
     thinking: hookFlag(env, 'THINKING'),
     prompt: hookValue(env, 'PROMPT'),
   };

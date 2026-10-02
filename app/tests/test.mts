@@ -16,6 +16,7 @@ import sessionStore from './unit/session/store.test.ts';
 import config from './unit/core/config.test.ts';
 import configRow from './unit/core/config-row.test.ts';
 import failure from './unit/core/failure.test.ts';
+import freeModels from './unit/core/free-models.test.ts';
 import usage from './unit/core/usage.test.ts';
 import policy from './unit/core/policy.test.ts';
 import interrupt from './unit/core/interrupt.test.ts';
@@ -48,6 +49,7 @@ run({
   config,
   configRow,
   failure,
+  freeModels,
   usage,
   policy,
   interrupt,

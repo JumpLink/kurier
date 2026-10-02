@@ -1047,28 +1047,43 @@ export class AgentSession {
   /**
    * A turn that could not run.
    *
-   * **Two failures, two sentences, and which one it is decided by whether a prompt ever left.** One
-   * that went away mid-turn has no answer and no future: the state is `gone` and the transcript gets the
-   * plan's line, because inventing an `end_turn` for a dead agent is the fabrication §6 forbids. One
-   * that never got going — a bad command, a handshake that timed out, `auth_required`, an agent that can
-   * neither load nor resume (trap 2) — has no turn to report, so the state goes back to `idle` and the
-   * reason lives on the attachment, where the composer shows it beside the button that will not work.
+   * **Three endings, and the first two are decided by whether a prompt ever left.** One that went away
+   * mid-turn has no answer and no future: the state is `gone` and the transcript gets the plan's line,
+   * because inventing an `end_turn` for a dead agent is the fabrication §6 forbids. One that never got
+   * going — a bad command, a handshake that timed out, `auth_required`, an agent that can neither load
+   * nor resume (trap 2) — has no turn to report, so the state goes back to `idle` and the reason lives on
+   * the attachment, where the composer shows it beside the button that will not work. The third is a
+   * prompt that went out and came back refused — `#reportModelRefusal` below, and it is neither of the
+   * two, because the agent is still there.
    *
    * An agent that died *during* the handshake counts as the second case, for the same reason: no prompt
    * was ever sent, so a transcript line claiming "the agent exited during this turn" would be about a
    * turn that did not run.
+   *
+   * **The kind is computed once, from the turn state, and used for both branches.** `#promptSent` is
+   * read *before* anything can clear it, which is why the classification is hoisted: the whole of issue
+   * #2 was a refusal that arrives as the same `-32000` as the login trap and can only be told apart by
+   * whether a prompt had gone out. `prompt()` clears the flag after the turn settles, so a value read
+   * anywhere later would be `false` and the login trap's advice would be back.
    */
   #reportFailure(error: unknown): void {
     const message = describe(error);
     // An agent that died mid-turn cannot answer a question it sent. Settle the desk before the state
     // moves, so no dialog outlives the window that shows it, and with `agent-gone` as the reason —
-    // that is what actually happened, and it is the one reason a person cannot act on.
+    // that is what actually happened, and it is the one reason a person cannot act on. A provider
+    // refusal settles it for the same reason (the turn is over, so its question can never be answered);
+    // on that path the desk is empty anyway, because the provider answers before it asks for anything.
     this.#failClosed('agent-gone');
+    const kind = failureKind(error, { promptSent: this.#promptSent });
+    if (kind === 'model') {
+      this.#reportModelRefusal(kind, message);
+      return;
+    }
     if (!this.#promptSent) {
       // Nothing ever left for the agent, so there is no turn to report as gone. `idle` rather than
       // `thinking`, because a turn that never started must not leave the window looking busy — and
       // `thinking` would show a Stop button with nothing to stop.
-      this.#setAttachment({ status: 'failed', kind: failureKind(error), message });
+      this.#setAttachment({ status: 'failed', kind, message });
       this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'none' });
       return;
     }
@@ -1083,6 +1098,34 @@ export class AgentSession {
     this.#emitConfig();
     this.#setAttachment({ status: 'gone', reason: message });
     this.#move({ kind: 'agent-gone', reason: message });
+  }
+
+  /**
+   * A turn the **provider** refused, on an agent that is attached and healthy.
+   *
+   * **Everything the `gone` path does is deliberately not done here**, and the list is the design:
+   *
+   * - **Not `gone`.** The agent handshook, loaded the session and answered; it is a *model* that will
+   *   not answer. `agentStatus` reads `kind === 'model'` as still attached, which is what keeps Send
+   *   working for the retry this dialog asks for.
+   * - **The config row stays, and so does its per-session cache.** `gone` clears both, and rightly:
+   *   live dropdowns over a dead process are controls pointing at nothing. Here the process is alive,
+   *   and **the dialog's own button opens the model dropdown** — clearing the row would make the
+   *   button open nothing, which is the exact defect the `gone` path exists to prevent turned inside out.
+   * - **No `agentExitedEntry` line.** Its sentence is "the agent exited during this turn — the turn was
+   *   never answered", and the agent did not exit: it answered. Nothing is written, because the only
+   *   entries this rule knows how to write are true of an answer and false here; a system line saying
+   *   the turn produced no output is true, but it is what the empty space after the person's own
+   *   prompt already says, and the refusal is on screen in the dialog and under the composer's button.
+   *
+   * `turn-ended` with `stopReason: null` rather than `agent-gone`: the turn *is* over, and the state
+   * machine has no other event for a turn that failed without the transport ending. `stopped` is not
+   * reachable because `cancelledBy` is `'none'` — nobody pressed Stop and the agent did not abandon
+   * the turn; the provider refused it, and the window says so in words rather than in a state name.
+   */
+  #reportModelRefusal(kind: 'model', message: string): void {
+    this.#setAttachment({ status: 'failed', kind, message });
+    this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'none' });
   }
 
   #setAttachment(attachment: AgentAttachment): void {

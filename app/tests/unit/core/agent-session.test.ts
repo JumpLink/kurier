@@ -739,6 +739,78 @@ export default async () => {
     });
   });
 
+  // Issue #2. The same `-32000` as the login trap, but the agent handshook, loaded the session and
+  // answered the turn — with a refusal. Nothing on the wire separates it from trap 1 except the prompt
+  // that went out first, and kurier used to show the login dialog here, naming a command that does not
+  // help. See `core/failure.ts`.
+  await describe('agent-session — the provider refused the turn', async () => {
+    await it('is the `model` kind, not the auth trap, and it earns a dialog', async () => {
+      const h = harness({ promptAuth: true });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status).toBe('failed');
+      if (attachment.status === 'failed') {
+        expect(attachment.kind).toBe('model');
+        // The dialog a window will put up: a sentence and a button, and **no** `kurier auth` command
+        // line — the `command` field is what `FailureDialog` renders as "Run this in a terminal".
+        const notice = failureNotice(attachment.kind);
+        expect(notice).not.toBe(null);
+        expect(notice?.command).toBe(null);
+        expect(notice?.action).toBe('choose-model');
+      }
+    });
+
+    await it('leaves the agent attached and the turn over, so a person can pick another model and retry', async () => {
+      const h = harness({ promptAuth: true });
+      await h.session.prompt('hello');
+      // `idle`, not `gone`: the agent answered, it did not exit. And `attached: true`, because a
+      // Send disabled behind a dialog whose only button is "Choose another model" would be the control
+      // that points at nothing.
+      expect(h.session.snapshot.state).toBe('idle');
+      expect(h.session.agent.attached).toBe(true);
+      expect(h.session.agentRunning).toBe(true);
+    });
+
+    await it('keeps the config row, because the dialog’s button opens it', async () => {
+      // The `gone` path clears the row and its cache, and rightly: live dropdowns over a dead process
+      // are controls pointing at nothing. Here the process is alive, so clearing them would make the
+      // button open nothing — the same defect pointed the other way.
+      const h = harness({ promptAuth: true });
+      await h.session.prompt('hello');
+      const row = h.session.configRow;
+      expect(row.visible).toBe(true);
+      expect(row.controls.some((control) => control.id === 'model')).toBe(true);
+      // And the row the surface last drew was not emptied either — that is what the button reads.
+      const drawn = h.configViews.at(-1);
+      expect(drawn?.visible).toBe(true);
+    });
+
+    await it('records no transcript line claiming the agent exited, because it did not', async () => {
+      // `agentExitedEntry`'s sentence is "the agent exited during this turn — the turn was never
+      // answered", and here the turn *was* answered. A line saying so would be a fabricated event, and
+      // the file would contradict the dialog on screen.
+      const h = harness({ promptAuth: true });
+      await h.session.prompt('hello');
+      const texts = h.entries.map((entry) => entry.text);
+      expect(texts.some((text) => text.includes('exited during this turn'))).toBe(false);
+      // The person's own prompt is there, and nothing invented after it.
+      expect(texts).toEqualArray(['hello']);
+    });
+
+    await it('still classifies the login trap as `auth`, with the same fixture agent and no prompt sent', async () => {
+      // The other half, and the reason the split is worth having: the two paths differ only in whether
+      // a prompt went out, so a client that lost the distinction would put one dialog on both.
+      const h = harness({ requireAuth: true });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status).toBe('failed');
+      if (attachment.status === 'failed') {
+        expect(attachment.kind).toBe('auth');
+        expect(failureNotice(attachment.kind)?.command).toBe('kurier auth');
+      }
+    });
+  });
+
   await describe('agent-session — closing the window', async () => {
     await it('cancels, waits for the turn, and only then ends the process', async () => {
       // Plan §6's ordering, and the one that is not interchangeable: terminating first SIGTERMs the agent

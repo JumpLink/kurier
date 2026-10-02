@@ -146,13 +146,19 @@ export type AgentAttachment =
   | { readonly status: 'attached'; readonly name: string }
   | { readonly status: 'gone'; readonly reason: string }
   /**
-   * The agent never came up.
+   * The agent never came up — **or refused the turn.**
    *
-   * **`kind` is the whole reason this is not just a `message`.** Three failures land here and two of
-   * them need something a person must do somewhere else — an auth trap (`kurier auth`, trap 1) and a
-   * reattach refusal (trap 2, which leaves the window empty) — so the surface has to be able to tell
-   * them from "the binary is not on PATH". Classified by `failureKind` in `core/failure.ts`, which is
-   * where the three ways of reading it are argued; nothing here decides what a dialog says.
+   * **`kind` is the whole reason this is not just a `message`.** Four failures land here and three of
+   * them need something a person must do somewhere else — an auth trap (`kurier auth`, trap 1), a
+   * provider refusal after a prompt was sent (issue #2), and a reattach refusal (trap 2, which leaves
+   * the window empty) — so the surface has to be able to tell them from "the binary is not on PATH".
+   * Classified by `failureKind` in `core/failure.ts`, which is where the four ways of reading it are
+   * argued; nothing here decides what a dialog says.
+   *
+   * **The one `failed` that keeps a process, and that is why `agentStatus` reads the kind.** The other
+   * three mean there is no agent to prompt; `'model'` means the agent is attached, healthy and refusing
+   * to answer *this* model — so it has to leave Send enabled, or the dialog's own button would lead to a
+   * dead control.
    */
   | { readonly status: 'failed'; readonly kind: FailureKind; readonly message: string };
 
@@ -180,6 +186,14 @@ export const NO_AGENT_YET = 'No agent is started yet. The first prompt starts it
  * something a person can act on and "the agent is gone" is not. The one thing this never invents is
  * a way to get an agent back — there is none in this window (a new agent is a new window), and the
  * sentence says so rather than implying otherwise.
+ *
+ * **The exception is `'model'`, and it is not a dead agent.** `failureKind` reaches that answer from an
+ * auth-required error *after a prompt was sent*, which means the agent is up: it handshook, it loaded
+ * the session, and it answered the turn — with a refusal. Reporting `attached: false` would disable
+ * Send in a window whose agent is alive, and the `'model'` dialog's one button is "Choose another
+ * model", which would then lead to a disabled entry. That is the "control that points at nothing" this
+ * window exists to avoid, so the two are decided together: a refused turn keeps its agent, and the note
+ * says why the last prompt did not land.
  */
 export function agentStatus(attachment: AgentAttachment): AgentStatus {
   switch (attachment.status) {
@@ -195,7 +209,7 @@ export function agentStatus(attachment: AgentAttachment): AgentStatus {
         note: `The agent exited${attachment.reason ? ` (${attachment.reason})` : ''}. Open a new window to send another prompt.`,
       };
     case 'failed':
-      return { attached: false, note: attachment.message };
+      return { attached: attachment.kind === 'model', note: attachment.message };
   }
 }
 

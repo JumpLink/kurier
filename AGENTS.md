@@ -163,66 +163,68 @@ gjsify run app/dist/kurier.gjs.mjs <command>
 gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
 
-The GUI is looked at, not believed: start it **detached** (a foreground GJS process is killed by
-the agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on
-`/eu/jumplink/Kurier/devtools` (`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>`
-so no real conversation ends up in a screenshot, and `KU_APP_SESSION=<id>` to open a session without
-a pointer. GTK behaviour a comment relies on gets a probe in `scripts/probes/` that prints the
-numbers the comment quotes.
+**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
 
 ### Watching a turn without a model
 
 `scripts/stand-in-agent.mjs` is a real ACP peer over stdio — real framing, real method names, the
-`fork` marker `opencode acp` sends and the v1 schema does not define. It answers without a model, a
-network or a quota, so a turn can be streamed, stopped and killed as often as needed and looks the
-same twice. `KU_APP_AGENT=stand-in` selects it; it is reachable through the dev hooks and **not** in
-`LAUNCHERS`, which is the table of programs a person installs.
+`fork` marker `opencode acp` sends and the v1 schema does not define — and `KU_APP_AGENT=stand-in`
+selects it: it is reachable through the dev hooks and **not** in `LAUNCHERS`, which is the table of
+programs a person installs.
 
 **Every knob, every recipe and every measured GTK fact is in
 [docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, its three permission-option
 knobs, the config row's four values and its two known limits, the per-session option cache, the failure
-knobs (`KU_STANDIN_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and the two kinds of GTK probe
-with the commands that print the numbers. Two rules that change behaviour stay here:
+knobs (`KU_STANDIN_AUTH` / `KU_STANDIN_PROMPT_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and
+[the two kinds of GTK probe](docs/dev-fixtures.md#probes) with the commands that print the numbers. Two
+rules that change behaviour stay here:
 
 - **`KU_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed sentences, so its default is `4`
   and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply still
   arriving, where the newest bubble is below the fold — and the default was `5` against a list of four,
   which read as a knob that could grow and could not.
 - **A hook set to `0` or `false` is off**, in kurier and in the stand-in alike, so there is one rule
-  for "is this on" in the repo.
+  for "is this on" in the repo. The reading rules are in `frontends/gui/hook-value.ts`, not in
+  `hooks.ts`: `readHooks` imports the framework's reader, whose barrel imports `Adw`, so a test that
+  imported it could not run on Node at all — and the rules (unset, empty, `0` and `false` are off; a
+  comma list keeps its order and drops its blanks) are the part a future key gets wrong. One rule, two
+  copies: the stand-in agent has the same `flag()` and cannot import this file, so it is copied and
+  both files say so.
 
 ### The states only a hook can reach
 
-**Four pointer-only controls, and a hook for each.** `KU_APP_STOP=1` presses the composer's Stop once
-the turn is running; `KU_APP_STOP_ESCAPE=1` dismisses an open permission dialog the way Escape does —
-recorded as `not-answered: dismissed`, sent over the wire as `cancelled`, and stopping nothing else.
-`KU_APP_DISMISS_FAILURE=1` closes the failure dialog, and `KU_APP_SWITCH=id[,id…]` opens sessions in
-turn once a failure is on screen. All four go through the surface (the composer's own `clicked`,
-`dismissPermission('dismissed')`, the dialog's own `close()`, and `#open` — the same call a sidebar row
-makes) rather than around it, so a screenshot is of the window and not of a re-implementation.
+**Five pointer-only controls, and a hook for each** — `KU_APP_STOP`, `KU_APP_STOP_ESCAPE`,
+`KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL`, `KU_APP_SWITCH=id[,id…]`, what each does and the
+measurements that forced a hook rather than a pointer are in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#the-five-pointer-only-controls). What stays here is the rule
+they all follow: every one goes **through the surface** (the composer's own `clicked`,
+`dismissPermission('dismissed')`, the dialog's own `close()` and its own `response` signal, and `#open` —
+the same call a sidebar row makes) rather than around it, so a screenshot is of the window and not of a
+re-implementation.
 
-**Why four, measured rather than assumed.** `ActivateWidget` on an `Adw.AlertDialog` response button
-reports `true` and emits no `response` (the permission dialog too, so it is libadwaita), `SendKey`
-answers `false` for Escape, nothing in devtools moves a `Gtk.ListBox` selection, and a real pointer
-cannot stand in: under Wayland `XTestFakeMotionEvent` does not move the pointer, and under
-`GDK_BACKEND=x11` a dialog is mapped but never painted. **The failure dialog has one response, so
-`close()` and pressing Close are the same call** — `scripts/probes/alert-dialog-close.mjs` case 1
-measures that an external `close()` emits `closed` and then `response("close")`, and the same probe
-records that `Adw.AlertDialog` has no callable `response()` at all.
+**Three dialogs, and only three failures earn one.** Plan §6 asks for the auth trap and the reattach
+refusal to be *shown*, and `core/failure.ts` is where that is decided: `failureKind` classifies an error
+by its **type and the turn state** (`RpcError` -32000, `UnsupportedCapabilityError`,
+`FailureContext.promptSent`), never by its wording; `failureNotice` returns a dialog for `auth`, `model`
+and `unsupported` and **`null` for `start`** — a bad command or a handshake timeout is already the
+composer's caption. No failure is written to the transcript: no turn ran, so nothing to record.
 
-**The reading rules are in `frontends/gui/hook-value.ts`, not in `hooks.ts`.** `readHooks` imports the
-framework's reader, whose barrel imports `Adw`, so a test that imported it could not run on Node at
-all — and the rules (unset, empty, `0` and `false` are off; a comma list keeps its order and drops its
-blanks) are the part a future key gets wrong. One rule, two copies: the stand-in agent has the same
-`flag()` and cannot import this file, so it is copied and both files say so.
+**`'auth'` and `'model'` are told apart structurally, because the wire cannot** ([issue
+#2](https://github.com/JumpLink/kurier/issues/2), measured in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#ku_standin_prompt_auth1--the-same-error-code-a-different-kind)):
+a **geo-blocked provider 403** reaches `session/prompt` as the login trap's own `-32000`, so matching the
+message is one reword from wrong and matching the code is *already* wrong. What survives is whether a
+prompt had gone out — `AgentSession.#promptSent`, as a **required** `FailureContext.promptSent`, so a new
+call site cannot omit it and get the login-trap advice back. **A login that expires mid-turn lands here
+too**, which is why the notice names *both* remedies in provider-neutral words. This path keeps the agent
+(`agentStatus` reads `kind === 'model'` as attached) and the config row, whose model dropdown the one
+button opens, and writes no transcript line — the agent answered, so `agentExitedEntry` would be one.
 
-**Two dialogs, and only two failures earn one.** Plan §6 asks for the auth trap and the reattach
-refusal to be *shown*, and `core/failure.ts` is where that is decided: `failureKind` classifies an
-error by its **type** (`RpcError` -32000, `UnsupportedCapabilityError`) and never by its wording, and
-`failureNotice` returns a dialog for `auth` and `unsupported` and **`null` for `start`** — a bad
-command or a handshake timeout is already the composer's caption, and a modal over it says "something
-is wrong" without adding anything. Neither failure is written to the transcript: no turn ran, so there
-is nothing to record.
+**The free-model hint is order, never a choice.** `app/data/free-models.json` (ids, the date checked, the
+criterion, the [zen link](https://opencode.ai/docs/zen)) is applied by `freeModelFirst` to a **model**
+control's values only, leaving the rest in the agent's order — the one named exception to "the agent's
+order is the order it sent". It never selects, hides or guesses: exact ids, so a model that has gone stops
+matching. Plan §3 rejected the alternatives: a default rots, probing burns quota.
 
 **Once per failure, and never over a window that has moved on.** Two more functions in the same file
 answer the two questions a surface asks on every state move, and both are needed: `failureToShow` is
@@ -234,73 +236,38 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-The refusal is deliberately *not* fixable from the window. kurier stores no credential (`AGENTS.md`
-§ Privacy), so the only remedy it can name is the command a person runs in a terminal — the dialog
-says so and offers nothing else, because a button that could only copy a string would be a control
-pointing at nothing.
+**The auth refusal is deliberately *not* fixable from the window; the model refusal is.** kurier stores no
+credential (§ Privacy), so for `auth` the only remedy it can name is the command a person runs in a
+terminal — the dialog says so and offers nothing else, because a button that could only copy a string would
+be a control pointing at nothing. The `'model'` dialog is the other half: **Choose another model** opens
+the row's model dropdown and picks nothing, and `failureAction` withholds the button when the agent
+reported no model option — a button that opens nothing is the same defect pointed the other way.
 
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
 wire** — so a screenshot shows kurier's ordering, labels, styling and focus rules acting on the full
 set the agent offered, `*_always` included. `KU_APP_PERMISSION=1` is kurier's side: it puts a fixture
 request through **the same gate** the agent's requests go through, so a screenshot shows the gate's
-behaviour rather than a dialog built for the screenshot.
+behaviour rather than a dialog built for the screenshot. It is a fallback, not a competitor, and it
+waits by polling for the gate to be asked rather than for a fixed delay (`window.ts`) — a fixed delay
+would either beat the agent's question or lose to it. The dialog's behaviour, the two halves and the
+measured GTK facts behind it are in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#the-permission-dialog); what it does and does not do is
+decided in `app/src/core/permission.ts` and tested on both runtimes, while the widget only renders.
 
-**Stop is not pointer-reachable while the permission dialog is up, and that is libadwaita's doing.**
-An `Adw.AlertDialog` grabs input on the window it is presented over, so the composer's Stop button
-cannot be clicked from underneath it — measured under `GDK_BACKEND=x11` with a real `XWarpPointer`
-click at the button's coordinates: the click is swallowed and the turn keeps running. The controller
-enforces Stop's rule anyway (`stop()` settles the open question `cancelled` first), so the fail-closed
-behaviour does not depend on the pointer; the dialog's own **Decline** covers the case a person can
-reach, answering `reject_once` and letting the turn continue. A dialog is the right place for the
-answer to "may this run?", not for "end this turn".
+**Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
+measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md).
+The rules that survive here: the first added button is the bottom one and the last added is the topmost,
+so **both end slots are a decline**; `buildDialog` names `default_response` explicitly rather than letting
+the add order choose it; and `show()` grabs the focus.
 
-**`KU_APP_PERMISSION` is a fallback, not a competitor**, and the wait is a poll rather than a fixed
-delay (`window.ts`): with `KU_STANDIN_PERMISSION=1` the agent's question is the better thing to
-photograph and it arrives an unpredictable moment after the prompt goes out, so a fixed delay would
-either beat it or lose to it. It stages only once the gate has not been asked; with no turn running
-that is the first tick, because there is no agent that could ask.
-
-```bash
-# the agent's own question, mid-turn, over the real chain
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
-
-# just the dialog, with no agent at all
-KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
-```
-
-What the dialog does and does not do is decided in `app/src/core/permission.ts` and tested on both
-runtimes; the widget only renders.
-
-The three GTK facts behind the permission dialog are **measured, not read from the signal docs** —
-`Adw.Dialog` emits `closed` before `response`, `force_close()` emits neither, and with no
-`default_response` libadwaita focuses the *last added* response. The probes that print the numbers, and
-the split between the two kinds of probe, are in
-[docs/dev-fixtures.md](docs/dev-fixtures.md#probes).
-
-**Kurier owns the button order, not just the button set** (`orderOptions`). The agent's order is chosen
-by the agent; the rank is `reject_once`, `allow_once`, `allow_always`, `reject_always`, stable within a
-kind, and the row appears **bottom-up from that**, so the first added is the bottom button and the last
-added is the topmost. Two measured libadwaita facts fix it: with no `default_response` **the focus goes
-to the *first* added response** (not the last — `Adw-1.gir` says otherwise and case 9 measures both
-directions), and the layout is bottom-up from the add order. So the first slot is a decline and the
-topmost button is a decline. `buildDialog` names `default_response` explicitly rather than letting the add
-order choose it, and `show()` grabs the focus — **case 10 builds a look-alike three ways** (grab in
-`map`, grab in an idle, no grab) and only the third reads `allow_once`, which is the whole justification
-for that grab. It is not observable from outside `PermissionDialog` (`present()` maps synchronously), so
-the widget probe measures the settled focus and every turn in between instead.
-
-**The button labels are kurier's four short sentences and the agent's own names are not on them.** The
-labels were once "kurier's word + the agent's name", which read "Always decline: Always decline in thi…"
-and was unreadable at the 360 px floor — a button is the decision, so its label has to fit one line. The
-agent's wording moved into the body as one caption line (`agentNames`), shown only when a name says
-something the kind does not. The terminal prompt follows the same rule: it prints `y = Allow once`, the
-option a `y` actually grants, in the same words as the button.
+**The button labels** are kurier's four short sentences; the agent's own names are not on them
+(captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md)). A button label must fit one line.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
 `Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is
-unusable, and `gjs -m scripts/probes/window-min-width.mjs [floor]` prints the sweep that says so;
-pass a number to reproduce a different floor, or nothing to see what the window does without one.
+unusable. [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agents-md) has the
+reproduction sweep and the cost to the config row.
 
 **GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
 question. Both runtimes, as in postbote and beifahrer:
