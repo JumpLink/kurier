@@ -31,6 +31,7 @@ import resolve from './unit/core/resolve.test.ts';
 import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
 import settings from './unit/core/settings.test.ts';
+import settingsView from './unit/core/settings-view.test.ts';
 import scroll from './unit/core/scroll.test.ts';
 import sessionGroups from './unit/core/session-groups.test.ts';
 import transcriptItems from './unit/core/transcript-items.test.ts';
@@ -69,6 +70,7 @@ run({
   devAgent,
   paths,
   settings,
+  settingsView,
   scroll,
   sessionGroups,
   transcriptItems,

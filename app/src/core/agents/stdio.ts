@@ -300,6 +300,54 @@ export function which(
   return probe ? probeOnHost(probe) : null;
 }
 
+/**
+ * `which` without blocking the caller: the same three answers, but the host question is a child process
+ * awaited, not `spawnSync`. For a surface that must keep drawing while the host answers (the preferences
+ * dialog inside a Flatpak). Outside a Flatpak there is no host question and this resolves at once.
+ */
+export async function whichAsync(
+  program: string,
+  env: NodeJS.ProcessEnv = process.env,
+  facts = currentSandboxFacts(),
+): Promise<string | null> {
+  if (program.includes('/')) return isExecutable(program, env) ? program : null;
+  const local = whichOnPath(program, env);
+  if (local) return local;
+  const probe = hostProbeArgv(program, facts);
+  return probe ? probeOnHostAsync(probe) : null;
+}
+
+/** The async twin of `probeOnHost`: same argv, same cap, same acceptance rule; stdin and stderr ignored. */
+function probeOnHostAsync(argv: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let settled = false;
+    const finish = (answer: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(answer);
+    };
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(FLATPAK_SPAWN, argv, { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      resolve(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(null);
+    }, HOST_PROBE_TIMEOUT_MS);
+    child.stdout?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.on('error', () => finish(null));
+    child.on('close', (code) => finish(code === 0 ? parseHostProbeOutput(stdout) : null));
+  });
+}
+
 /** The pure PATH walk, exactly as it was. */
 function whichOnPath(program: string, env: NodeJS.ProcessEnv): string | null {
   const path = env['PATH'] ?? '';
@@ -338,7 +386,15 @@ function probeOnHost(argv: string[]): string | null {
     timeout: HOST_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) return null;
-  const found = (result.stdout ?? '')
+  return parseHostProbeOutput(result.stdout ?? '');
+}
+
+/**
+ * The path in a host probe's stdout, or `null`. Shared by the blocking probe and the async one, so the two
+ * cannot disagree about what counts as an answer.
+ */
+export function parseHostProbeOutput(stdout: string): string | null {
+  const found = stdout
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)

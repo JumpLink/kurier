@@ -57,6 +57,7 @@ The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is
 precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
 `kurier agents --use <id>[:bundled|host]|none` writes it.
+The GUI writes it from Preferences (`<Ctrl>comma`; `core/settings-view.ts` decides the rows, unavailable ones stay listed) and a change applies the next time kurier starts (the window resolves its agent once and keeps it); a settings file kurier could not read is never destroyed by a save (`saveDecision`: a newer `version` refuses, anything else is first moved to `settings.json.bak`); inside a Flatpak the dialog opens before the host answers (`Checking…`, then async). Hooks `KU_APP_PREFERENCES[_AGENT]` are in docs/dev-fixtures.md.
 With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
 `toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under

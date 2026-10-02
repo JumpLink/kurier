@@ -186,6 +186,20 @@ export interface KurierHooks extends FrameworkHooks {
    * photograph a dropdown with the modal still up — a state a person cannot be in.
    */
   chooseModel?: boolean;
+
+  /**
+   * `KU_APP_PREFERENCES` — open the preferences dialog through its own `app.preferences` action.
+   * A flag, so `KU_APP_PREFERENCES=0` leaves it closed.
+   */
+  preferences?: boolean;
+
+  /**
+   * `KU_APP_PREFERENCES_AGENT` — choose a row in that dialog by key (`auto`, `opencode:host`,
+   * `opencode:bundled`) through its own handler, and open the dialog first. A combo or radio row is
+   * what the devtools plane cannot operate (see above), so this is the only way to photograph the
+   * dialog after a choice.
+   */
+  preferencesAgent?: string;
 }
 
 /**
@@ -228,6 +242,8 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     // A flag for the same reason `DISMISS_FAILURE` is one: it changes the state under test, so it has to
     // honour its own off-switch. `KU_APP_CHOOSE_MODEL=0` must leave the dialog up, not press it.
     chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
+    preferences: hookFlag(env, 'PREFERENCES'),
+    preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),
     thinking: hookFlag(env, 'THINKING'),
     prompt: hookValue(env, 'PROMPT'),
   };

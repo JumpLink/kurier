@@ -243,6 +243,20 @@ The two rules these five all follow — each hook goes **through the surface** r
 hook's value is read by `frontends/gui/hook-value.ts` and not by `hooks.ts` — are stated once, with the
 reason for each, in `AGENTS.md` § Run / build / test.
 
+## The preferences dialog
+
+Not a sixth pointer-only control in the table above, but the same reason: radio rows are not operable from the devtools plane. `KU_APP_PREFERENCES=1` opens the dialog through `app.preferences`, the action the menu and `<Ctrl>comma` run. `KU_APP_PREFERENCES_AGENT=<key>` opens it and chooses a row through the dialog's own handler; keys are `auto`, `<id>:host`, `<id>:bundled`. Both follow `flag()`/`hookValue` rules, and each logs one line saying whether it reached.
+
+```sh
+# 360 px: with GJSIFY_DEVTOOLS=1, resize afterwards:
+#   gdbus call --session --dest eu.jumplink.Kurier --object-path /eu/jumplink/Kurier/devtools \
+#     --method org.gjsify.Devtools.ResizeWindow 360 600
+GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-in KU_APP_PREFERENCES_AGENT=opencode:bundled \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version.
+
 ## The permission dialog
 
 **The three GTK facts behind it are measured, not read from the signal docs**: `Adw.Dialog` emits

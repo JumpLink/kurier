@@ -12,10 +12,14 @@ import { join } from 'node:path';
 import {
   DEFAULT_SETTINGS,
   parseChoiceSpec,
+  backupPath,
   parseSettings,
   readSettings,
+  saveDecision,
+  saveSettings,
   writeSettings,
   type Settings,
+  type SettingsProblemKind,
 } from '../../../src/core/settings.ts';
 
 async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
@@ -28,6 +32,12 @@ async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<
 }
 
 const BUNDLED: Settings = { version: 1, agent: { id: 'opencode', source: 'bundled' } };
+
+function kindOf(raw: string): SettingsProblemKind {
+  const parsed = parseSettings(raw);
+  if (!('problem' in parsed)) throw new Error(`expected a problem, got ${JSON.stringify(parsed)}`);
+  return parsed.kind;
+}
 
 function problemOf(raw: string): string {
   const parsed = parseSettings(raw);
@@ -145,6 +155,7 @@ export default async () => {
         expect(readSettings(join(dir, 'nope.json'))).toStrictEqual({
           settings: DEFAULT_SETTINGS,
           problem: null,
+          problemKind: null,
         });
       });
     });
@@ -186,7 +197,7 @@ export default async () => {
       await withTempDir(async (dir) => {
         const file = join(dir, 'settings.json');
         writeSettings(file, BUNDLED);
-        expect(readSettings(file)).toStrictEqual({ settings: BUNDLED, problem: null });
+        expect(readSettings(file)).toStrictEqual({ settings: BUNDLED, problem: null, problemKind: null });
         writeSettings(file, DEFAULT_SETTINGS);
         expect(readSettings(file).settings).toStrictEqual(DEFAULT_SETTINGS);
       });
@@ -246,6 +257,87 @@ export default async () => {
         }
         expect(threw).toBe(true);
         expect(readdirSync(dir)).toStrictEqual(['settings.json']);
+      });
+    });
+  });
+
+  await describe('the problem kind', async () => {
+    await it('a higher version number is newer-version, even with keys this kurier lacks', async () => {
+      expect(kindOf('{"version":2,"agent":null}')).toBe('newer-version');
+      expect(kindOf('{"version":9,"theme":"dark"}')).toBe('newer-version');
+      expect(kindOf('{"version":9,"token":"x"}')).toBe('newer-version');
+    });
+
+    await it('every other problem is invalid', async () => {
+      expect(kindOf('{ nope')).toBe('invalid');
+      expect(kindOf('[]')).toBe('invalid');
+      expect(kindOf('{"agent":null}')).toBe('invalid');
+      expect(kindOf('{"version":"2"}')).toBe('invalid');
+      expect(kindOf('{"version":0}')).toBe('invalid');
+      expect(kindOf('{"version":1,"token":"x"}')).toBe('invalid');
+      expect(kindOf('{"version":1,"agent":{"id":"a","source":"flatpak"}}')).toBe('invalid');
+    });
+
+    await it('readSettings carries the kind; unreadable is its own', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'settings.json');
+        writeFileSync(file, '{"version":9,"agent":null}');
+        expect(readSettings(file).problemKind).toBe('newer-version');
+        writeFileSync(file, '{ not json');
+        expect(readSettings(file).problemKind).toBe('invalid');
+        expect(readSettings(dir).problemKind).toBe('unreadable');
+      });
+    });
+  });
+
+  await describe('saveDecision', async () => {
+    await it('writes over a clean file, backs up an invalid one, refuses the rest', async () => {
+      expect(saveDecision(null)).toBe('write');
+      expect(saveDecision('invalid')).toBe('backup-then-write');
+      expect(saveDecision('newer-version')).toBe('refuse');
+      expect(saveDecision('unreadable')).toBe('refuse');
+    });
+  });
+
+  await describe('saveSettings', async () => {
+    await it('a clean or missing file is written with no backup', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'settings.json');
+        expect(saveSettings(file, BUNDLED)).toStrictEqual({ backup: null });
+        expect(saveSettings(file, DEFAULT_SETTINGS)).toStrictEqual({ backup: null });
+        expect(readdirSync(dir)).toStrictEqual(['settings.json']);
+      });
+    });
+
+    await it('a newer-version file is refused and left byte for byte as it was', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'settings.json');
+        const text = '{"version":9,"agent":null,"theme":"dark"}\n';
+        writeFileSync(file, text);
+        let message = '';
+        try {
+          saveSettings(file, BUNDLED);
+        } catch (error) {
+          message = error instanceof Error ? error.message : String(error);
+        }
+        expect(message).toContain('not overwriting');
+        expect(readFileSync(file, 'utf8')).toBe(text);
+        expect(readdirSync(dir)).toStrictEqual(['settings.json']);
+      });
+    });
+
+    await it('an invalid file is moved to .bak (0600, replacing an older one), then the choice is written', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'settings.json');
+        const bak = backupPath(file);
+        expect(bak).toBe(`${file}.bak`);
+        writeFileSync(bak, 'an older copy');
+        writeFileSync(file, '{"version":1,"token":"x"}', { mode: 0o644 });
+        expect(saveSettings(file, BUNDLED)).toStrictEqual({ backup: bak });
+        expect(readFileSync(bak, 'utf8')).toBe('{"version":1,"token":"x"}');
+        expect(statSync(bak).mode & 0o777).toBe(0o600);
+        expect(readSettings(file)).toStrictEqual({ settings: BUNDLED, problem: null, problemKind: null });
+        expect(readdirSync(dir).sort()).toStrictEqual(['settings.json', 'settings.json.bak']);
       });
     });
   });

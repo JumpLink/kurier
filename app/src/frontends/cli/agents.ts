@@ -19,7 +19,7 @@ import {
   describeChoice,
   parseChoiceSpec,
   readSettings,
-  writeSettings,
+  saveSettings,
   type Settings,
 } from '../../core/settings.ts';
 
@@ -92,10 +92,13 @@ const command: CommandModule = {
         return;
       }
       try {
-        writeSettings(file, { version: 1, agent: parsed.choice });
+        const { backup } = saveSettings(file, { version: 1, agent: parsed.choice });
+        if (backup) err(`the earlier settings file was moved to ${backup}`);
       } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code ?? 'unknown error';
-        err(`could not write ${file}: ${code}`);
+        const code = (error as NodeJS.ErrnoException).code;
+        err(
+          code ? `could not write ${file}: ${code}` : error instanceof Error ? error.message : String(error),
+        );
         process.exitCode = 1;
         return;
       }

@@ -27,10 +27,13 @@ import { runAdwaitaApp } from '@gjsify/adwaita-app';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 
 import { chooseAgent } from '../../core/agents/dev-agent.ts';
-import { gatherResolveContext } from '../../core/agents/probe.ts';
+import { BUNDLED_AGENTS } from '../../core/agents/catalog.ts';
+import { gatherResolveContext, gatherResolveContextAsync } from '../../core/agents/probe.ts';
 import { NO_AGENT_MESSAGE, resolveDefaultWithNote } from '../../core/agents/resolve.ts';
+import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
 import { sessionsFile, settingsFile } from '../../core/paths.ts';
-import { readSettings } from '../../core/settings.ts';
+import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
+import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
 import { MainWindow } from './window.ts';
@@ -67,7 +70,8 @@ const settingsNotes: string[] = [];
 const agent = chooseAgent(hooks.agent, () => {
   const { settings, problem } = readSettings(settingsFile());
   if (problem) settingsNotes.push(problem);
-  // No `--version` spawn: the window must not wait on a child before it appears.
+  // No `--version` spawn. Inside a Flatpak this still asks the host, synchronously (up to 5 s per
+  // launcher), before the window exists — only the preferences dialog is asynchronous (see below).
   const { agent: found, note } = resolveDefaultWithNote(
     gatherResolveContext(process.env, false),
     settings.agent,
@@ -78,6 +82,8 @@ const agent = chooseAgent(hooks.agent, () => {
 });
 for (const note of settingsNotes) console.log(`kurier: ${note}`);
 if (agent.note) console.log(`kurier: ${agent.note}`);
+
+const sandboxed = isSandboxed(currentSandboxFacts());
 
 const status = await runAdwaitaApp({
   applicationId: APP_ID,
@@ -100,6 +106,35 @@ const status = await runAdwaitaApp({
     new MainWindow(app, {
       hooks,
       agent: agent.command,
+      preferences: {
+        // The file is read afresh on every open and after every choice, so the rows show the file, not a
+        // memory of it. Never a blocking child: with no host answer yet (`detected` null) the PATH walk
+        // is all that runs, and inside a Flatpak the host rows say "Checking…" until `detect` answers.
+        // Outside a Flatpak there is no host question, so `detect` is `null` and the cheap rows are final.
+        load: (detected) => {
+          const file = settingsFile();
+          const { settings, problem, problemKind } = readSettings(file);
+          const context = detected ?? gatherResolveContext(process.env, false, false);
+          return settingsChoicesView(context.detections, BUNDLED_AGENTS, settings, {
+            bundledAvailable: context.bundledAvailable,
+            problem,
+            problemKind,
+            backupPath: backupPath(file),
+            hostPending: detected === null && sandboxed,
+          });
+        },
+        detect: sandboxed
+          ? async () => {
+              try {
+                return await gatherResolveContextAsync(process.env);
+              } catch {
+                // A probe that threw means "no host answer": the cheap rows, now final.
+                return gatherResolveContext(process.env, false, false);
+              }
+            }
+          : null,
+        save: (choice) => saveSettings(settingsFile(), { version: 1, agent: choice }),
+      },
       loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
       // **One store for the window's lifetime, not one per call.** The window reads the file once at
       // startup and appends a batch per streamed chunk; a fresh store per append would re-read and

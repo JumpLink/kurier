@@ -88,6 +88,16 @@ template $KurierMainWindow: Adw.ApplicationWindow {
         // collapsed window was missing was never a button; it was `MainWindow.#open`.
         Adw.HeaderBar contentHeader {
           show-title: false;
+
+          // The primary menu holds the app-level actions; `app.preferences` is installed by
+          // `MainWindow.#installPreferences`, which also binds `<Ctrl>comma`.
+          [end]
+          Gtk.MenuButton {
+            icon-name: "open-menu-symbolic";
+            menu-model: primary_menu;
+            primary: true;
+            tooltip-text: "Main menu";
+          }
         }
         // **The stack, not a swap of `set_content`.** The empty state and a session are two
         // answers to one question, and a `Gtk.Stack` holds both so switching back and forth is a
@@ -145,4 +155,13 @@ template $KurierMainWindow: Adw.ApplicationWindow {
       };
     };
   };
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: "Preferences";
+      action: "app.preferences";
+    }
+  }
 }

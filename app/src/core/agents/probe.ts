@@ -12,8 +12,8 @@ import { detectAgents, parseVersionOutput, type AgentFacts } from './detect.ts';
 import { isolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
 import type { ResolveContext } from './resolve.ts';
-import { currentSandboxFacts, toHostCommand } from './sandbox.ts';
-import { which, type AgentCommand } from './stdio.ts';
+import { currentSandboxFacts, toHostCommand, type SandboxFacts } from './sandbox.ts';
+import { which, whichAsync, type AgentCommand } from './stdio.ts';
 
 const VERSION_TIMEOUT_MS = 5000;
 
@@ -31,16 +31,23 @@ function readVersion(launcher: AgentCommand, program: string): string | null {
   return parseVersionOutput(result.stdout ?? '');
 }
 
+const NO_HOST: SandboxFacts = { flatpakInfoExists: false };
+
 /**
  * `readVersions: false` skips the `--version` spawn (up to 5 s per launcher). Detection needs only the
- * path; the version is cosmetic, so the window asks for none and never waits on a child at startup.
+ * path; the version is cosmetic, so the preferences dialog asks for none.
+ *
+ * `probeHost: false` also skips the one other child: inside a Flatpak, `which` asks the host's shell
+ * (`flatpak-spawn`, up to 5 s per launcher) when the sandbox's own PATH has nothing. Outside a Flatpak
+ * there is no such question, so the flag changes nothing there.
  */
 export function gatherAgentFacts(
   launchers: readonly AgentCommand[] = LAUNCHERS,
   readVersions = true,
+  probeHost = true,
 ): AgentFacts[] {
   return launchers.map((launcher): AgentFacts => {
-    const hostPath = which(launcher.program);
+    const hostPath = which(launcher.program, process.env, probeHost ? currentSandboxFacts() : NO_HOST);
     const entry = BUNDLED_AGENTS.find((candidate) => candidate.id === launcher.id);
     return {
       id: launcher.id,
@@ -51,13 +58,44 @@ export function gatherAgentFacts(
   });
 }
 
+/**
+ * The facts without a blocking child: every host question is awaited, and no `--version` is read. The
+ * answer a surface shows after the cheap `gatherResolveContext(env, false, false)` has been drawn.
+ */
+export async function gatherAgentFactsAsync(
+  launchers: readonly AgentCommand[] = LAUNCHERS,
+): Promise<AgentFacts[]> {
+  return Promise.all(
+    launchers.map(async (launcher): Promise<AgentFacts> => {
+      const entry = BUNDLED_AGENTS.find((candidate) => candidate.id === launcher.id);
+      return {
+        id: launcher.id,
+        hostPath: await whichAsync(launcher.program),
+        hostVersion: null,
+        bundledExists: entry !== undefined && existsSync(bundledProgram(entry)),
+      };
+    }),
+  );
+}
+
+export async function gatherResolveContextAsync(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ResolveContext> {
+  return resolveContextFrom(env, await gatherAgentFactsAsync());
+}
+
 /** The impure half of resolution: probe this machine once, and say where a bundled copy keeps its state. */
 export function gatherResolveContext(
   env: NodeJS.ProcessEnv = process.env,
   readVersions = true,
+  probeHost = true,
 ): ResolveContext {
+  return resolveContextFrom(env, gatherAgentFacts(LAUNCHERS, readVersions, probeHost));
+}
+
+function resolveContextFrom(env: NodeJS.ProcessEnv, facts: readonly AgentFacts[]): ResolveContext {
   return {
-    detections: detectAgents(gatherAgentFacts(LAUNCHERS, readVersions)),
+    detections: detectAgents(facts),
     isolationFor: (id) => isolationDirs(dataDir(env), id),
     bundledAvailable: (id) => {
       const entry = BUNDLED_AGENTS.find((candidate) => candidate.id === id);

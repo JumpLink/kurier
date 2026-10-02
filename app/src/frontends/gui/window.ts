@@ -64,6 +64,7 @@
  */
 
 import Adw from '@girs/adw-1';
+import Gio from '@girs/gio-2.0';
 import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
 // Type-only, and the reason it reads that way: the `Gtk.Stack` the window names is the template's
@@ -92,6 +93,7 @@ import { Composer } from './composer.ts';
 import { ConfigRow } from './config-row.ts';
 import { FailureDialog } from './failure-dialog.ts';
 import { PermissionDialog } from './permission-dialog.ts';
+import { PreferencesDialog, type PreferencesActions } from './preferences.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
 import Template from './window.blp';
@@ -152,6 +154,8 @@ export interface MainWindowOptions {
   readonly loadSessions: () => readonly SessionRecord[];
   /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else the available setting, else host install, else bundled. */
   readonly agent: AgentCommand;
+  /** What the preferences dialog reads and writes. Absent: no Preferences entry. */
+  readonly preferences?: PreferencesActions;
   /** Persist streamed transcript lines. Called once per arriving batch, in order. */
   readonly appendTurns?: (sessionId: string, entries: TranscriptEntry[]) => void;
   /** The clock, injected so a screenshot run is the only place a real one is used. */
@@ -263,6 +267,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   #permissionSource: number | null = null;
   /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
   #permissionTicks = 0;
+  #preferences: PreferencesDialog | null = null;
 
   /**
    * `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`, and the one timer that runs all
@@ -407,9 +412,26 @@ export class MainWindow extends Adw.ApplicationWindow {
     // the same breakpoint sets `collapsed` on the first frame at 500 px — checked by running it, not
     // by reading it.
     this.#applyBreakpoint();
+    if (options.preferences) this.#installPreferences(app, options.preferences);
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
+  }
+
+  /**
+   * The Preferences entry: `app.preferences`, `<Ctrl>comma`, and a primary menu in the content header.
+   * The action is the one entry point, so the menu, the accelerator and `KU_APP_PREFERENCES` all run the
+   * same call.
+   */
+  #installPreferences(app: Adw.Application, actions: PreferencesActions): void {
+    const dialog = new PreferencesDialog(actions);
+    this.#preferences = dialog;
+    // Installed once: the window is the app's only one (`AdwaitaApp` memoises `createWindow`), so this
+    // constructor runs once per process and the action and its accelerator are never added twice.
+    const action = new Gio.SimpleAction({ name: 'preferences' });
+    action.connect('activate', () => dialog.show(this));
+    app.add_action(action);
+    app.set_accels_for_action('app.preferences', ['<Ctrl>comma']);
   }
 
   #load(loadSessions: () => readonly SessionRecord[]): void {
@@ -770,6 +792,34 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     this.#applyStopHook(hooks);
     this.#applyFailureHooks(hooks);
+    this.#applyPreferencesHooks(hooks);
+  }
+
+  /** `KU_APP_PREFERENCES` opens the dialog through its action; `KU_APP_PREFERENCES_AGENT` also chooses a row. */
+  #applyPreferencesHooks(hooks: KurierHooks): void {
+    if (hooks.preferences !== true && hooks.preferencesAgent === undefined) return;
+    const dialog = this.#preferences;
+    const app = this.application;
+    if (!dialog || !app) {
+      console.log('kurier: KU_APP_PREFERENCES — this window has no preferences dialog');
+      return;
+    }
+    console.log('kurier: KU_APP_PREFERENCES — opening the dialog through app.preferences');
+    app.activate_action('preferences', null);
+    const key = hooks.preferencesAgent;
+    if (key === undefined) return;
+    // The rows are final once the host detection (if any) has answered; the dialog says when.
+    void dialog.ready().then(() => {
+      const outcome = dialog.select(key);
+      const said: Record<typeof outcome, string> = {
+        chose: `chose ${key} through the dialog`,
+        unchanged: `${key} is already the saved choice — nothing written`,
+        refused: 'the dialog is locked (the settings file is not overwritten) — nothing written',
+        failed: `choosing ${key} did not save — see the dialog`,
+        missing: `no row ${key} in the dialog`,
+      };
+      console.log(`kurier: KU_APP_PREFERENCES_AGENT — ${said[outcome]}`);
+    });
   }
 
   /**
