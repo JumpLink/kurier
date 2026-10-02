@@ -48,3 +48,11 @@ export function settingsFile(env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env['KURIER_SETTINGS_FILE']?.trim();
   return explicit || join(xdgConfigHome(env), 'kurier', 'settings.json');
 }
+
+/**
+ * The dismissed-notices file: ids only, in the data directory. `KURIER_NOTICES_FILE` overrides it.
+ */
+export function noticesFile(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env['KURIER_NOTICES_FILE']?.trim();
+  return explicit || join(dataDir(env), 'notices.json');
+}

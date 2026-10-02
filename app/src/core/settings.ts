@@ -19,19 +19,9 @@
  * different choices: they keep separate logins and histories (`core/agents/isolation.ts`).
  */
 
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, join } from 'node:path';
+import { chmodSync, readFileSync, renameSync } from 'node:fs';
+
+import { writePrivateFile } from './private-file.ts';
 
 export type AgentChoiceSource = 'host' | 'bundled';
 
@@ -223,23 +213,5 @@ export function saveSettings(path: string, settings: Settings): { readonly backu
  * left alone: `KURIER_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
  */
 export function writeSettings(path: string, settings: Settings): void {
-  const dir = dirname(path);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    chmodSync(dir, 0o700);
-  }
-  const temp = join(dir, `.settings-${process.pid}-${Date.now()}.tmp`);
-  try {
-    writeFileSync(temp, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });
-    const handle = openSync(temp, 'r+');
-    try {
-      fsyncSync(handle);
-    } finally {
-      closeSync(handle);
-    }
-    renameSync(temp, path);
-  } catch (error) {
-    rmSync(temp, { force: true });
-    throw error;
-  }
+  writePrivateFile(path, `${JSON.stringify(settings, null, 2)}\n`, 'settings');
 }

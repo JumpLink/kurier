@@ -52,6 +52,11 @@ export interface ComposerInput {
    * makes one. Absent means no.
    */
   readonly startsConversation?: boolean;
+  /**
+   * Why no prompt can ever be sent from this window (no agent exists at all). Send and the entry are off and
+   * this is the caption. Stop still outranks it, though nothing can be running without an agent.
+   */
+  readonly unavailable?: string;
 }
 
 export interface ComposerView {
@@ -96,6 +101,16 @@ export function composerView(input: ComposerInput): ComposerView {
       reason: '',
       status:
         state === 'thinking' ? 'Working — the agent is answering.' : 'The agent is waiting for your answer.',
+    };
+  }
+
+  if (input.unavailable) {
+    return {
+      action: 'send',
+      buttonEnabled: false,
+      entryEditable: false,
+      reason: input.unavailable,
+      status: '',
     };
   }
 

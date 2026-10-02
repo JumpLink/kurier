@@ -285,6 +285,21 @@ GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE
 
 Two defects found on the way, both fixed: `agentStatus({status: 'none'})` was `attached: false`, so Send stayed disabled until an agent existed — and the agent only starts on the first prompt (only `KU_APP_THINKING` could send one); and `#open` re-read nothing, so a chat revisited after streaming showed the startup copy of its transcript.
 
+## The bundled-agent notice and the no-agent page
+
+The bundled copy exists only inside a Flatpak, so two hooks stand in for it. Both are flags (`0`/`false` = off) and both go through the window's own paths.
+
+- `KU_APP_NOTICE=1` — force the bundled-agent condition: the `Adw.Banner` under the content header shows (fixed English text from `core/empty-state.ts`, one **Got it**). Not shown for a host install, with no agent, or once dismissed. The text is kept to three lines at 360 px: `Adw.Banner` ellipsizes beyond that, which cut the statement itself.
+- `KU_APP_NOTICE_DISMISS=1` — press **Got it** by emitting the banner's own `button-clicked`; logs one line. The id lands in `$KURIER_NOTICES_FILE` (default `$XDG_DATA_HOME/kurier/notices.json`, 0600 in 0700, atomic write); a corrupt or unreadable file shows the notice again and never stops startup.
+- `KU_APP_NO_AGENT=1` — force the nothing-found resolution (beats `KU_APP_AGENT`): the content pane says "No agent found" with the install command (selectable text, no markup), the docs link and a **Preferences** button (`app.preferences`); Send and the entry are off with the reason under the composer. `kurier start`, `kurier auth` and `kurier agents` print the same remedy (`NO_AGENT_REMEDY`).
+
+```sh
+# synthetic everything; a missing sessions file is first run
+GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
+  KURIER_NOTICES_FILE=/tmp/x/notices.json KU_APP_CWD=/tmp/x/project KU_APP_AGENT=stand-in \
+  KU_APP_NOTICE=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs   # or KU_APP_NO_AGENT=1
+```
+
 ## The permission dialog
 
 **The three GTK facts behind it are measured, not read from the signal docs**: `Adw.Dialog` emits

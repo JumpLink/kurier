@@ -70,7 +70,7 @@ import GObject from '@girs/gobject-2.0';
 // Type-only, and the reason it reads that way: the `Gtk.Stack` the window names is the template's
 // `contentStack`, and the only mention of `Gtk` left in this file is that declaration. The import
 // that used to *build* one is gone with `buildSplitView`.
-import type Gtk from '@girs/gtk-4.0';
+import Gtk from '@girs/gtk-4.0';
 
 import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@kurier/session';
 
@@ -78,6 +78,7 @@ import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
 import type { RecordedResolution } from '../../core/agents/resolve.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
 import { displayCwd } from '../../core/cwd.ts';
+import type { EmptyStateView, NoticeView } from '../../core/empty-state.ts';
 import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
@@ -174,6 +175,12 @@ export interface MainWindowOptions {
   readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
   /** What the preferences dialog reads and writes. Absent: no Preferences entry. */
   readonly preferences?: PreferencesActions;
+  /** Nothing could be resolved: the content pane says so and Send is off. Absent: an agent exists. */
+  readonly noAgent?: Extract<EmptyStateView, { kind: 'no-agent' }>;
+  /** The privacy banner to show under the content header, until it is dismissed. */
+  readonly notice?: NoticeView;
+  /** Remember that the notice was dismissed. */
+  readonly rememberNotice?: (id: NoticeView['id']) => void;
   /** Persist streamed transcript lines. Called once per arriving batch, in order. */
   readonly appendTurns?: (sessionId: string, entries: TranscriptEntry[]) => void;
   /** The clock, injected so a screenshot run is the only place a real one is used. */
@@ -227,6 +234,12 @@ export class MainWindow extends Adw.ApplicationWindow {
   declare readonly _composerHost: Adw.Bin;
   /** One dim line under the composer naming the directory a new chat will run in. Hidden otherwise. */
   declare readonly _cwdCaption: Gtk.Label;
+  declare readonly _noticeBanner: Adw.Banner;
+  declare readonly _noAgentPage: Adw.StatusPage;
+  declare readonly _noAgentBody: Gtk.Label;
+  declare readonly _noAgentCommands: Gtk.Box;
+  declare readonly _noAgentDocs: Gtk.Label;
+  declare readonly _noAgentPreferences: Gtk.Button;
 
   readonly #sessions: SessionList;
   /** One transcript view for the whole window, refilled per session. See the constructor. */
@@ -297,6 +310,10 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
   #permissionTicks = 0;
   #preferences: PreferencesDialog | null = null;
+  /** Why no prompt can be sent at all (no agent found), or `undefined`. Feeds the composer. */
+  readonly #unavailable: string | undefined;
+  #notice: NoticeView | null = null;
+  #rememberNotice: ((id: NoticeView['id']) => void) | undefined;
 
   /**
    * `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`, and the one timer that runs all
@@ -349,6 +366,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this._contentPage.title = APP_NAME;
     this._sidebarTitle.title = APP_NAME;
 
+    this.#unavailable = options.noAgent?.sendReason;
     this.#loadSessions = options.loadSessions;
     this.#newChat = options.newChat;
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
@@ -412,7 +430,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       // to be kept in step with the controller's defaults by hand — and the first version of this line
       // did exactly that, and then the controller's constructor emitted its own state into a composer
       // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
-      input: composerInput(this.#agent.snapshot),
+      input: composerInput(this.#agent.snapshot, this.#unavailable),
       onSend: (text) => this.#onSend(text),
       // **Stop takes the dialog down with it, and names the reason before it does.** The window
       // contributes only the ordering — `agent.stop()` settles the question itself — so the two calls
@@ -447,11 +465,50 @@ export class MainWindow extends Adw.ApplicationWindow {
     // the same breakpoint sets `collapsed` on the first frame at 500 px — checked by running it, not
     // by reading it.
     this.#applyBreakpoint();
+    if (options.noAgent) this.#showNoAgent(options.noAgent, options.preferences !== undefined);
+    if (options.notice) this.#showNotice(options.notice, options.rememberNotice);
     if (options.preferences) this.#installPreferences(app, options.preferences);
     this.#installNewChat(app);
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
+  }
+
+  /** The nothing-found page: what `emptyStateView` said, on screen, with the commands selectable. */
+  #showNoAgent(view: Extract<EmptyStateView, { kind: 'no-agent' }>, hasPreferences: boolean): void {
+    this._noAgentPage.title = view.title;
+    this._noAgentBody.label = view.body;
+    for (const command of view.commands) {
+      const label = new Gtk.Label({
+        label: command,
+        selectable: true,
+        useMarkup: false,
+        wrap: true,
+        xalign: 0,
+      });
+      label.add_css_class('monospace');
+      this._noAgentCommands.append(label);
+    }
+    this._noAgentDocs.label = `or see ${view.docsUrl}`;
+    this._noAgentPreferences.visible = hasPreferences;
+    this._contentStack.visibleChildName = 'no-agent';
+  }
+
+  #showNotice(view: NoticeView, remember: ((id: NoticeView['id']) => void) | undefined): void {
+    this.#notice = view;
+    this.#rememberNotice = remember;
+    this._noticeBanner.title = view.text;
+    this._noticeBanner.buttonLabel = view.button;
+    this._noticeBanner.connect('button-clicked', () => this.#dismissNotice());
+    this._noticeBanner.revealed = true;
+  }
+
+  #dismissNotice(): void {
+    const view = this.#notice;
+    if (!view) return;
+    this.#notice = null;
+    this._noticeBanner.revealed = false;
+    this.#rememberNotice?.(view.id);
   }
 
   /**
@@ -501,11 +558,11 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#agent.startConversation(chat.cwd);
     this.#permissions.close();
     this.#transcript.setEntries([]);
-    this._contentStack.visibleChildName = 'new';
+    this._contentStack.visibleChildName = this.#unavailable ? 'no-agent' : 'new';
     this._contentPage.title = APP_NAME;
     this._contentHeader.showTitle = false;
     this._cwdCaption.label = `in ${displayCwd(chat.cwd, chat.home)}`;
-    this._cwdCaption.visible = true;
+    this._cwdCaption.visible = !this.#unavailable;
     this._split.showContent = true;
   }
 
@@ -646,7 +703,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * event as a state change arriving.
    */
   #onSend(text: string): void {
-    if (text.trim() === '') return;
+    if (text.trim() === '' || this.#unavailable) return;
     this.#composer.clearDraft();
     void this.#agent.prompt(text);
   }
@@ -663,7 +720,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * truth about whether the app is alive.
    */
   #onSnapshot(snapshot: AgentSnapshot): void {
-    this.#composer.setInput(composerInput(snapshot));
+    this.#composer.setInput(composerInput(snapshot, this.#unavailable));
     // `keepsDraft` is the decision and it lives in core; the window only carries it out. An agent that
     // exited can never receive what is in the entry, and leaving it there collects words that go
     // nowhere — so `gone` is the one state that discards it.
@@ -904,6 +961,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         return GLib.SOURCE_CONTINUE;
       });
     }
+    if (hooks.noticeDismiss === true) {
+      if (this.#notice) {
+        console.log('kurier: KU_APP_NOTICE_DISMISS — pressing the banner’s Got it');
+        this._noticeBanner.emit('button-clicked');
+      } else {
+        console.log('kurier: KU_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
+      }
+    }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
     // `KU_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
     // turn against whatever agent was selected — no staged fake stream — because a fake one would test
@@ -911,7 +976,11 @@ export class MainWindow extends Adw.ApplicationWindow {
     // anything from the session file: a screenshot must not carry a real conversation out of it.
     if (hooks.thinking === true) {
       const prompt = hooks.prompt ?? 'Summarise this repository in three sentences.';
-      if (!this.#hasChat()) {
+      if (this.#unavailable) {
+        // The composer refuses to send here, so the hook does too: a hook that could send where a person
+        // cannot would photograph a window that does not exist.
+        console.log(`kurier: KU_APP_THINKING — not sent: ${this.#unavailable}`);
+      } else if (!this.#hasChat()) {
         console.log('kurier: KU_APP_THINKING — no session is open, so there is nowhere to send it');
       } else {
         console.log(
@@ -1194,8 +1263,9 @@ export class MainWindow extends Adw.ApplicationWindow {
  * the window assembled the input itself, the join between the two core modules would be a second
  * implementation of it — and this file's header is about not having decisions here.
  */
-function composerInput(snapshot: AgentSnapshot): ComposerInput {
+function composerInput(snapshot: AgentSnapshot, unavailable?: string): ComposerInput {
   return {
+    ...(unavailable ? { unavailable } : {}),
     state: snapshot.state,
     agent: agentStatus(snapshot.attachment),
     sessionId: snapshot.sessionId,
@@ -1222,6 +1292,12 @@ GObject.registerClass(
       'configHost',
       'composerHost',
       'cwdCaption',
+      'noticeBanner',
+      'noAgentPage',
+      'noAgentBody',
+      'noAgentCommands',
+      'noAgentDocs',
+      'noAgentPreferences',
     ],
   },
   MainWindow,

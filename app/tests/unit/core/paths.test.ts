@@ -3,7 +3,14 @@ import { describe, expect, it } from '@gjsify/unit';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { dataDir, sessionsFile, settingsFile, xdgConfigHome, xdgDataHome } from '../../../src/core/paths.ts';
+import {
+  dataDir,
+  noticesFile,
+  sessionsFile,
+  settingsFile,
+  xdgConfigHome,
+  xdgDataHome,
+} from '../../../src/core/paths.ts';
 
 const XDG_DEFAULT = join(homedir(), '.local', 'share');
 
@@ -60,6 +67,16 @@ export default async () => {
 
     await it('ignores a relative XDG_CONFIG_HOME', async () => {
       expect(xdgConfigHome({ XDG_CONFIG_HOME: 'relative' })).toBe(join(homedir(), '.config'));
+    });
+  });
+
+  await describe('noticesFile', async () => {
+    await it('honors KURIER_NOTICES_FILE', async () => {
+      expect(noticesFile({ KURIER_NOTICES_FILE: '/tmp/x/n.json' })).toBe('/tmp/x/n.json');
+    });
+
+    await it('defaults to notices.json in the data directory', async () => {
+      expect(noticesFile({ KURIER_DATA_DIR: '/opt/kd' })).toBe('/opt/kd/notices.json');
     });
   });
 };

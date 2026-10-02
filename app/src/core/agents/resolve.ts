@@ -11,6 +11,7 @@
 
 import { dirname } from 'node:path';
 
+import { NO_AGENT_REMEDY } from '../empty-state.ts';
 import { BUNDLED_AGENTS, bundledProgram, type BundledAgent } from './catalog.ts';
 import { resolveAgent, type AgentDetection } from './detect.ts';
 import type { AgentChoice } from '../settings.ts';
@@ -19,9 +20,7 @@ import { LAUNCHERS } from './launcher.ts';
 import type { AgentCommand } from './stdio.ts';
 
 /** Shown when nothing can be started. Names the way out, not just the lack. */
-export const NO_AGENT_MESSAGE =
-  'no agent is available — install one (opencode: https://opencode.ai/docs/#install), ' +
-  'or use a Flatpak build of kurier, which bundles one';
+export const NO_AGENT_MESSAGE = `no agent is available — ${NO_AGENT_REMEDY}`;
 
 export type ResolvedSource = 'host' | 'bundled';
 

@@ -23,6 +23,7 @@ import {
   type Settings,
 } from '../../core/settings.ts';
 
+import { NO_AGENT_REMEDY } from '../../core/empty-state.ts';
 import { err, out, pickArgv } from './output.ts';
 
 const SOURCE_LABEL = { host: 'host', bundled: 'bundled', none: 'not found' } as const;
@@ -58,7 +59,7 @@ export function agentsReport(
   lines.push(
     chosen
       ? `kurier would use: ${chosen.id} (${SOURCE_LABEL[chosen.source]}, ${chosen.path}${chosen.version ? `, ${chosen.version}` : ''})`
-      : 'kurier would use: none — no agent is available; install one of the launchers above',
+      : `kurier would use: none — no agent is available — ${NO_AGENT_REMEDY}`,
   );
   return lines;
 }

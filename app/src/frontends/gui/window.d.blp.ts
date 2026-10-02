@@ -28,8 +28,14 @@ export declare const InternalChildren: [
     'sidebarTitle',
     'contentPage',
     'contentStack',
+    'noAgentPage',
+    'noAgentBody',
+    'noAgentCommands',
+    'noAgentDocs',
+    'noAgentPreferences',
     'transcriptHost',
     'contentHeader',
+    'noticeBanner',
     'configHost',
     'composerHost',
     'cwdCaption',
@@ -43,8 +49,14 @@ export interface Children {
     _sidebarTitle: Adw.WindowTitle;
     _contentPage: Adw.NavigationPage;
     _contentStack: Gtk.Stack;
+    _noAgentPage: Adw.StatusPage;
+    _noAgentBody: Gtk.Label;
+    _noAgentCommands: Gtk.Box;
+    _noAgentDocs: Gtk.Label;
+    _noAgentPreferences: Gtk.Button;
     _transcriptHost: Adw.Bin;
     _contentHeader: Adw.HeaderBar;
+    _noticeBanner: Adw.Banner;
     _configHost: Adw.Bin;
     _composerHost: Adw.Bin;
     _cwdCaption: Gtk.Label;

@@ -268,4 +268,19 @@ export default async () => {
       });
     });
   });
+
+  await describe('an unavailable agent', async () => {
+    await it('turns Send and the entry off and says why, on screen', async () => {
+      const view = composerView({ ...at('idle', NOTHING, null), unavailable: 'No agent found.' });
+      expect(view.buttonEnabled).toBe(false);
+      expect(view.entryEditable).toBe(false);
+      expect(view.reason).toBe('No agent found.');
+    });
+
+    await it('is not in the way of Stop', async () => {
+      const view = composerView({ ...at('thinking'), unavailable: 'No agent found.' });
+      expect(view.action).toBe('stop');
+      expect(view.buttonEnabled).toBe(true);
+    });
+  });
 };

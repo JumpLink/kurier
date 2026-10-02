@@ -32,7 +32,9 @@ import { gatherCwdFacts, gatherResolveContext, gatherResolveContextAsync } from 
 import { NO_AGENT_MESSAGE, resolveDefaultWithNote, resolveRecorded } from '../../core/agents/resolve.ts';
 import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
 import { resolveCwd } from '../../core/cwd.ts';
-import { sessionsFile, settingsFile } from '../../core/paths.ts';
+import { emptyStateView, noticeView } from '../../core/empty-state.ts';
+import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
+import { noticesFile, sessionsFile, settingsFile } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
 import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
@@ -68,6 +70,7 @@ const settingsNotes: string[] = [];
  * will see it, and falls back rather than refusing to start. With no hook the agent is resolved as the CLI
  * resolves it: the saved setting if it is available, else the person's own install, else the bundled copy.
  */
+let nothingFound = false;
 const agent = chooseAgent(hooks.agent, () => {
   const { settings, problem } = readSettings(settingsFile());
   if (problem) settingsNotes.push(problem);
@@ -78,9 +81,28 @@ const agent = chooseAgent(hooks.agent, () => {
     settings.agent,
   );
   if (note) settingsNotes.push(note);
-  if (!found) console.log(`kurier: ${NO_AGENT_MESSAGE}`);
+  if (!found || hooks.noAgent) {
+    nothingFound = true;
+    console.log(`kurier: ${NO_AGENT_MESSAGE}`);
+    return null;
+  }
   return found;
 });
+// `KU_APP_NO_AGENT` beats `KU_APP_AGENT`: it forces the nothing-found resolution for the empty state.
+const noAgent = hooks.noAgent === true || nothingFound;
+const emptyView = noAgent ? emptyStateView({ agent: null }) : null;
+
+/**
+ * The bundled-agent notice, read once: nothing seen yet (or a file that could not be read, which shows it
+ * again) and the copy that runs. `KU_APP_NOTICE` forces the bundled condition — the copy does not exist
+ * outside a Flatpak.
+ */
+const noticesPath = noticesFile();
+const noticesRead = readNotices(noticesPath);
+if (noticesRead.problem) console.log(`kurier: ${noticesRead.problem}`);
+const notice = noAgent
+  ? null
+  : noticeView(hooks.notice === true ? 'bundled' : agent.source, noticesRead.notices.seen);
 for (const note of settingsNotes) console.log(`kurier: ${note}`);
 if (agent.note) console.log(`kurier: ${agent.note}`);
 
@@ -115,6 +137,21 @@ const status = await runAdwaitaApp({
       hooks,
       agent: agent.command,
       agentSource: agent.source,
+      ...(emptyView?.kind === 'no-agent' ? { noAgent: emptyView } : {}),
+      ...(notice
+        ? {
+            notice,
+            rememberNotice: (id: typeof notice.id) => {
+              try {
+                writeNotices(noticesPath, markSeen(readNotices(noticesPath).notices, id));
+              } catch (error) {
+                console.log(
+                  `kurier: could not remember the notice — ${error instanceof Error ? error.message : String(error)}`,
+                );
+              }
+            },
+          }
+        : {}),
       newChat: cwd ? { cwd, home: facts.home } : null,
       // **Only when no agent is pinned.** `KU_APP_AGENT` means "this agent, for everything in this window"
       // — a fixture record naming `opencode` must be answered by the stand-in, not start a real one.

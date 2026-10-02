@@ -114,6 +114,14 @@ template $KurierMainWindow: Adw.ApplicationWindow {
             tooltip-text: "Main menu";
           }
         }
+        // The privacy notice for the bundled agent: a second top bar, so it sits right under the header.
+        // Fixed English text and the button label come from `core/empty-state.ts`; hidden until
+        // `MainWindow` reveals it. `use-markup: false` because the text is data, not markup.
+        [top]
+        Adw.Banner noticeBanner {
+          revealed: false;
+          use-markup: false;
+        }
         // **The stack, not a swap of `set_content`.** The empty state and a session are two
         // answers to one question, and a `Gtk.Stack` holds both so switching back and forth is a
         // `visibleChildName` assignment rather than a reparent. That matters because the *composer*
@@ -149,6 +157,60 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               styles [
                 "compact",
               ]
+            };
+          }
+          StackPage {
+            name: "no-agent";
+            // No agent could be found. Texts come from `emptyStateView` (core); the commands are
+            // selectable labels so they can be copied, never markup.
+            child: Adw.StatusPage noAgentPage {
+              icon-name: "dialog-warning-symbolic";
+              vexpand: true;
+              styles [
+                "compact",
+              ]
+
+              child: Gtk.Box {
+                orientation: vertical;
+                spacing: 12;
+                halign: center;
+
+                Gtk.Label noAgentBody {
+                  wrap: true;
+                  use-markup: false;
+                  justify: center;
+                  max-width-chars: 56;
+                }
+
+                Gtk.Box noAgentCommands {
+                  orientation: vertical;
+                  spacing: 6;
+                  halign: center;
+                }
+
+                Gtk.Label noAgentDocs {
+                  use-markup: false;
+                  selectable: true;
+                  wrap: true;
+                  justify: center;
+
+                  styles [
+                    "dim-label",
+                    "caption",
+                  ]
+                }
+
+                Gtk.Button noAgentPreferences {
+                  label: _("Preferences");
+                  action-name: "app.preferences";
+                  halign: center;
+                  visible: false;
+
+                  styles [
+                    "pill",
+                  ]
+                }
+              };
             };
           }
           StackPage {

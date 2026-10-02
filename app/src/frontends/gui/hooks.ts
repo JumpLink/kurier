@@ -221,6 +221,15 @@ export interface KurierHooks extends FrameworkHooks {
    * through to the next candidate like any other (`core/cwd.ts`).
    */
   cwd?: string;
+
+  /** `KU_APP_NOTICE` — force the bundled-agent condition, so the privacy banner can be photographed outside a Flatpak. */
+  notice?: boolean;
+
+  /** `KU_APP_NOTICE_DISMISS` — press the banner's "Got it" through the banner's own `button-clicked`. */
+  noticeDismiss?: boolean;
+
+  /** `KU_APP_NO_AGENT` — force the nothing-found resolution; beats `KU_APP_AGENT`. */
+  noAgent?: boolean;
 }
 
 /**
@@ -268,6 +277,9 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     newChat: hookFlag(env, 'NEW_CHAT'),
     newChatMidTurn: hookFlag(env, 'NEW_CHAT_MIDTURN'),
     cwd: hookValue(env, 'CWD'),
+    notice: hookFlag(env, 'NOTICE'),
+    noticeDismiss: hookFlag(env, 'NOTICE_DISMISS'),
+    noAgent: hookFlag(env, 'NO_AGENT'),
     thinking: hookFlag(env, 'THINKING'),
     prompt: hookValue(env, 'PROMPT'),
   };

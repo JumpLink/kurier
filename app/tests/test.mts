@@ -40,6 +40,8 @@ import permission from './unit/core/permission.test.ts';
 import agentSession from './unit/core/agent-session.test.ts';
 import cwd from './unit/core/cwd.test.ts';
 import conversation from './unit/core/conversation.test.ts';
+import notices from './unit/core/notices.test.ts';
+import emptyState from './unit/core/empty-state.test.ts';
 
 import hookValue from './unit/gui/hook-value.test.ts';
 
@@ -81,6 +83,8 @@ run({
   agentSession,
   cwd,
   conversation,
+  notices,
+  emptyState,
   hookValue,
   smoke,
 });
