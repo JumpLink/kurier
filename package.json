@@ -163,6 +163,46 @@
       ],
       "modules": [
         {
+          "name": "opencode",
+          "buildsystem": "simple",
+          "build-commands": [
+            "install -Dm755 apply_extra /app/bin/apply_extra"
+          ],
+          "sources": [
+            {
+              "type": "extra-data",
+              "filename": "opencode.tar.gz",
+              "only-arches": [
+                "x86_64"
+              ],
+              "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.34/opencode-linux-x64.tar.gz",
+              "sha256": "0f22479647226d1d2dd99595d20082ee7bda3870b62dc6a90b41efc1a71d7e9a",
+              "size": 60665582
+            },
+            {
+              "type": "extra-data",
+              "filename": "opencode.tar.gz",
+              "only-arches": [
+                "aarch64"
+              ],
+              "url": "https://github.com/anomalyco/opencode/releases/download/v1.18.34/opencode-linux-arm64.tar.gz",
+              "sha256": "bbdb3f00c2c51e42e315525233151309724226a8776da8e9145e3b0fa3d5310f",
+              "size": 60479105
+            },
+            {
+              "type": "script",
+              "dest-filename": "apply_extra",
+              "commands": [
+                "set -e",
+                "mkdir -p /app/extra/agents/opencode",
+                "tar -xzf /app/extra/opencode.tar.gz -C /app/extra/agents/opencode",
+                "chmod 0755 /app/extra/agents/opencode/opencode",
+                "rm -f /app/extra/opencode.tar.gz"
+              ]
+            }
+          ]
+        },
+        {
           "name": "kurier",
           "buildsystem": "simple",
           "build-commands": [

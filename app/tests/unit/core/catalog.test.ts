@@ -14,6 +14,8 @@ import {
   bundledProgram,
   parseBundledCatalog,
 } from '../../../src/core/agents/catalog.ts';
+import manifest from '../../../../eu.jumplink.Kurier.json' with { type: 'json' };
+import pkg from '../../../../package.json' with { type: 'json' };
 
 const SHA = 'a'.repeat(64);
 
@@ -32,6 +34,7 @@ function valid(): Record<string, any> {
         env: { DEMO_FLAG: 'true' },
         refreshed: '2026-01-01',
         installPath: `${BUNDLED_PREFIX}/demo`,
+        binary: 'bin/demo-cli',
       },
     ],
   };
@@ -122,6 +125,12 @@ export default async () => {
       rejects((c) => (c['agents'][0].installPath = '/usr/bin/demo'), /installPath/);
       rejects((c) => (c['agents'][0].installPath = `${BUNDLED_PREFIX}/other`), /installPath/);
     });
+
+    await it('rejects a binary that is absolute, empty, or climbs out of the archive', async () => {
+      for (const binary of ['/usr/bin/demo', '', '../demo', 'bin/../../demo', 'bin//demo', './demo']) {
+        rejects((c) => (c['agents'][0].binary = binary), /binary/);
+      }
+    });
   });
 
   await describe('the shipped catalog', async () => {
@@ -137,10 +146,75 @@ export default async () => {
     });
   });
 
+  await describe('the Flatpak module agrees with the catalog', async () => {
+    // `package.json#gjsify.flatpak.modules` is hand-written, `eu.jumplink.Kurier.json` is generated from it
+    // by `gjsify flatpak init --force`, and the catalog is the pin. A refresh that updates one and not the
+    // others would ship a hash the archive no longer has, or unpack where `bundledProgram` does not look —
+    // and a forgotten `init --force` leaves the manifest stale while `package.json` is right.
+    const lists: Array<[string, Array<Record<string, any>>]> = [
+      ['package.json', (pkg as any).gjsify.flatpak.modules],
+      ['eu.jumplink.Kurier.json', (manifest as any).modules],
+    ];
+
+    for (const [file, modules] of lists) {
+      await it(`${file} names at least one bundled agent`, async () => {
+        expect(BUNDLED_AGENTS.length > 0).toBe(true);
+      });
+
+      for (const agent of BUNDLED_AGENTS) {
+        await it(`${file} carries ${agent.id}'s pins as extra-data, one per arch`, async () => {
+          const module = modules.find((entry) => entry['name'] === agent.id);
+          expect(module !== undefined).toBe(true);
+          const extra = (module!['sources'] as Array<Record<string, any>>).filter(
+            (s) => s['type'] === 'extra-data',
+          );
+          expect(extra.length).toBe(agent.dist.length);
+          for (const dist of agent.dist) {
+            const source = extra.find((s) => s['only-arches']?.join(',') === dist.arch);
+            expect(source !== undefined).toBe(true);
+            expect(source!['url']).toBe(dist.url);
+            expect(source!['sha256']).toBe(dist.sha256);
+            expect(source!['size']).toBe(dist.size);
+          }
+        });
+
+        await it(`${file} unpacks ${agent.id} where bundledProgram looks, before kurier's own module`, async () => {
+          const index = modules.findIndex((entry) => entry['name'] === agent.id);
+          expect(index >= 0).toBe(true);
+          expect(index < modules.findIndex((entry) => entry['name'] === 'kurier')).toBe(true);
+          const sources = modules[index]!['sources'] as Array<Record<string, any>>;
+          const filenames = new Set(
+            sources.filter((s) => s['type'] === 'extra-data').map((s) => s['filename'] as string),
+          );
+          expect(filenames.size).toBe(1);
+          const filename = [...filenames][0]!;
+          const script = sources.find((s) => s['dest-filename'] === 'apply_extra');
+          expect(script !== undefined).toBe(true);
+          // Whole lines, so `…/opencode2` or a tarball named differently from the extra-data source fails.
+          expect((script!['commands'] as string[]).join('\n')).toBe(
+            [
+              'set -e',
+              `mkdir -p ${agent.installPath}`,
+              `tar -xzf /app/extra/${filename} -C ${agent.installPath}`,
+              `chmod 0755 ${bundledProgram(agent)}`,
+              `rm -f /app/extra/${filename}`,
+            ].join('\n'),
+          );
+        });
+      }
+    }
+  });
+
   await describe('bundledProgram', async () => {
-    await it("is the binary named by the id, inside the entry's directory under the prefix", async () => {
+    await it("is the archive's binary path, not the id, inside the entry's directory", async () => {
       const entry = parseBundledCatalog(valid()).agents[0]!;
-      expect(bundledProgram(entry)).toBe(`${BUNDLED_PREFIX}/demo/demo`);
+      expect(bundledProgram(entry)).toBe(`${BUNDLED_PREFIX}/demo/bin/demo-cli`);
+    });
+
+    await it('is where the shipped archive puts opencode: the tarball holds one file, `opencode`', async () => {
+      // `tar -tzf opencode-linux-{x64,arm64}.tar.gz` for 1.18.34 lists exactly `opencode`, at the root.
+      const entry = BUNDLED_AGENTS.find((agent) => agent.id === 'opencode')!;
+      expect(bundledProgram(entry)).toBe('/app/extra/agents/opencode/opencode');
     });
 
     await it('is never on a PATH directory', async () => {

@@ -29,6 +29,7 @@ const CATALOG = parseBundledCatalog({
     env: {},
     refreshed: '2026-01-01',
     installPath: `${BUNDLED_PREFIX}/${id}`,
+    binary: id,
   })),
 }).agents;
 

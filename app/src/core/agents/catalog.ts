@@ -13,6 +13,10 @@
  * `BUNDLED_PREFIX` is the only place the prefix is written in code; the data file's `installPath` must
  * agree with it and `parseBundledCatalog` refuses a file that does not.
  *
+ * **Why `/app/extra`.** The Flatpak ships the archive as `extra-data`: it is downloaded at install time,
+ * not at build time, and the one directory written then is `/app/extra` — the rest of `/app` is the
+ * read-only build result. `apply_extra` unpacks there, so the prefix is under it. See `data/README.md`.
+ *
  * **What `env` is.** A set of flags the agent's launcher passes at spawn (`AgentCommand.env`), such as
  * `OPENCODE_DISABLE_AUTOUPDATE`. It is never a credential: AGENTS.md § Privacy bans one in a launcher
  * `env`, and the validator only checks that values are strings — it cannot tell a flag from a token, so
@@ -22,7 +26,7 @@
 import raw from '../../../data/bundled-agents.json' with { type: 'json' };
 
 /** Where bundled agents are unpacked. Off PATH on purpose — see the file header. */
-export const BUNDLED_PREFIX = '/app/libexec/kurier/agents';
+export const BUNDLED_PREFIX = '/app/extra/agents';
 
 const ARCHES = ['x86_64', 'aarch64'] as const;
 
@@ -38,7 +42,7 @@ export interface BundledDist {
 }
 
 export interface BundledAgent {
-  /** The launcher id this copy stands in for, and the name of the binary inside `installPath`. */
+  /** The launcher id this copy stands in for. */
   readonly id: string;
   readonly title: string;
   readonly version: string;
@@ -52,6 +56,8 @@ export interface BundledAgent {
   readonly refreshed: string;
   /** Directory the archive is unpacked into: `${BUNDLED_PREFIX}/${id}`. */
   readonly installPath: string;
+  /** The binary's path inside the archive, relative — read off `tar -tzf`, not derived from the id. */
+  readonly binary: string;
 }
 
 export interface BundledCatalog {
@@ -116,13 +122,20 @@ function parseAgent(value: unknown, where: string): BundledAgent {
   const entry = object(value, where);
   onlyKeys(
     entry,
-    ['id', 'title', 'version', 'license', 'dist', 'command', 'env', 'refreshed', 'installPath'],
+    ['id', 'title', 'version', 'license', 'dist', 'command', 'env', 'refreshed', 'installPath', 'binary'],
     where,
   );
   const id = text(entry, 'id', where);
   const installPath = text(entry, 'installPath', where);
   if (installPath !== `${BUNDLED_PREFIX}/${id}`) {
     throw new Error(`bundled catalog: ${where}.installPath must be ${BUNDLED_PREFIX}/${id}`);
+  }
+  const binary = text(entry, 'binary', where);
+  if (
+    binary.startsWith('/') ||
+    binary.split('/').some((part) => part === '' || part === '.' || part === '..')
+  ) {
+    throw new Error(`bundled catalog: ${where}.binary must be a relative path inside the archive`);
   }
 
   const distList = entry['dist'];
@@ -162,6 +175,7 @@ function parseAgent(value: unknown, where: string): BundledAgent {
     env,
     refreshed: date(entry, 'refreshed', where),
     installPath,
+    binary,
   };
 }
 
@@ -186,7 +200,7 @@ export const BUNDLED_CATALOG: BundledCatalog = parseBundledCatalog(raw);
 
 export const BUNDLED_AGENTS: readonly BundledAgent[] = BUNDLED_CATALOG.agents;
 
-/** The absolute path of the agent's binary inside its install directory. The archive holds it as `<id>`. */
+/** The absolute path of the agent's binary: its path inside the archive, under the install directory. */
 export function bundledProgram(entry: BundledAgent): string {
-  return `${entry.installPath}/${entry.id}`;
+  return `${entry.installPath}/${entry.binary}`;
 }

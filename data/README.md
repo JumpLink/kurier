@@ -108,6 +108,33 @@ on a comment before the root element and refuses to export with "is not a valid 
 Format not recognized". Measured here on both icons: unchanged fails, comment inside
 succeeds.
 
+### The bundled agent (opencode, as `extra-data`)
+
+The first module in `package.json#gjsify.flatpak.modules` ships opencode, pinned in
+`app/data/bundled-agents.json` (1.18.34, one url/sha256/size per arch). It is `extra-data`,
+not a build source: flatpak-builder only *records* the url, and the client downloads and
+verifies the archive when the app is **installed**. `/app/bin/apply_extra` then runs in a
+sandbox with no network whose only writable path is `/app/extra` — the rest of `/app` is
+the read-only build result — so the archive unpacks to `/app/extra/agents/opencode/`
+(`BUNDLED_PREFIX` in `app/src/core/agents/catalog.ts`). That is off PATH on purpose: in
+`/app/bin` it would shadow the person's own opencode. `apply_extra` uses the runtime's
+`tar` and `gzip` (both present in `org.gnome.Platform//50`). The archive holds a single
+file, `opencode`; the catalog's `binary` field says so instead of guessing from the id.
+
+**Refreshing the pin:** update `bundled-agents.json` (version, url, sha256, size; `tar -tzf`
+for `binary`), copy the same values into the module in `package.json`, then re-run the
+`gjsify flatpak init --force …` line from AGENTS.md § Packaging. The catalog tests fail
+when the module in either `package.json` or the generated `eu.jumplink.Kurier.json`
+disagrees with the catalog, so a forgotten `init --force` is red.
+
+**`gjsify ship` drops it.** `ship` renders exactly one module of its own and reads neither
+`modules` nor `extraModules`, so a Flatpak built with `ship` has no bundled agent. Only the
+manifest above carries it.
+
+**`--filesystem=host` is load-bearing twice now.** Besides what `flatpak-spawn --host`
+needs, the bundled agent runs *inside* the sandbox, and that grant is what lets it read and
+edit the project it is pointed at.
+
 What is still open: `kurier` has no `v0.1.0` tag, so the `sources` `tag` in the manifest
 does not resolve until one is pushed; and both icons are placeholders (see the table
 above) until the real mark lands.

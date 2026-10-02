@@ -25,7 +25,8 @@
         "OPENCODE_DISABLE_AUTOUPDATE": "true"
       },
       "refreshed": "2026-10-02",
-      "installPath": "/app/libexec/kurier/agents/opencode"
+      "installPath": "/app/extra/agents/opencode",
+      "binary": "opencode"
     }
   ]
 }
