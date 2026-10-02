@@ -93,6 +93,17 @@ let configOptions = CONFIG ? buildConfigOptions() : null;
 
 /** Fixed, so two screenshots are comparable. `session/load` keeps whatever id it was asked for. */
 const SESSION_ID = 'ses_standin_0001';
+
+/**
+ * A fresh id per `session/new`: the first is `SESSION_ID`, so a one-chat run is unchanged, and the next
+ * ones are numbered. Two New chats in one window would otherwise answer the same id, and the store
+ * refuses a record that already exists.
+ */
+let sessionsCreated = 0;
+function newSessionId() {
+  sessionsCreated += 1;
+  return sessionsCreated === 1 ? SESSION_ID : `${SESSION_ID}_${sessionsCreated}`;
+}
 const TOOL_CALL_ID = 'standin_read_1';
 
 /**
@@ -272,7 +283,7 @@ input.on('line', (line) => {
     case 'logout':
       return reply(id, {});
     case 'session/new':
-      return reply(id, sessionState(SESSION_ID));
+      return reply(id, sessionState(newSessionId()));
     case 'session/load':
     case 'session/resume':
       // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code kurier's

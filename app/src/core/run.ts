@@ -29,8 +29,15 @@ export interface AgentHandle {
   readonly logLines: string[];
   /** Name and version the agent reported, for `kurier start`'s first line. */
   readonly agentInfo: string;
-  close(): void;
+  /**
+   * End the agent. Resolves once the process has ended (bounded by `CLOSE_WAIT_MS`), so a caller that is
+   * about to start a replacement can wait for the old one instead of racing its shutdown.
+   */
+  close(): void | Promise<void>;
 }
+
+/** The most a close waits for the process to end: SIGTERM, then SIGKILL after the channel's grace. */
+const CLOSE_WAIT_MS = 6_000;
 
 export interface OpenAgentOptions {
   command: AgentCommand;
@@ -68,6 +75,24 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
     },
   });
   const client = new AcpClient({ transport, gate: options.gate });
+  let ended = false;
+  const waiting = new Set<() => void>();
+  transport.onClose(() => {
+    ended = true;
+    for (const resolve of waiting) resolve();
+  });
+  const closeAndWait = (): Promise<void> => {
+    client.close();
+    if (ended) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, CLOSE_WAIT_MS);
+      (timer as { unref?: () => void }).unref?.();
+      waiting.add(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  };
   // Before the handshake on purpose — see the note on `onSpawn`.
   options.onSpawn?.(() => client.close());
 
@@ -82,7 +107,7 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
       client,
       logLines,
       agentInfo: info ? `${info.name} ${info.version}` : 'an unnamed agent',
-      close: () => client.close(),
+      close: closeAndWait,
     };
   } catch (error) {
     client.close(`handshake failed: ${error instanceof Error ? error.message : String(error)}`);

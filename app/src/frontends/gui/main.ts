@@ -28,9 +28,10 @@ import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/sessi
 
 import { chooseAgent } from '../../core/agents/dev-agent.ts';
 import { BUNDLED_AGENTS } from '../../core/agents/catalog.ts';
-import { gatherResolveContext, gatherResolveContextAsync } from '../../core/agents/probe.ts';
-import { NO_AGENT_MESSAGE, resolveDefaultWithNote } from '../../core/agents/resolve.ts';
+import { gatherCwdFacts, gatherResolveContext, gatherResolveContextAsync } from '../../core/agents/probe.ts';
+import { NO_AGENT_MESSAGE, resolveDefaultWithNote, resolveRecorded } from '../../core/agents/resolve.ts';
 import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
+import { resolveCwd } from '../../core/cwd.ts';
 import { sessionsFile, settingsFile } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
 import { settingsChoicesView } from '../../core/settings-view.ts';
@@ -85,6 +86,13 @@ if (agent.note) console.log(`kurier: ${agent.note}`);
 
 const sandboxed = isSandboxed(currentSandboxFacts());
 
+/**
+ * Where a new chat runs. `KU_APP_CWD` is the dev hook that pins it (a screenshot must not show a real
+ * directory name), `KURIER_CWD` is the same override for a person; `resolveCwd` decides the rest.
+ */
+const facts = gatherCwdFacts(process.env);
+const cwd = resolveCwd({ ...process.env, ...(hooks.cwd ? { KURIER_CWD: hooks.cwd } : {}) }, facts);
+
 const status = await runAdwaitaApp({
   applicationId: APP_ID,
   css: APP_CSS,
@@ -106,6 +114,27 @@ const status = await runAdwaitaApp({
     new MainWindow(app, {
       hooks,
       agent: agent.command,
+      agentSource: agent.source,
+      newChat: cwd ? { cwd, home: facts.home } : null,
+      // **Only when no agent is pinned.** `KU_APP_AGENT` means "this agent, for everything in this window"
+      // — a fixture record naming `opencode` must be answered by the stand-in, not start a real one.
+      ...(hooks.agent
+        ? {}
+        : {
+            resolveAgent: async (id, source) => {
+              try {
+                return resolveRecorded(
+                  id,
+                  source,
+                  sandboxed
+                    ? await gatherResolveContextAsync(process.env)
+                    : gatherResolveContext(process.env, false, false),
+                );
+              } catch (error) {
+                return { problem: error instanceof Error ? error.message : String(error) };
+              }
+            },
+          }),
       preferences: {
         // The file is read afresh on every open and after every choice, so the rows show the file, not a
         // memory of it. Never a blocking child: with no host answer yet (`detected` null) the PATH walk
@@ -134,6 +163,9 @@ const status = await runAdwaitaApp({
             }
           : null,
         save: (choice) => saveSettings(settingsFile(), { version: 1, agent: choice }),
+      },
+      createSession: (record) => {
+        createSessionStore(sessionsFile()).create(record);
       },
       loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
       // **One store for the window's lifetime, not one per call.** The window reads the file once at

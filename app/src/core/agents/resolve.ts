@@ -172,3 +172,21 @@ export function describeResolved(agent: ResolvedAgent): string | null {
     : '';
   return `using the bundled ${agent.command.id}${agent.version ? ` ${agent.version}` : ''}${where}`;
 }
+
+/**
+ * Whether two commands start the same process. A window keeps one agent alive, and a session recorded
+ * on the other copy (host vs bundled) needs that process replaced rather than reused: the two keep
+ * separate histories, so prompting one through the other's connection reaches the wrong database.
+ */
+export function sameCommand(a: AgentCommand, b: AgentCommand): boolean {
+  if (a === b) return true;
+  const env = (command: AgentCommand) => JSON.stringify(Object.entries(command.env ?? {}).sort());
+  return (
+    a.id === b.id &&
+    a.program === b.program &&
+    JSON.stringify(a.args) === JSON.stringify(b.args) &&
+    (a.bundled ?? false) === (b.bundled ?? false) &&
+    (a.cwd ?? '') === (b.cwd ?? '') &&
+    env(a) === env(b)
+  );
+}

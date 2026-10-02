@@ -7,6 +7,8 @@ import {
   agentName,
   agentStatus,
   isEchoOf,
+  isOnScreen,
+  leavesRunningTurn,
   permissionDecisionEntry,
   transition,
   type AgentAttachment,
@@ -130,6 +132,35 @@ export default async () => {
       });
     });
 
+    await describe('leaving a chat', async () => {
+      await it('a cancel by `left` ends idle, never stopped', async () => {
+        expect(transition('thinking', ended('cancelled', 'left'))).toBe('idle');
+        expect(transition('thinking', ended(null, 'left'))).toBe('idle');
+      });
+
+      await it('chat-reset clears how the last chat ended, and leaves a running turn alone', async () => {
+        const reset: TurnEvent = { kind: 'chat-reset' };
+        expect(transition('gone', reset)).toBe('idle');
+        expect(transition('stopped', reset)).toBe('idle');
+        expect(transition('thinking', reset)).toBe('thinking');
+        expect(transition('waiting-for-you', reset)).toBe('waiting-for-you');
+      });
+
+      await it('leavesRunningTurn: only a running turn, and only toward another chat', async () => {
+        expect(leavesRunningTurn(false, 'a', null)).toBe(false);
+        expect(leavesRunningTurn(true, 'a', null)).toBe(true);
+        expect(leavesRunningTurn(true, 'a', 'b')).toBe(true);
+        expect(leavesRunningTurn(true, 'a', 'a')).toBe(false);
+        expect(leavesRunningTurn(true, null, 'b')).toBe(true);
+      });
+
+      await it('isOnScreen: only the session on screen, never an empty new chat', async () => {
+        expect(isOnScreen('a', 'a')).toBe(true);
+        expect(isOnScreen('a', 'b')).toBe(false);
+        expect(isOnScreen('a', null)).toBe(false);
+      });
+    });
+
     await it('is total: every event from every state produces one of the five', async () => {
       // A transition function that could return `undefined` would hand the surface a state it cannot
       // render, and an empty line teaches a person nothing. So the whole cross product is asserted.
@@ -153,7 +184,7 @@ export default async () => {
 
   await describe('turn — what the window may say about the agent', async () => {
     const cases: { attachment: AgentAttachment; attached: boolean; mentions: string }[] = [
-      { attachment: { status: 'none' }, attached: false, mentions: 'No agent is started' },
+      { attachment: { status: 'none' }, attached: true, mentions: '' },
       { attachment: { status: 'attaching' }, attached: false, mentions: 'Starting the agent' },
       { attachment: { status: 'attached', name: 'OpenCode 2.0.19' }, attached: true, mentions: '' },
       { attachment: { status: 'gone', reason: 'exited with code 1' }, attached: false, mentions: 'code 1' },

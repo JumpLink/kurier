@@ -37,8 +37,9 @@ import type {
   SessionId,
   SessionUpdate,
 } from '@kurier/acp/types';
-import type { TranscriptEntry } from '@kurier/session';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
 
+import { sameCommand, type RecordedResolution } from './agents/resolve.ts';
 import type { AgentCommand } from './agents/stdio.ts';
 import type { TurnState } from './composer-state.ts';
 import {
@@ -50,6 +51,7 @@ import {
   type ConfigRowView,
 } from './config-row.ts';
 import { findControl, projectConfigOptions, type ConfigControl } from './config.ts';
+import { conversationRecord, unsavedMessage } from './conversation.ts';
 import { failureKind } from './failure.ts';
 import {
   answerFor,
@@ -64,6 +66,8 @@ import {
   agentExitedEntry,
   agentStatus,
   isEchoOf,
+  isOnScreen,
+  leavesRunningTurn,
   permissionDecisionEntry,
   transition,
   type AgentAttachment,
@@ -126,6 +130,15 @@ export interface AgentSessionEvents {
    * that reassembled it from raw options would be a second opinion about what may be drawn.
    */
   onConfig?(view: ConfigRowView): void;
+  /**
+   * A new conversation got its session and its record (already persisted through `create`). The surface
+   * lists it; the user's line it already drew stays where it is.
+   *
+   * **`current` is whether the person is still looking at the conversation that sent the prompt.** A
+   * New chat pressed during the handshake moves the window on, and then the record is listed but not
+   * opened — pulling the person back into a chat they left would be the surprise.
+   */
+  onConversation?(record: SessionRecord, current: boolean): void;
 }
 
 export interface AgentSnapshot {
@@ -133,11 +146,24 @@ export interface AgentSnapshot {
   readonly attachment: AgentAttachment;
   /** The session a prompt would go to. `null` while no session is open. */
   readonly sessionId: SessionId | null;
+  /** A new conversation is waiting for its first prompt, which is what creates its session. */
+  readonly startsConversation: boolean;
 }
 
 /** The session a window is bound to. */
 export interface BoundSession {
   readonly id: SessionId;
+  readonly cwd: string;
+  /**
+   * The agent the record names, with the copy that held it. Absent for a caller that has none (a test);
+   * then the window's own command is used. `source` absent means `host`, like the record's field.
+   */
+  readonly agent?: { readonly id: string; readonly source?: AgentSource };
+}
+
+/** A conversation that has a directory and no session yet. `pending` is what tells it from a `BoundSession`. */
+interface PendingConversation {
+  readonly pending: true;
   readonly cwd: string;
 }
 
@@ -169,6 +195,16 @@ export interface AgentSessionOptions {
   readonly events: AgentSessionEvents;
   /** Persistence. `SessionStore.append`; a surface without a store (a test) leaves it out. */
   readonly append?: (sessionId: SessionId, entries: TranscriptEntry[]) => void;
+  /** Persist a new conversation's record. `SessionStore.create`; a throw is a failed start. */
+  readonly create?: (record: SessionRecord) => void;
+  /** Which copy `command` is, for the record a new conversation writes. Default `host`. */
+  readonly source?: AgentSource;
+  /**
+   * The agent a stored session names, on the copy that held it (`resolveRecorded`). Asked on the first
+   * prompt of such a session, never on selecting it. Absent means every session uses `command` — which
+   * is also how a pinned dev agent (`KU_APP_AGENT`) wins over a fixture record naming another agent.
+   */
+  readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
   /** ISO clock, injected so a test can pin the transcript's timestamps. */
   readonly now?: () => string;
   /**
@@ -184,13 +220,16 @@ export interface AgentSessionOptions {
 /** What the controller needs of an `AgentHandle`: the connection, and a way to end it. */
 interface AgentClientHandle {
   readonly client: AcpClient;
-  close(): void;
+  close(): void | Promise<void>;
 }
 
 export class AgentSession {
   readonly #command: AgentCommand;
   readonly #events: AgentSessionEvents;
   readonly #append: (sessionId: SessionId, entries: TranscriptEntry[]) => void;
+  readonly #create: (record: SessionRecord) => void;
+  readonly #source: AgentSource;
+  readonly #resolveAgent: AgentSessionOptions['resolveAgent'];
   readonly #now: () => string;
   readonly #open: (options: OpenAgentOptions) => Promise<AgentHandle>;
   readonly #closeGraceMs: number;
@@ -207,9 +246,14 @@ export class AgentSession {
   #askedPermissions = false;
 
   #session: BoundSession | null = null;
+  /** A new conversation's directory, until its first prompt makes the session. Exclusive with `#session`. */
+  #pending: PendingConversation | null = null;
   #state: TurnState = 'idle';
   #attachment: AgentAttachment = { status: 'none' };
   #handle: AgentClientHandle | null = null;
+  /** What `#handle` was started from, so a session recorded on the other copy can replace it. */
+  #handleCommand: AgentCommand | null = null;
+  #agentName = '';
   /** The closer `onSpawn` handed over. Covers a close during the handshake — see `shutdown`. */
   #spawnedClose: (() => void) | null = null;
   /** True once a process exists — from spawn, before the handshake. What `agentRunning` reports. */
@@ -291,11 +335,22 @@ export class AgentSession {
    * guessed from the agent's answer — see `CancelledBy`.
    */
   #cancelRequested = false;
+  /**
+   * Set when the stop was the person *leaving* the chat the turn belongs to (New chat, another row), and
+   * cleared with `#cancelRequested`. It only changes how the turn ends: `left` lands on `idle`, because
+   * "Stopped." belongs to the chat that was stopped, not to the one on screen now.
+   */
+  #leaving = false;
+  /** The old process's `close()`, while it runs, so the replacement does not spawn until it has ended. */
+  #retiring: Promise<void> | null = null;
 
   constructor(options: AgentSessionOptions) {
     this.#command = options.command;
     this.#events = options.events;
     this.#append = options.append ?? (() => {});
+    this.#create = options.create ?? (() => {});
+    this.#source = options.source ?? 'host';
+    this.#resolveAgent = options.resolveAgent;
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#open = options.open ?? ((openOptions) => openAgent(openOptions));
     this.#closeGraceMs = options.closeGraceMs ?? CLOSE_GRACE_MS;
@@ -313,7 +368,12 @@ export class AgentSession {
 
   /** The render inputs, as one value. The surface never reaches into the controller's fields. */
   get snapshot(): AgentSnapshot {
-    return { state: this.#state, attachment: this.#attachment, sessionId: this.#session?.id ?? null };
+    return {
+      state: this.#state,
+      attachment: this.#attachment,
+      sessionId: this.#session?.id ?? null,
+      startsConversation: this.#pending !== null,
+    };
   }
 
   /** The composer's two agent facts. The join between `turn.ts`'s model and `composer-state.ts`. */
@@ -374,7 +434,10 @@ export class AgentSession {
    * "selecting a session shows its stored transcript; prompting binds it".
    */
   bind(session: BoundSession | null): void {
+    // Before the window points anywhere else: the turn that is running belongs to the chat being left.
+    this.#leaveTurn(session?.id ?? null);
     this.#session = session;
+    this.#pending = null;
     // **The row follows the agent, and the cache makes coming back possible.** The options on screen
     // are what *the agent* reported about *the session it holds*, so a row over another session's
     // conversation is a control pointing at the wrong thing — and the row is emptied when the window
@@ -394,6 +457,35 @@ export class AgentSession {
   }
 
   /**
+   * Point the window at a conversation that does not exist yet. **Starts nothing, like `bind`.**
+   *
+   * The first `prompt()` starts the agent, sends `session/new` for `cwd`, writes the record and only
+   * then sends the prompt — so a window nobody types in never owns a process. A start that failed
+   * (a bad command, a missing login) is forgiven here: this is the "try again" the person asked for, and
+   * the old failure would otherwise disable Send for the rest of the window. A `model` refusal is not
+   * (the agent answered, and its dialog has its own button), and neither is an agent that exited.
+   */
+  startConversation(cwd: string): void {
+    // A running turn is stopped the way the Stop button stops it, before the pane is emptied.
+    this.#leaveTurn(null);
+    this.#session = null;
+    this.#pending = { pending: true, cwd };
+    this.#clearConfigRow();
+    const failed = this.#attachment;
+    if (failed.status === 'gone') {
+      // The agent exited, so its handle is dead: retire it, and the next prompt starts a fresh agent.
+      // Without this the dead handle would be reused and the composer's "Press New chat" would be a lie.
+      this.#retiring = this.#retire();
+      this.#attachment = { status: 'none' };
+    } else if (failed.status === 'failed' && failed.kind !== 'model') {
+      this.#attachment = this.#handle ? { status: 'attached', name: this.#agentName } : { status: 'none' };
+    }
+    this.#state = transition(this.#state, { kind: 'chat-reset' });
+    this.#emit();
+    this.#emitConfig();
+  }
+
+  /**
    * Empty the row and cancel the bookkeeping a set in flight is holding.
    *
    * **`#configBusy` goes too, and that is not a detail.** A set is a round trip, so the person can
@@ -408,6 +500,26 @@ export class AgentSession {
     this.#configError = null;
     this.#configBusy = false;
     this.#configSetSession = null;
+  }
+
+  /**
+   * Moving the window away from the chat a turn belongs to stops that turn — through `stop()`, so the
+   * cancel goes out and an open permission settles `cancelled` — and the answer it streams until it
+   * settles stays in its own record (`#record`). The decision is `leavesRunningTurn`.
+   *
+   * **A person who is looking at another chat must not be left with a turn running behind it.** It would
+   * keep the composer on Stop for a chat they are no longer in, and the old answer would stream into the
+   * new pane.
+   */
+  #leaveTurn(target: SessionId | null): void {
+    if (!leavesRunningTurn(this.#turn !== null, this.#turnSession, target)) return;
+    this.#leaving = true;
+    if (!this.#cancelRequested) this.stop();
+  }
+
+  /** How this controller's own cancel is told apart when the turn settles. See `CancelledBy`. */
+  #cancelKind(): CancelledBy {
+    return this.#leaving ? 'left' : 'window';
   }
 
   /**
@@ -434,22 +546,32 @@ export class AgentSession {
    * `stop()` and `shutdown()` are what wait on it.
    */
   async prompt(text: string): Promise<void> {
-    const session = this.#session;
+    // Exclusive by construction (`bind` clears the one, `startConversation` the other).
+    const target = this.#session ?? this.#pending;
     const body = text.trim();
     // Also the answer to "why did nothing happen when I pressed Send": there is no session to prompt, and
     // `composerView` has already disabled the button and said so on screen. Not throwing here is what
     // keeps that a dead button rather than a dead button *and* a stack trace nobody can see.
-    if (!session || body === '') return;
+    if (!target || body === '') return;
     // The composer shows Stop while a turn runs, so this should be unreachable — and a second turn on
     // one session id would have the agent interleaving two answers into one transcript.
     if (this.#turn) return;
 
     this.#cancelRequested = false;
-    this.#turnSession = session.id;
-    this.#record(session.id, [{ kind: 'user', text: body, at: this.#now(), sessionId: session.id }]);
+    this.#leaving = false;
+    if (!('pending' in target)) {
+      this.#turnSession = target.id;
+      this.#record(target.id, [{ kind: 'user', text: body, at: this.#now(), sessionId: target.id }]);
+    } else {
+      // **Drawn now, written when the session exists.** There is no id to file the line under until
+      // `session/new` answers, and the person must not watch an empty pane through a cold handshake.
+      // `#startConversation` appends the same line to the new record.
+      this.#events.onEntries([{ kind: 'user', text: body, at: this.#now() }]);
+    }
     this.#move({ kind: 'prompt' });
 
-    const turn = this.#runTurn(body, session).finally(() => {
+    const run = 'pending' in target ? this.#runNewConversation(body, target) : this.#runTurn(body, target);
+    const turn = run.finally(() => {
       this.#turn = null;
       this.#turnSession = null;
     });
@@ -527,13 +649,87 @@ export class AgentSession {
 
   // ─── the turn ──────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * The first turn of a conversation that has no session yet: connect, `session/new`, write the record,
+   * then the ordinary turn. A failure at any step is a sentence like any other (`#reportFailure`); one
+   * before `session/new` leaves nothing on disk, so there is no record to be wrong about.
+   */
+  async #runNewConversation(body: string, pending: PendingConversation): Promise<void> {
+    try {
+      const handle = await this.#connect(this.#command);
+      if (this.#cancelRequested) {
+        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: this.#cancelKind() });
+        return;
+      }
+      const answer = await withAuthHint('session/new', () =>
+        handle.client.newSession({ cwd: pending.cwd, mcpServers: [] }),
+      );
+      const at = this.#now();
+      const record = conversationRecord({
+        id: answer.sessionId,
+        agent: this.#command.id,
+        agentSource: this.#source,
+        cwd: pending.cwd,
+        prompt: body,
+        at,
+        supportsLoadSession: handle.client.supportsLoadSession,
+        supportsResumeSession: handle.client.supportsResumeSession,
+      });
+      try {
+        this.#create(record);
+      } catch (error) {
+        throw new Error(unsavedMessage(describe(error)), { cause: error });
+      }
+      const session: BoundSession = {
+        id: answer.sessionId,
+        cwd: pending.cwd,
+        agent: { id: record.agent, source: this.#source },
+      };
+      // By identity: a New chat pressed during the handshake replaced `#pending`, and the window is
+      // then showing another empty chat that this session must not take over.
+      const current = this.#pending === pending;
+      if (current) {
+        this.#session = session;
+        this.#pending = null;
+      }
+      this.#agentSession = session.id;
+      this.#turnSession = session.id;
+      // Persisted only; the surface drew this line before the handshake began.
+      this.#append(session.id, [{ kind: 'user', text: body, at, sessionId: session.id }]);
+      this.#takeConfigOptions(answer.configOptions, session.id);
+      this.#events.onConversation?.(record, current);
+      this.#emit();
+      if (this.#cancelRequested) {
+        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: this.#cancelKind() });
+        return;
+      }
+      await this.#deliver(handle, body, session);
+    } catch (error) {
+      this.#reportFailure(error);
+    }
+  }
+
+  /** The agent a session needs: its own copy when the window can tell, else the window's. */
+  async #commandFor(
+    session: BoundSession,
+    resolve: NonNullable<AgentSessionOptions['resolveAgent']>,
+  ): Promise<AgentCommand> {
+    const resolution = await resolve(session.agent?.id ?? this.#command.id, session.agent?.source);
+    // A copy that is gone is a sentence naming why, never a quiet fall to the other one.
+    if ('problem' in resolution) throw new Error(resolution.problem);
+    return resolution.agent.command;
+  }
+
   async #runTurn(body: string, session: BoundSession): Promise<void> {
     try {
-      const handle = await this.#connect();
+      // No resolver means one command for the whole window, and no extra await: the turn's timing is
+      // measured in microtask ticks by the tests that pin it.
+      const resolve = session.agent ? this.#resolveAgent : undefined;
+      const handle = await this.#connect(resolve ? await this.#commandFor(session, resolve) : this.#command);
       // Stop pressed during the handshake: no prompt was sent, so there is nothing to cancel and
       // nothing to wait for.
       if (this.#cancelRequested) {
-        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'window' });
+        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: this.#cancelKind() });
         return;
       }
       await this.#bindAgent(handle, session);
@@ -546,21 +742,26 @@ export class AgentSession {
       // pressed Stop. Since prompting a session is what *causes* the load, this is the first prompt of
       // every session rather than an edge case.
       if (this.#cancelRequested) {
-        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'window' });
+        this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: this.#cancelKind() });
         return;
       }
-      // From here a turn exists: if the promise below rejects, the agent went away *during* it, and the
-      // transcript line the plan asks for is the honest record. See `#reportFailure`.
-      this.#promptSent = true;
-      const { stopReason } = await runTurn(handle.client, {
-        sessionId: session.id,
-        text: body,
-        onUpdate: (notification) => this.#onUpdate(notification, body, session.id),
-      });
-      this.#move({ kind: 'turn-ended', stopReason, cancelledBy: this.#cancelledBy(stopReason) });
+      await this.#deliver(handle, body, session);
     } catch (error) {
       this.#reportFailure(error);
     }
+  }
+
+  /** Send the prompt and settle the turn. Shared by an opened session and a new conversation. */
+  async #deliver(handle: AgentClientHandle, body: string, session: BoundSession): Promise<void> {
+    // From here a turn exists: if the promise below rejects, the agent went away *during* it, and the
+    // transcript line the plan asks for is the honest record. See `#reportFailure`.
+    this.#promptSent = true;
+    const { stopReason } = await runTurn(handle.client, {
+      sessionId: session.id,
+      text: body,
+      onUpdate: (notification) => this.#onUpdate(notification, body, session.id),
+    });
+    this.#move({ kind: 'turn-ended', stopReason, cancelledBy: this.#cancelledBy(stopReason) });
   }
 
   /**
@@ -572,7 +773,7 @@ export class AgentSession {
    */
   #cancelledBy(stopReason: string): CancelledBy {
     if (stopReason !== 'cancelled') return 'none';
-    return this.#cancelRequested ? 'window' : 'agent';
+    return this.#cancelRequested ? this.#cancelKind() : 'agent';
   }
 
   #onUpdate(notification: Parameters<typeof toTranscript>[0], body: string, sessionId: SessionId): void {
@@ -601,7 +802,9 @@ export class AgentSession {
   #record(sessionId: SessionId, entries: TranscriptEntry[]): void {
     if (entries.length === 0) return;
     this.#append(sessionId, entries);
-    this.#events.onEntries(entries);
+    // Recorded always, drawn only for the chat on screen: a turn that is being stopped after the person
+    // left it keeps filling its own record, and none of that belongs in the pane they went to.
+    if (isOnScreen(sessionId, this.#session?.id ?? null)) this.#events.onEntries(entries);
   }
 
   // ─── the connection ────────────────────────────────────────────────────────────────────────
@@ -616,13 +819,22 @@ export class AgentSession {
    * what the composer puts under the entry, so the person reads what to do instead of watching a
    * spinner that will never resolve.
    */
-  async #connect(): Promise<AgentClientHandle> {
+  async #connect(command: AgentCommand): Promise<AgentClientHandle> {
+    // A session recorded on the other copy of the agent (host vs bundled) keeps its history in that
+    // copy's database, so the live process is replaced rather than prompted about a session it never held.
+    if (this.#handle && this.#handleCommand && !sameCommand(this.#handleCommand, command)) {
+      this.#retiring = this.#retire();
+    }
+    if (this.#retiring) {
+      await this.#retiring;
+      this.#retiring = null;
+    }
     if (this.#handle) return this.#handle;
     if (this.#connecting) return this.#connecting;
     const connecting = (async () => {
       this.#setAttachment({ status: 'attaching' });
       const handle = await this.#open({
-        command: this.#command,
+        command,
         gate: this.#gate(),
         // The agent's stderr is not a transcript line — it is the agent talking to itself, and
         // `AGENTS.md` keeps it off stdout for the same reason. The notice channel is where it goes.
@@ -637,6 +849,8 @@ export class AgentSession {
         },
       });
       this.#handle = { client: handle.client, close: handle.close };
+      this.#handleCommand = command;
+      this.#agentName = handle.agentInfo;
       this.#setAttachment({ status: 'attached', name: handle.agentInfo });
       return this.#handle;
     })();
@@ -646,6 +860,31 @@ export class AgentSession {
     } catch (error) {
       this.#connecting = null;
       throw error;
+    }
+  }
+
+  /**
+   * End the live process so another command can take its place. Only between turns (`prompt` refuses a
+   * second turn), so nothing is cancelled out from under a person; the sessions the old process held are
+   * not held by the new one, which is what the cleared bookkeeping says.
+   */
+  async #retire(): Promise<void> {
+    const close = this.#handle?.close ?? this.#spawnedClose;
+    this.#handle = null;
+    this.#handleCommand = null;
+    this.#spawnedClose = null;
+    this.#connecting = null;
+    this.#processAlive = false;
+    this.#agentSession = null;
+    this.#configBySession.clear();
+    this.#clearConfigRow();
+    this.#emitConfig();
+    // Awaited, so the replacement does not spawn while the old process is still in SIGTERM → grace
+    // with its data directory and locks held. A close that throws is not a reason to refuse the new one.
+    try {
+      await close?.();
+    } catch {
+      /* the old process is gone or going; nothing here can act on it */
     }
   }
 
@@ -1034,8 +1273,7 @@ export class AgentSession {
    */
   async stageConfigOption(controlId: string, value: string, prompt?: string): Promise<void> {
     if (this.#agentSession === null) {
-      const session = this.#session;
-      if (!session) {
+      if (!this.#session && !this.#pending) {
         this.#events.onNotice?.('KU_APP_CONFIG: no session is open, so there is no option to set');
         return;
       }

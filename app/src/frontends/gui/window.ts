@@ -72,10 +72,12 @@ import GObject from '@girs/gobject-2.0';
 // that used to *build* one is gone with `buildSplitView`.
 import type Gtk from '@girs/gtk-4.0';
 
-import { labelOf, type SessionRecord, type TranscriptEntry } from '@kurier/session';
+import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
+import type { RecordedResolution } from '../../core/agents/resolve.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
+import { displayCwd } from '../../core/cwd.ts';
 import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
@@ -133,6 +135,8 @@ const PERMISSION_STAGE_DEADLINE_MS = 8_000;
  * screenshot taken afterwards shows the state the hook set out to create.
  */
 const FAILURE_HOOK_STEP_MS = 250;
+/** Finer than the failure hooks: the stand-in's chunks are ~900 ms apart, and the hook must land between two. */
+const MIDTURN_HOOK_STEP_MS = 50;
 
 /**
  * What the window needs in order to own a turn.
@@ -154,6 +158,20 @@ export interface MainWindowOptions {
   readonly loadSessions: () => readonly SessionRecord[];
   /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else the available setting, else host install, else bundled. */
   readonly agent: AgentCommand;
+  /** Which copy `agent` is — what a new conversation's record names. */
+  readonly agentSource?: AgentSource;
+  /**
+   * Where a new chat runs, and the home it is abbreviated against. `null` when no directory could be
+   * found at all: then there is no New chat and the window opens on the session list alone.
+   */
+  readonly newChat: { readonly cwd: string; readonly home: string | null } | null;
+  /** Write a new conversation's record. `SessionStore.create`. */
+  readonly createSession?: (record: SessionRecord) => void;
+  /**
+   * The agent a stored session names, on the copy that held it — `resolveRecorded`. Left out when
+   * `KU_APP_AGENT` pins an agent, so a fixture record naming `opencode` is still answered by the stand-in.
+   */
+  readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
   /** What the preferences dialog reads and writes. Absent: no Preferences entry. */
   readonly preferences?: PreferencesActions;
   /** Persist streamed transcript lines. Called once per arriving batch, in order. */
@@ -207,6 +225,8 @@ export class MainWindow extends Adw.ApplicationWindow {
   declare readonly _configHost: Adw.Bin;
   /** Holds the composer, as the content pane's bottom bar. Plan §7 step 4. */
   declare readonly _composerHost: Adw.Bin;
+  /** One dim line under the composer naming the directory a new chat will run in. Hidden otherwise. */
+  declare readonly _cwdCaption: Gtk.Label;
 
   readonly #sessions: SessionList;
   /** One transcript view for the whole window, refilled per session. See the constructor. */
@@ -251,6 +271,15 @@ export class MainWindow extends Adw.ApplicationWindow {
   readonly #agent: AgentSession;
   /** The session on screen, or `null` while none is. The only place the window answers "which". */
   #openRecord: SessionRecord | null = null;
+  /** The records the sidebar lists, newest first — the list a new conversation is added to. */
+  #records: SessionRecord[] = [];
+  readonly #loadSessions: () => readonly SessionRecord[];
+  readonly #newChat: MainWindowOptions['newChat'];
+  /** The `KU_APP_NEW_CHAT` poll, so a close cannot fire it into a window that is gone. */
+  #newChatSource: number | null = null;
+  #midTurnSource: number | null = null;
+  /** Lines from the agent (not the person's own) drawn so far; `KU_APP_NEW_CHAT_MIDTURN` waits for one. */
+  #streamed = 0;
   /**
    * The spawn-time closer, once the agent has one. Written by the `onCloser` hook below.
    *
@@ -320,6 +349,8 @@ export class MainWindow extends Adw.ApplicationWindow {
     this._contentPage.title = APP_NAME;
     this._sidebarTitle.title = APP_NAME;
 
+    this.#loadSessions = options.loadSessions;
+    this.#newChat = options.newChat;
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#permissions = new PermissionDialog(this);
     this.#failures = new FailureDialog();
@@ -345,10 +376,14 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#agent = new AgentSession({
       command: options.agent,
       ...(options.appendTurns ? { append: options.appendTurns } : {}),
+      ...(options.createSession ? { create: options.createSession } : {}),
+      ...(options.agentSource ? { source: options.agentSource } : {}),
+      ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
       ...(options.now ? { now: options.now } : {}),
       events: {
         onSnapshot: (snapshot) => this.#onSnapshot(snapshot),
         onEntries: (entries) => this.#onEntries(entries),
+        onConversation: (record, current) => this.#onConversation(record, current),
         onNotice: (message) => this.#onNotice(message),
         // Kept so `close-request` can end a process that exists while the handshake is still running
         // and no turn has been awaited — the orphan `onSpawn` exists to prevent. `shutdown()` below
@@ -413,6 +448,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     // by reading it.
     this.#applyBreakpoint();
     if (options.preferences) this.#installPreferences(app, options.preferences);
+    this.#installNewChat(app);
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
@@ -434,11 +470,84 @@ export class MainWindow extends Adw.ApplicationWindow {
     app.set_accels_for_action('app.preferences', ['<Ctrl>comma']);
   }
 
+  /**
+   * `win.new-chat`: the sidebar button, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate this one action.
+   * Window-scoped rather than `app.`: what it resets is this window's composer. Disabled when no
+   * directory could be found, so the button is insensitive rather than pointing at nothing.
+   */
+  #installNewChat(app: Adw.Application): void {
+    const action = new Gio.SimpleAction({ name: 'new-chat', enabled: this.#newChat !== null });
+    action.connect('activate', () => this.#startNewChat());
+    this.add_action(action);
+    app.set_accels_for_action('win.new-chat', ['<Ctrl>n']);
+  }
+
+  /**
+   * The empty composer: no session is open and the first prompt makes one. **Starts nothing** — the
+   * agent and `session/new` wait for the prompt, so a window nobody types in owns no process.
+   *
+   * The draft is left alone: a person who was writing something and reached for New chat has not asked
+   * to lose it. `show_content` brings the pane forward on a collapsed window, where this is a tap on the
+   * sidebar's own header.
+   */
+  #startNewChat(): void {
+    const chat = this.#newChat;
+    if (!chat) return;
+    this.#failures.close();
+    this.#openRecord = null;
+    this.#sessions.clearSelection();
+    // The agent stops a running turn itself (`startConversation`), settling any open question
+    // `cancelled`; the dialog widget goes down after it, like Stop's.
+    this.#agent.startConversation(chat.cwd);
+    this.#permissions.close();
+    this.#transcript.setEntries([]);
+    this._contentStack.visibleChildName = 'new';
+    this._contentPage.title = APP_NAME;
+    this._contentHeader.showTitle = false;
+    this._cwdCaption.label = `in ${displayCwd(chat.cwd, chat.home)}`;
+    this._cwdCaption.visible = true;
+    this._split.showContent = true;
+  }
+
+  /**
+   * A new conversation has its session and its record. The sidebar gets the row at the top and, when the
+   * person is still in that chat, marks it open — the transcript already shows what they sent, so this
+   * does not go through `#open`, which would replace it with the (empty) stored copy.
+   */
+  #onConversation(record: SessionRecord, current: boolean): void {
+    this.#records = [record, ...this.#records.filter((existing) => existing.id !== record.id)];
+    this.#sessions.setSessions(this.#records);
+    if (!current) return;
+    this.#sessions.select(record.id);
+    this.#openRecord = record;
+    this._contentPage.title = labelOf(record);
+    this._contentHeader.showTitle = true;
+    this._cwdCaption.visible = false;
+    this._contentStack.visibleChildName = 'open';
+  }
+
   #load(loadSessions: () => readonly SessionRecord[]): void {
     try {
-      this.#sessions.setSessions(loadSessions());
+      this.#records = [...loadSessions()];
+      this.#sessions.setSessions(this.#records);
+      // First run: nothing to list, so the window is the chat. With sessions it stays on the list's
+      // "pick one" page, as before.
+      if (this.#records.length === 0) this.#startNewChat();
     } catch (error) {
       this.#sessions.showError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * The record as the store holds it now. The window's list was read at startup, and a session that
+   * streamed or was created since is longer on disk — showing the startup copy would be a transcript
+   * that loses its own last answer. A read that fails falls back to the copy in hand.
+   */
+  #fresh(record: SessionRecord): SessionRecord {
+    try {
+      return this.#loadSessions().find((candidate) => candidate.id === record.id) ?? record;
+    } catch {
+      return record;
     }
   }
 
@@ -468,9 +577,11 @@ export class MainWindow extends Adw.ApplicationWindow {
    * method stay a pure view operation — no await, no failure path, no process to leak when a person
    * clicks through a list.
    */
-  #open(record: SessionRecord): void {
+  #open(listed: SessionRecord): void {
+    const record = this.#fresh(listed);
     const label = labelOf(record);
     this.#openRecord = record;
+    this._cwdCaption.visible = false;
     // **A session switch takes the failure dialog down, and keeps `#shownFailure`.** The dialog is about
     // the window, not about the session — but a person who clicked another conversation while a modal
     // sentence about the last one was up is now looking at a *different* conversation, and a modal that
@@ -478,7 +589,15 @@ export class MainWindow extends Adw.ApplicationWindow {
     // `#open` then emits, and `failureToShow` answers `null` for the failure this window already showed,
     // so closing it here does not buy it back on the next state move — that was the whole defect.
     this.#failures.close();
-    this.#agent.bind({ id: record.id, cwd: record.cwd });
+    // The recorded agent travels with the session, so the first prompt reattaches it on the copy that
+    // holds its history (`resolveRecorded`) rather than on the window's single agent.
+    this.#agent.bind({
+      id: record.id,
+      cwd: record.cwd,
+      agent: record.agentSource ? { id: record.agent, source: record.agentSource } : { id: record.agent },
+    });
+    // `bind` stopped a turn that belongs to another chat; its question, if any, is already settled.
+    this.#permissions.close();
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
     // map, so an index would be a second naming scheme for the same three states.
@@ -623,10 +742,13 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #onEntries(entries: TranscriptEntry[]): void {
     this.#transcript.appendEntries(entries);
+    this.#streamed += entries.filter((entry) => entry.kind !== 'user').length;
     // A session that was showing `'empty'` has just said something. Left as it is, the pane keeps the
     // "Nothing here yet" status page *underneath* the new bubble, and the sentence contradicts what is
     // on top of it.
-    if (this._contentStack.visibleChildName === 'empty') this._contentStack.visibleChildName = 'open';
+    // The same for a new chat, whose first line is drawn before its session exists.
+    const visible = this._contentStack.visibleChildName;
+    if (visible === 'empty' || visible === 'new') this._contentStack.visibleChildName = 'open';
   }
 
   /**
@@ -688,6 +810,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         GLib.source_remove(this.#failureHooks.source);
         this.#failureHooks.source = null;
       }
+      if (this.#newChatSource !== null) {
+        GLib.source_remove(this.#newChatSource);
+        this.#newChatSource = null;
+      }
+      if (this.#midTurnSource !== null) {
+        GLib.source_remove(this.#midTurnSource);
+        this.#midTurnSource = null;
+      }
       if (!this.#agent.turnRunning && !this.#agent.agentRunning) return false;
       this.#closing = true;
       void (async () => {
@@ -726,7 +856,7 @@ export class MainWindow extends Adw.ApplicationWindow {
         // A hook that cannot be parsed is a typo, and a typo that silently did nothing is how a surface
         // ends up with a screenshot nobody can account for. Named loudly, with the format.
         console.log(`kurier: KU_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`);
-      } else if (!this.#openRecord) {
+      } else if (!this.#hasChat()) {
         console.log('kurier: KU_APP_CONFIG — no session is open, so there is no agent to ask');
       } else {
         console.log(
@@ -781,18 +911,75 @@ export class MainWindow extends Adw.ApplicationWindow {
     // anything from the session file: a screenshot must not carry a real conversation out of it.
     if (hooks.thinking === true) {
       const prompt = hooks.prompt ?? 'Summarise this repository in three sentences.';
-      const record = this.#openRecord;
-      if (!record) {
+      if (!this.#hasChat()) {
         console.log('kurier: KU_APP_THINKING — no session is open, so there is nowhere to send it');
       } else {
-        console.log(`kurier: KU_APP_THINKING — sending to ${record.id}`);
+        console.log(
+          `kurier: KU_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
+        );
         this.#composer.clearDraft();
         void this.#agent.prompt(prompt);
       }
     }
     this.#applyStopHook(hooks);
+    this.#applyNewChatHook(hooks);
+    this.#applyNewChatMidTurnHook(hooks);
     this.#applyFailureHooks(hooks);
     this.#applyPreferencesHooks(hooks);
+  }
+
+  /**
+   * `KU_APP_NEW_CHAT`: press New chat — through `win.new-chat`, the action the button and `<Ctrl>n` run.
+   *
+   * **After the running turn, not during it.** Combined with `KU_APP_THINKING` the point is to photograph
+   * the empty composer *after* a chat exists, and a New chat in the middle of the first answer would
+   * photograph a half-streamed one. Nothing running: it fires at once.
+   */
+  #applyNewChatHook(hooks: KurierHooks): void {
+    if (hooks.newChat !== true) return;
+    const press = (): void => {
+      console.log('kurier: KU_APP_NEW_CHAT — activating win.new-chat');
+      // The action itself, not `this.activate_action(…)`: on a window GJS resolves that name to
+      // `Gio.ActionGroup`'s, which takes the name *without* the `win.` prefix and returns nothing — the
+      // prefixed spelling is a silent no-op (measured: the first version of this hook did nothing and
+      // logged success). `activate` on the action is what the button's `action-name` ends up calling.
+      const action = this.lookup_action('new-chat');
+      if (!action) console.log('kurier: KU_APP_NEW_CHAT — no such action on this window');
+      else action.activate(null);
+    };
+    if (!this.#agent.turnRunning) {
+      press();
+      return;
+    }
+    this.#newChatSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FAILURE_HOOK_STEP_MS, () => {
+      if (this.#agent.turnRunning) return GLib.SOURCE_CONTINUE;
+      this.#newChatSource = null;
+      press();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  /**
+   * `KU_APP_NEW_CHAT_MIDTURN`: press New chat once the running turn has streamed something and is still
+   * going — the one-keystroke path that used to leave the old answer streaming into the empty pane.
+   * Through the same action as the button. Polls, because the turn starts a moment after the hook runs.
+   */
+  #applyNewChatMidTurnHook(hooks: KurierHooks): void {
+    if (hooks.newChatMidTurn !== true) return;
+    this.#midTurnSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MIDTURN_HOOK_STEP_MS, () => {
+      if (!this.#agent.turnRunning || this.#streamed === 0) return GLib.SOURCE_CONTINUE;
+      this.#midTurnSource = null;
+      console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
+      const action = this.lookup_action('new-chat');
+      if (!action) console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — no such action on this window');
+      else action.activate(null);
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  /** A session is open, or a new chat is waiting for its first prompt — either way a prompt has somewhere to go. */
+  #hasChat(): boolean {
+    return this.#openRecord !== null || this.#agent.snapshot.startsConversation;
   }
 
   /** `KU_APP_PREFERENCES` opens the dialog through its action; `KU_APP_PREFERENCES_AGENT` also chooses a row. */
@@ -939,7 +1126,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #applyStopHook(hooks: KurierHooks): void {
     if (hooks.stop !== true && hooks.stopEscape !== true) return;
-    if (!this.#openRecord) {
+    if (!this.#hasChat()) {
       console.log('kurier: KU_APP_STOP — no session is open, so there is no turn to stop');
       return;
     }
@@ -987,7 +1174,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * case is settled there rather than guessed at again here.
    */
   #stagePermission(): void {
-    if (!this.#openRecord) {
+    if (!this.#hasChat()) {
       console.log('kurier: KU_APP_PERMISSION — no session is open, so there is nothing to ask about');
       return;
     }
@@ -1012,6 +1199,7 @@ function composerInput(snapshot: AgentSnapshot): ComposerInput {
     state: snapshot.state,
     agent: agentStatus(snapshot.attachment),
     sessionId: snapshot.sessionId,
+    startsConversation: snapshot.startsConversation,
   };
 }
 
@@ -1033,6 +1221,7 @@ GObject.registerClass(
       'transcriptHost',
       'configHost',
       'composerHost',
+      'cwdCaption',
     ],
   },
   MainWindow,

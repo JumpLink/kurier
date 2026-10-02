@@ -50,8 +50,11 @@ export type { FailureKind, TurnState };
  * - `none`: no `stopReason` exists at all. Only reachable when kurier never sent the prompt (Stop
  *   during the handshake), because an agent that dies mid-turn takes the `agent-gone` path instead and
  *   must never be dressed up as a finished turn.
+ * - `left`: the person moved to another chat and the controller stopped the turn for them (New chat, a
+ *   sidebar row). It is a cancel like `window`, but the chat it belonged to is no longer on screen, so
+ *   "Stopped." must not be written over the chat they went to: the state ends `idle`.
  */
-export type CancelledBy = 'window' | 'agent' | 'none';
+export type CancelledBy = 'window' | 'agent' | 'left' | 'none';
 
 export type TurnEvent =
   /** A prompt is going out. Nothing has been sent yet, so nothing can have gone wrong. */
@@ -72,8 +75,10 @@ export type TurnEvent =
       readonly stopReason: StopReason | null;
       readonly cancelledBy: CancelledBy;
     }
-  /** The transport ended (process exit, EOF) while a turn was running. Terminal for this window. */
-  | { readonly kind: 'agent-gone'; readonly reason: string };
+  /** The transport ended (process exit, EOF) while a turn was running. Terminal until New chat. */
+  | { readonly kind: 'agent-gone'; readonly reason: string }
+  /** New chat: a fresh conversation starts, so what the last one ended in is not its state. */
+  | { readonly kind: 'chat-reset' };
 
 /**
  * The one transition function.
@@ -83,8 +88,9 @@ export type TurnEvent =
  * nothing. Each of those cases is a real question and the answers are the plan's, not guesses:
  *
  * - **`prompt` from `gone` does not resurrect the agent.** `composer-state.ts` calls `gone` terminal —
- *   an agent that exited is not coming back in this window, and a window that quietly grew a second
- *   agent would be holding two subprocesses behind one Stop button.
+ *   an agent that exited is not coming back for *that* chat, and a window that quietly grew a second
+ *   agent would be holding two subprocesses behind one Stop button. The one way out is `chat-reset`
+ *   (New chat), which also retires the dead handle, so the next prompt starts a fresh agent on purpose.
  * - **`turn-ended` outranks `permission-answered`.** A turn that ended while a dialog was open (Stop
  *   answers the dialog `cancelled`, per the schema) must not be dragged back to `thinking`.
  * - **`agent-gone` wins over everything.** Nothing that arrives after the transport ended describes a
@@ -123,7 +129,39 @@ export function transition(state: TurnState, event: TurnEvent): TurnState {
 
     case 'agent-gone':
       return 'gone';
+
+    case 'chat-reset':
+      // Only the two states that describe how the *last* chat ended. A running turn is left alone: it
+      // settles on its own answer, and `left` is what makes that answer land on `idle`.
+      return state === 'gone' || state === 'stopped' ? 'idle' : state;
   }
+}
+
+/**
+ * Whether moving the window to `target` abandons the turn that is running.
+ *
+ * **`target` is the session the window is about to show, `null` for a new chat.** The turn belongs to
+ * `turnSession` — `null` while a new conversation is still in its handshake, when no id exists yet — so
+ * any other target, and every new chat, leaves it behind. Nothing running leaves nothing behind.
+ */
+export function leavesRunningTurn(
+  running: boolean,
+  turnSession: SessionId | null,
+  target: SessionId | null,
+): boolean {
+  return running && (target === null || target !== turnSession);
+}
+
+/**
+ * Whether lines for `sessionId` may reach the transcript on screen.
+ *
+ * **The turn's session, not the window's, is what the lines are about — and only the window's is on
+ * screen.** A turn that outlives the chat it started in (it is being stopped, or the agent has not
+ * answered the cancel yet) keeps streaming into its own record, and none of it may reach the pane of the
+ * chat the person went to. `shown` is `null` for an empty new chat, which shows no session at all.
+ */
+export function isOnScreen(sessionId: SessionId, shown: SessionId | null): boolean {
+  return shown !== null && sessionId === shown;
 }
 
 // ─── what the window may say about the agent ─────────────────────────────────────────────────
@@ -170,22 +208,19 @@ export interface AgentStatus {
   readonly note: string;
 }
 
-/** Nothing to send to yet — the window's own words, so the surface has one place to change them. */
-export const NO_AGENT_YET = 'No agent is started yet. The first prompt starts it.';
-
 /**
  * The join between the agent's life and what the composer may say.
  *
- * **`attached` is `true` only for `attached`, deliberately.** While the handshake is in flight there
+ * **`attached` is `true` for `none` (the prompt starts the agent) and for `attached`; it is `false`
+ * while `attaching`, after `gone`, and for a failed start.** While the handshake is in flight there
  * is a process but no session to prompt, so a Send enabled then would accept a message that cannot be
  * delivered; and the composer's `stop` branch outranks `attached` anyway, so a person who pressed Send
  * a moment ago still gets a working Stop instead of a disabled button that claims nothing is
  * happening.
  *
  * The `note` for a dead agent is the *reason*, not a summary: "the agent exited (code 1)" is
- * something a person can act on and "the agent is gone" is not. The one thing this never invents is
- * a way to get an agent back — there is none in this window (a new agent is a new window), and the
- * sentence says so rather than implying otherwise.
+ * something a person can act on and "the agent is gone" is not. The one way back it names is the one
+ * that exists: New chat retires the dead handle and the next prompt starts a fresh agent.
  *
  * **The exception is `'model'`, and it is not a dead agent.** `failureKind` reaches that answer from an
  * auth-required error *after a prompt was sent*, which means the agent is up: it handshook, it loaded
@@ -198,7 +233,10 @@ export const NO_AGENT_YET = 'No agent is started yet. The first prompt starts it
 export function agentStatus(attachment: AgentAttachment): AgentStatus {
   switch (attachment.status) {
     case 'none':
-      return { attached: false, note: NO_AGENT_YET };
+      // **A prompt has somewhere to go: it starts the agent.** This used to be `attached: false` with a
+      // sentence promising that the first prompt starts it, on a Send button that stayed disabled — so
+      // the composer could not send the one message that would have started anything.
+      return { attached: true, note: '' };
     case 'attaching':
       return { attached: false, note: 'Starting the agent…' };
     case 'attached':
@@ -206,7 +244,7 @@ export function agentStatus(attachment: AgentAttachment): AgentStatus {
     case 'gone':
       return {
         attached: false,
-        note: `The agent exited${attachment.reason ? ` (${attachment.reason})` : ''}. Open a new window to send another prompt.`,
+        note: `The agent exited${attachment.reason ? ` (${attachment.reason})` : ''}. Press New chat to send another prompt.`,
       };
     case 'failed':
       return { attached: attachment.kind === 'model', note: attachment.message };

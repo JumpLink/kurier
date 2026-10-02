@@ -257,6 +257,34 @@ GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-i
 
 Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version.
 
+## First run and New chat
+
+**First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `kurier start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate that one action.
+
+**The cwd** is `KURIER_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`core/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
+
+- `KU_APP_NEW_CHAT=1` — press New chat through `win.new-chat`. With a turn running it waits for the turn to end, so `KU_APP_THINKING=1 KU_APP_PROMPT=… KU_APP_NEW_CHAT=1` photographs the empty composer *after* a chat exists. The action is activated with `lookup_action('new-chat').activate(null)`: `this.activate_action('win.new-chat', null)` resolves to `Gio.ActionGroup`'s on a window, takes no prefix, returns nothing and did nothing (measured).
+- `KU_APP_NEW_CHAT_MIDTURN=1` — press New chat **while the turn is streaming**: polls (50 ms) until the agent has said something and the turn is still running, then activates `win.new-chat`. New chat stops the turn the way Stop does (`session/cancel`; an open permission settles `cancelled`, `turn-cancelled`), the turn ends `idle` (never `Stopped.` on the new chat), and anything the old turn still says goes to its own record and never to the visible pane — the same holds for opening another row mid-turn (`bind`). After the agent has exited (`gone`), New chat retires the dead handle (awaiting its `close()`) so the next prompt starts a fresh agent; a record that cannot be written after `session/new` says so (`unsavedMessage`: not saved, why, press New chat).
+  ```sh
+  GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
+    KU_APP_AGENT=stand-in KU_APP_CWD=/tmp/x/project KU_STANDIN_DELAY_MS=1500 \
+    KU_APP_THINKING=1 KU_APP_PROMPT='Say hello.' KU_APP_NEW_CHAT_MIDTURN=1 \
+    ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ```
+- `KU_APP_CWD=<path>` — pin the cwd so a screenshot never shows a private path; beats `KURIER_CWD`. `KU_APP_THINKING` + `KU_APP_PROMPT` also send into the pending chat.
+- The stand-in answers `session/new` with `ses_standin_0001`, then `…_2`, `…_3`: two chats in one window must not collide in the store.
+- A session opened from the list is reattached on the copy of the agent its record names (`resolveRecorded`), asked on its first prompt. **Not wired with `KU_APP_AGENT`**: that pins one agent for the whole window, otherwise a fixture record naming `opencode` would start a real one.
+
+```sh
+# first run, a prompt, then the empty composer again — synthetic file, pinned cwd
+mkdir -p /tmp/x/project
+GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
+  KU_APP_AGENT=stand-in KU_APP_CWD=/tmp/x/project KU_APP_THINKING=1 KU_APP_PROMPT='Say hello.' KU_APP_NEW_CHAT=1 \
+  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+Two defects found on the way, both fixed: `agentStatus({status: 'none'})` was `attached: false`, so Send stayed disabled until an agent existed — and the agent only starts on the first prompt (only `KU_APP_THINKING` could send one); and `#open` re-read nothing, so a chat revisited after streaming showed the startup copy of its transcript.
+
 ## The permission dialog
 
 **The three GTK facts behind it are measured, not read from the signal docs**: `Adw.Dialog` emits

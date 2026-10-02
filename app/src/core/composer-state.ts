@@ -28,8 +28,9 @@
  * unless it is on screen.
  *
  * The states are the plan's (§6) and no others: `idle | thinking | waiting-for-you | stopped | gone`.
- * `gone` is terminal — an agent that exited mid-turn is not coming back in this window, so text typed
- * then could never be sent, and an entry that still invites a prompt collects words that go nowhere.
+ * `gone` is terminal for its chat — an agent that exited mid-turn is not coming back there, so text typed
+ * then could never be sent, and an entry that still invites a prompt collects words that go nowhere. New
+ * chat is the way out: it retires the dead agent and the next prompt starts a fresh one.
  */
 
 import type { AgentStatus } from './turn.ts';
@@ -46,6 +47,11 @@ export interface ComposerInput {
   readonly agent: AgentStatus;
   /** The open session — where a prompt would go. `null` while no session is open. */
   readonly sessionId: string | null;
+  /**
+   * A new conversation is waiting for its first prompt: there is no session id yet, and Send is what
+   * makes one. Absent means no.
+   */
+  readonly startsConversation?: boolean;
 }
 
 export interface ComposerView {
@@ -100,7 +106,7 @@ export function composerView(input: ComposerInput): ComposerView {
       entryEditable: false,
       // The turn's own state is the reason here, not the agent's: the turn is what ended. The agent
       // sentence would say the same thing in words that belong to a different failure.
-      reason: 'The agent exited. Start a new session to send another prompt.',
+      reason: 'The agent exited. Press New chat to send another prompt.',
       status: '',
     };
   }
@@ -112,15 +118,14 @@ export function composerView(input: ComposerInput): ComposerView {
       // Typing is still allowed: the text is kept, so it is there when an agent arrives. Refusing to
       // type into a field that will be enabled a second later is the surprise, not the help.
       entryEditable: true,
-      // The agent's own sentence when it has one. `NO_AGENT_YET` covers `status: 'none'`, which is the
-      // only shape that reports nothing — the fallback keeps a caller that forgot to say anything
-      // from rendering an empty reason under a disabled button.
+      // The agent's own sentence when it has one; the fallback keeps a caller that forgot to say
+      // anything from rendering an empty reason under a disabled button.
       reason: agent.note || NOTHING_TO_SEND_TO,
       status: '',
     };
   }
 
-  if (input.sessionId === null) {
+  if (input.sessionId === null && input.startsConversation !== true) {
     return {
       action: 'send',
       buttonEnabled: false,

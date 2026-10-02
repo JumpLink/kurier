@@ -32,6 +32,7 @@ export declare const InternalChildren: [
     'contentHeader',
     'configHost',
     'composerHost',
+    'cwdCaption',
 ];
 
 /** The `_`-prefixed members GJS installs for them. Merge it into the class interface. */
@@ -46,4 +47,5 @@ export interface Children {
     _contentHeader: Adw.HeaderBar;
     _configHost: Adw.Bin;
     _composerHost: Adw.Bin;
+    _cwdCaption: Gtk.Label;
 }

@@ -23,6 +23,8 @@ const NAMES = [
   // window.ts — the unopened page and the session that replaced it.
   'mail-send-receive-symbolic',
   'utilities-terminal-symbolic',
+  // window.blp — the sidebar's New chat button.
+  'list-add-symbolic',
   // session-list.ts — the empty and unreadable states.
   'dialog-warning-symbolic',
   // transcript-view.ts — the two closed lines.

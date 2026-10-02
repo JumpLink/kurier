@@ -4,16 +4,25 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 
 import { BUNDLED_AGENTS, bundledProgram } from './catalog.ts';
 import { dataDir } from '../paths.ts';
 import { detectAgents, parseVersionOutput, type AgentFacts } from './detect.ts';
 import { isolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
+import type { CwdFacts } from '../cwd.ts';
 import type { ResolveContext } from './resolve.ts';
-import { currentSandboxFacts, toHostCommand, type SandboxFacts } from './sandbox.ts';
-import { which, whichAsync, type AgentCommand } from './stdio.ts';
+import {
+  FLATPAK_SPAWN,
+  currentSandboxFacts,
+  hostCwdArgv,
+  isSandboxed,
+  toHostCommand,
+  type SandboxFacts,
+} from './sandbox.ts';
+import { parseHostProbeOutput, which, whichAsync, type AgentCommand } from './stdio.ts';
 
 const VERSION_TIMEOUT_MS = 5000;
 
@@ -101,5 +110,39 @@ function resolveContextFrom(env: NodeJS.ProcessEnv, facts: readonly AgentFacts[]
       const entry = BUNDLED_AGENTS.find((candidate) => candidate.id === id);
       return entry !== undefined && existsSync(bundledProgram(entry));
     },
+  };
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The facts `resolveCwd` reasons about. Inside a Flatpak the host is asked once, synchronously and
+ * bounded, like the agent probe — it runs before the window exists, so nothing is drawn yet to freeze.
+ * An unanswered host is `null`, and `resolveCwd` falls through to `$HOME`.
+ */
+export function gatherCwdFacts(env: NodeJS.ProcessEnv = process.env): CwdFacts {
+  const sandbox = currentSandboxFacts();
+  const argv = hostCwdArgv(sandbox);
+  let hostCwd: string | null = null;
+  if (argv) {
+    const result = spawnSync(FLATPAK_SPAWN, argv, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: VERSION_TIMEOUT_MS,
+    });
+    if (result.status === 0) hostCwd = parseHostProbeOutput(result.stdout ?? '');
+  }
+  return {
+    sandboxed: isSandboxed(sandbox),
+    processCwd: process.cwd(),
+    hostCwd,
+    home: env['HOME']?.trim() || homedir() || null,
+    exists: isDirectory,
   };
 }

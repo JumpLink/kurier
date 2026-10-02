@@ -68,7 +68,10 @@ export default async () => {
       expect(choice.command).toBe(bundled.command);
       expect(choice.note).toContain('bundled opencode 1.0.0');
       expect(asked).toBe(1);
+      expect(choice.source).toBe('bundled');
       expect(chooseAgent('opencode', resolver).command.bundled).toBe(undefined);
+      expect(chooseAgent('opencode', resolver).source).toBe('host');
+      expect(chooseAgent(STAND_IN_AGENT_ID, resolver).source).toBe('host');
       expect(chooseAgent(STAND_IN_AGENT_ID, resolver).command.id).toBe(STAND_IN_AGENT_ID);
       expect(asked).toBe(1);
     });

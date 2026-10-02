@@ -91,10 +91,9 @@ export class SessionList {
       new Adw.StatusPage({
         iconName: 'mail-send-receive-symbolic',
         title: 'No sessions yet',
-        // Says where sessions come from *today*. A "start one" button would be a control that
-        // points at nothing until the composer exists. The `<tt>` is markup and works because
-        // `description` is the one `Adw.StatusPage` field that is Pango; see `window.ts` `#open`.
-        description: 'Sessions started with <tt>kurier start</tt> appear here.',
+        // Says where sessions come from. The `<tt>` is markup and works because `description` is the
+        // one `Adw.StatusPage` field that is Pango; see `window.ts` `#open`.
+        description: 'Chats you start here, or with <tt>kurier start</tt>, appear here.',
         vexpand: true,
         cssClasses: ['compact'],
       }),
@@ -151,6 +150,12 @@ export class SessionList {
     this.#openId = id;
     this.#mark(row);
     return this.#records[row.get_index()];
+  }
+
+  /** Nothing is open: the mark goes, and no row stands for the pane. */
+  clearSelection(): void {
+    this.#openId = null;
+    this.#mark(null);
   }
 
   /**

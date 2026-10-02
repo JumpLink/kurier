@@ -200,6 +200,27 @@ export interface KurierHooks extends FrameworkHooks {
    * dialog after a choice.
    */
   preferencesAgent?: string;
+
+  /**
+   * `KU_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
+   * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `KU_APP_NEW_CHAT=0` stays where it is.
+   */
+  newChat?: boolean;
+
+  /**
+   * `KU_APP_NEW_CHAT_MIDTURN` — press New chat **while a turn is streaming**: once the agent has
+   * answered with something, and the turn is still running. Combined with `KU_APP_THINKING` and a slow
+   * stand-in (`KU_STANDIN_DELAY_MS`), it reaches the state `KU_APP_NEW_CHAT` waits its way around.
+   */
+  newChatMidTurn?: boolean;
+
+  /**
+   * `KU_APP_CWD` — where a new chat runs, **instead of asking the host or reading the process cwd**.
+   * A screenshot shows this path under the composer, and the real one is a private directory name, so
+   * every screenshot run pins a synthetic one. It beats `KURIER_CWD`; a path that does not exist falls
+   * through to the next candidate like any other (`core/cwd.ts`).
+   */
+  cwd?: string;
 }
 
 /**
@@ -244,6 +265,9 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
     preferences: hookFlag(env, 'PREFERENCES'),
     preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),
+    newChat: hookFlag(env, 'NEW_CHAT'),
+    newChatMidTurn: hookFlag(env, 'NEW_CHAT_MIDTURN'),
+    cwd: hookValue(env, 'CWD'),
     thinking: hookFlag(env, 'THINKING'),
     prompt: hookValue(env, 'PROMPT'),
   };

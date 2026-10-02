@@ -13,11 +13,12 @@
 
 import type { CommandModule } from 'yargs';
 
+import { conversationRecord } from '../../core/conversation.ts';
 import { installInterruptHandler } from '../../core/interrupt.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
-import { LOCAL_PRINCIPAL, createSessionStore, newSession } from '@kurier/session';
+import { createSessionStore } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 
 import { agentForNew } from './choose.ts';
@@ -98,21 +99,15 @@ const command: CommandModule = {
       err(`${agent.agentInfo} — session ${session.sessionId} in ${cwd}`);
 
       const created = store.create(
-        newSession({
+        conversationRecord({
           id: session.sessionId,
           agent: launcher.id,
           agentSource: resolved.source,
           cwd,
-          principal: LOCAL_PRINCIPAL,
-          boundTo: null,
+          prompt: text,
           at: at(),
-          // Recorded now, from the agent's own capabilities, so `resume` knows what this session
-          // was reattached with — not what it *should* have been.
-          reattach: agent.client.supportsLoadSession
-            ? 'load'
-            : agent.client.supportsResumeSession
-              ? 'resume'
-              : null,
+          supportsLoadSession: agent.client.supportsLoadSession,
+          supportsResumeSession: agent.client.supportsResumeSession,
         }),
       );
 

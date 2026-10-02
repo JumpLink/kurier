@@ -38,6 +38,8 @@ import transcriptItems from './unit/core/transcript-items.test.ts';
 import turn from './unit/core/turn.test.ts';
 import permission from './unit/core/permission.test.ts';
 import agentSession from './unit/core/agent-session.test.ts';
+import cwd from './unit/core/cwd.test.ts';
+import conversation from './unit/core/conversation.test.ts';
 
 import hookValue from './unit/gui/hook-value.test.ts';
 
@@ -77,6 +79,8 @@ run({
   turn,
   permission,
   agentSession,
+  cwd,
+  conversation,
   hookValue,
   smoke,
 });

@@ -1,13 +1,17 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import { AcpClient } from '@kurier/acp/client';
-import type { TranscriptEntry } from '@kurier/session';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../../src/core/agent-session.ts';
 import type { ConfigRowView } from '../../../src/core/config-row.ts';
+import { composerView } from '../../../src/core/composer-state.ts';
+import { unsavedMessage } from '../../../src/core/conversation.ts';
 import { failureNotice } from '../../../src/core/failure.ts';
 import type { PermissionQuestion } from '../../../src/core/permission.ts';
 import { OPENCODE_COMMAND } from '../../../src/core/agents/opencode.ts';
+import type { RecordedResolution } from '../../../src/core/agents/resolve.ts';
+import type { AgentCommand } from '../../../src/core/agents/stdio.ts';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
 
 const SESSION = { id: 'ses_fixture_0001', cwd: '/fixture' };
@@ -20,10 +24,19 @@ interface Harness {
   readonly entries: TranscriptEntry[];
   readonly persisted: { sessionId: string; entries: TranscriptEntry[] }[];
   readonly notices: string[];
+  /** Records handed to `create`, and the ones the surface was told about, in order. */
+  readonly created: SessionRecord[];
+  readonly conversations: SessionRecord[];
+  /** The command of every process the controller started. */
+  readonly opened: AgentCommand[];
+  /** How many connections the controller has ended. */
+  closed(): number;
   /** Every config view handed to the surface, in order. */
   readonly configViews: ConfigRowView[];
   /** True once `onSpawn`'s closer has been called — the "nothing unowned" assertion. */
   spawnCloserUsed(): boolean;
+  /** Let a `slowClose` close finish. */
+  finishClose(): void;
   /** One tick of the microtask queue, which is where the fixture's turn replies land. */
   flush(): Promise<void>;
   /**
@@ -51,6 +64,15 @@ interface HarnessOptions extends FixtureAgentOptions {
    * guardrail 2 — the same path, not a special case.
    */
   onPermission?: (question: PermissionQuestion) => Promise<string | null | undefined>;
+  /** Which copy the window's command is, for the record a new conversation writes. */
+  source?: AgentSource;
+  /** What `create` throws, to exercise a store that cannot write. */
+  createFails?: Error;
+  resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
+  /** `close()` returns a promise that `finishClose()` resolves, like a process that is still ending. */
+  slowClose?: boolean;
+  /** Refuse every `open` after the first: the fixture has one transport, so a second process cannot be real. */
+  failAfterFirstOpen?: boolean;
 }
 
 /**
@@ -69,7 +91,15 @@ function harness(options: HarnessOptions = {}): Harness {
   const persisted: { sessionId: string; entries: TranscriptEntry[] }[] = [];
   const notices: string[] = [];
   const configViews: ConfigRowView[] = [];
+  const created: SessionRecord[] = [];
+  const conversations: SessionRecord[] = [];
+  const opened: AgentCommand[] = [];
   let spawnCloserUsed = false;
+  let closed = 0;
+  let finishClose = (): void => {};
+  const closing = new Promise<void>((resolve) => {
+    finishClose = resolve;
+  });
   let tick = 0;
   const clock = (): string => {
     tick += 1;
@@ -86,21 +116,40 @@ function harness(options: HarnessOptions = {}): Harness {
       // The row's own channel, collected like the snapshots: what a surface would be handed, and the
       // only way to see *when* it was handed something rather than only what it holds now.
       onConfig: (view) => configViews.push(view),
+      onConversation: (record) => conversations.push(record),
       // Spread so an absent hook stays absent: `onPermission: undefined` would be a hook that exists
       // and cannot ask, which is not the same thing the CLI has.
       ...(options.onPermission ? { onPermission: options.onPermission } : {}),
     },
     append: (sessionId, batch) => persisted.push({ sessionId, entries: batch }),
+    create: (record) => {
+      if (options.createFails) throw options.createFails;
+      created.push(record);
+    },
+    ...(options.source ? { source: options.source } : {}),
+    ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
     // The gate kurier passes is the gate the client answers with, so the refusal assertions are about
     // the wire and not about a local array — that is what makes guardrail 2 a measurement.
     open: async (openOptions) => {
+      opened.push(openOptions.command);
       openOptions.onSpawn?.(() => {
         spawnCloserUsed = true;
       });
       if (options.failWith) throw options.failWith;
+      if (options.failAfterFirstOpen && opened.length > 1)
+        throw new Error('the second process could not start');
       const client = new AcpClient({ transport: agent.transport, gate: openOptions.gate });
       await client.initialize();
-      return { client, logLines: [], agentInfo: 'FixtureAgent 0.1.0', close: () => client.close() };
+      return {
+        client,
+        logLines: [],
+        agentInfo: 'FixtureAgent 0.1.0',
+        close: () => {
+          closed += 1;
+          client.close();
+          return options.slowClose ? closing : undefined;
+        },
+      };
     },
   });
 
@@ -112,6 +161,11 @@ function harness(options: HarnessOptions = {}): Harness {
     entries,
     persisted,
     notices,
+    created,
+    conversations,
+    opened,
+    closed: () => closed,
+    finishClose: () => finishClose(),
     configViews,
     spawnCloserUsed: () => spawnCloserUsed,
     flush: async () => {
@@ -180,6 +234,247 @@ export default async () => {
       await h.session.prompt('hello');
       expect(h.session.agentRunning).toBe(true);
       expect(h.spawnCloserUsed()).toBe(false); // Registered, not yet used — nothing has closed it.
+    });
+  });
+
+  // A conversation that does not exist yet: the window opens on an empty composer, and the first prompt is
+  // what makes the session. Everything here goes through the real client against `FixtureAgent`.
+  await describe('agent-session — a new conversation', async () => {
+    const NEW_CWD = '/synthetic/project';
+
+    function fresh(options: HarnessOptions = {}): Harness {
+      const h = harness({ bind: false, ...options });
+      h.session.startConversation(NEW_CWD);
+      return h;
+    }
+
+    await it('offers a first prompt and starts no process until it is sent', async () => {
+      const h = fresh();
+      expect(h.session.snapshot.sessionId).toBe(null);
+      expect(h.session.snapshot.startsConversation).toBe(true);
+      expect(h.session.agentRunning).toBe(false);
+      expect(h.opened.length).toBe(0);
+      expect(h.created.length).toBe(0);
+    });
+
+    await it('sends session/new with the directory, writes the record, then prompts', async () => {
+      const h = fresh({ source: 'bundled' });
+      await h.session.prompt('  Summarise this repository.  \nsecond line');
+      const methods = h.agent.sent.map((entry) => entry.method);
+      expect(methods.indexOf('session/new')).toBeGreaterThan(-1);
+      expect(methods.indexOf('session/new')).toBeLessThan(methods.indexOf('session/prompt'));
+      expect(methods).not.toContain('session/load');
+      const params = h.agent.sent.find((entry) => entry.method === 'session/new')?.params as { cwd: string };
+      expect(params.cwd).toBe(NEW_CWD);
+
+      expect(h.created.length).toBe(1);
+      const record = h.created[0]!;
+      expect(record.id).toBe('ses_fixture_0001');
+      expect(record.agent).toBe(OPENCODE_COMMAND.id);
+      expect(record.agentSource).toBe('bundled');
+      expect(record.cwd).toBe(NEW_CWD);
+      expect(record.title).toBe('Summarise this repository.');
+      expect(record.reattach).toBe('load');
+      expect(h.conversations).toStrictEqual([record]);
+    });
+
+    await it('behaves like an opened session afterwards: bound, idle, and the next turn is a plain prompt', async () => {
+      const h = fresh();
+      await h.session.prompt('first');
+      expect(h.session.snapshot.sessionId).toBe('ses_fixture_0001');
+      expect(h.session.snapshot.startsConversation).toBe(false);
+      expect(h.session.snapshot.state).toBe('idle');
+      await h.session.prompt('second');
+      const methods = h.agent.sent.map((entry) => entry.method);
+      expect(methods.filter((method) => method === 'session/new').length).toBe(1);
+      expect(methods.filter((method) => method === 'session/load').length).toBe(0);
+      expect(h.opened.length).toBe(1);
+    });
+
+    await it('draws the person’s line first and persists it under the new session', async () => {
+      const h = fresh();
+      await h.session.prompt('hello there');
+      expect(h.entries[0]).toMatchObject({ kind: 'user', text: 'hello there' });
+      const user = h.persisted.flatMap((batch) => batch.entries).filter((entry) => entry.kind === 'user');
+      expect(user.length).toBe(1);
+      expect(user[0]).toMatchObject({ text: 'hello there', sessionId: 'ses_fixture_0001' });
+      expect(h.persisted.every((batch) => batch.sessionId === 'ses_fixture_0001')).toBe(true);
+      // Not drawn twice: the agent's echo of the prompt is filtered as it is for any turn.
+      expect(h.entries.filter((entry) => entry.kind === 'user').length).toBe(1);
+    });
+
+    await it('shows the agent’s options for the new session', async () => {
+      const h = fresh();
+      await h.session.prompt('hello');
+      expect(h.session.configOptions).not.toBe(null);
+    });
+
+    await it('ignores an empty prompt, and a window with neither a session nor a conversation', async () => {
+      const h = fresh();
+      await h.session.prompt('   ');
+      expect(h.opened.length).toBe(0);
+      const none = harness({ bind: false });
+      await none.session.prompt('hello');
+      expect(none.opened.length).toBe(0);
+    });
+
+    await it('is a sentence, and writes nothing, when the agent cannot start', async () => {
+      const h = fresh({ failWith: new Error('spawn opencode ENOENT') });
+      await h.session.prompt('hello');
+      expect(h.session.snapshot.attachment.status).toBe('failed');
+      expect(h.session.snapshot.state).toBe('idle');
+      expect(h.created.length).toBe(0);
+      expect(h.persisted.length).toBe(0);
+      expect(h.session.snapshot.startsConversation).toBe(true);
+    });
+
+    await it('names the login trap at session/new, as it does for a reattach', async () => {
+      const h = fresh({ requireAuth: true });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status === 'failed' && attachment.kind).toBe('auth');
+      expect(h.created.length).toBe(0);
+    });
+
+    await it('is a start failure when the record cannot be written, and sends no prompt', async () => {
+      const h = fresh({ createFails: new Error('EACCES: cannot write the session file') });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status === 'failed' && attachment.kind).toBe('start');
+      expect(attachment.status === 'failed' && attachment.message).toContain('EACCES');
+      expect(h.agent.sent.map((entry) => entry.method)).not.toContain('session/prompt');
+      expect(h.conversations.length).toBe(0);
+    });
+
+    await it('forgives a failed start when the person asks for a new chat, and keeps a refused model', async () => {
+      const h = fresh({ failWith: new Error('spawn opencode ENOENT') });
+      await h.session.prompt('hello');
+      expect(h.session.snapshot.attachment.status).toBe('failed');
+      h.session.startConversation(NEW_CWD);
+      expect(h.session.snapshot.attachment.status).toBe('none');
+      expect(h.session.snapshot.startsConversation).toBe(true);
+
+      const refused = fresh({ promptAuth: true });
+      await refused.session.prompt('hello');
+      const before = refused.session.snapshot.attachment;
+      expect(before.status === 'failed' && before.kind).toBe('model');
+      refused.session.startConversation(NEW_CWD);
+      expect(refused.session.snapshot.attachment).toBe(before);
+    });
+
+    await it('leaves the pending conversation when a stored session is opened, and comes back to it', async () => {
+      const h = fresh();
+      h.session.bind(SESSION);
+      expect(h.session.snapshot.startsConversation).toBe(false);
+      expect(h.session.snapshot.sessionId).toBe(SESSION.id);
+      h.session.startConversation(NEW_CWD);
+      expect(h.session.snapshot.startsConversation).toBe(true);
+      expect(h.session.snapshot.sessionId).toBe(null);
+    });
+
+    await it('ends where it began when Stop lands during the handshake: no session, no record', async () => {
+      const h = fresh();
+      const sent = h.session.prompt('hello');
+      // The turn exists the moment `prompt` returns its promise, and the handshake has not finished:
+      // Stop only records the intention, and `#runNewConversation` acts on it before `session/new`.
+      h.session.stop();
+      await sent;
+      expect(h.created.length).toBe(0);
+      expect(h.agent.sent.map((entry) => entry.method)).not.toContain('session/new');
+      expect(h.agent.sent.map((entry) => entry.method)).not.toContain('session/prompt');
+      expect(h.session.snapshot.state).toBe('stopped');
+    });
+  });
+
+  // Opening a stored session reattaches it on the copy of the agent that holds its history.
+  await describe('agent-session — the agent a stored session names', async () => {
+    const BUNDLED: AgentCommand = {
+      ...OPENCODE_COMMAND,
+      title: 'bundled',
+      program: '/synthetic/bundled',
+      bundled: true,
+    };
+    const found = async (): Promise<RecordedResolution> => ({
+      agent: { command: BUNDLED, source: 'bundled', version: '1.0.0', isolation: null },
+    });
+
+    await it('uses the window’s command when no resolver is wired — the pinned dev agent wins', async () => {
+      const h = harness({ bind: false });
+      h.session.bind({ ...SESSION, agent: { id: 'someone-else', source: 'bundled' } });
+      await h.session.prompt('hello');
+      expect(h.opened).toStrictEqual([OPENCODE_COMMAND]);
+    });
+
+    await it('asks the resolver for the record’s agent and copy, on the first prompt and not on bind', async () => {
+      const asked: [string, AgentSource | undefined][] = [];
+      const h = harness({
+        bind: false,
+        resolveAgent: async (id, source) => {
+          asked.push([id, source]);
+          return found();
+        },
+      });
+      h.session.bind({ ...SESSION, agent: { id: 'opencode', source: 'bundled' } });
+      expect(asked.length).toBe(0);
+      await h.session.prompt('hello');
+      expect(asked).toStrictEqual([['opencode', 'bundled']]);
+      expect(h.opened).toStrictEqual([BUNDLED]);
+    });
+
+    await it('passes an absent source through as absent, which the resolver reads as host', async () => {
+      const asked: (AgentSource | undefined)[] = [];
+      const h = harness({
+        bind: false,
+        resolveAgent: async (_id, source) => {
+          asked.push(source);
+          return found();
+        },
+      });
+      h.session.bind({ ...SESSION, agent: { id: 'opencode' } });
+      await h.session.prompt('hello');
+      expect(asked).toStrictEqual([undefined]);
+    });
+
+    await it('is a start failure naming why when the recorded copy is gone, and starts nothing', async () => {
+      const problem = 'this session was started on the bundled opencode, which is not in this install';
+      const h = harness({ bind: false, resolveAgent: async () => ({ problem }) });
+      h.session.bind({ ...SESSION, agent: { id: 'opencode', source: 'bundled' } });
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status === 'failed' && attachment.kind).toBe('start');
+      expect(attachment.status === 'failed' && attachment.message).toBe(problem);
+      expect(h.opened.length).toBe(0);
+    });
+
+    await it('does not restart the process for a second session on the same copy', async () => {
+      const h = harness({ bind: false, resolveAgent: found });
+      h.session.bind({ ...SESSION, agent: { id: 'opencode', source: 'bundled' } });
+      await h.session.prompt('one');
+      h.session.bind({ id: 'ses_other', cwd: '/synthetic', agent: { id: 'opencode', source: 'bundled' } });
+      await h.session.prompt('two');
+      expect(h.opened.length).toBe(1);
+    });
+
+    await it('replaces the process for a session held by the other copy', async () => {
+      const h = harness({
+        bind: false,
+        failAfterFirstOpen: true,
+        resolveAgent: async (_id, source) =>
+          source === 'bundled'
+            ? found()
+            : { agent: { command: OPENCODE_COMMAND, source: 'host', version: null, isolation: null } },
+      });
+      h.session.bind({ ...SESSION, agent: { id: 'opencode', source: 'host' } });
+      await h.session.prompt('one');
+      expect(h.opened).toStrictEqual([OPENCODE_COMMAND]);
+      h.session.bind({ id: 'ses_other', cwd: '/synthetic', agent: { id: 'opencode', source: 'bundled' } });
+      expect(h.closed()).toBe(0);
+      // The fixture has one transport, so the second process is refused; what is asserted is the
+      // decision: the old process is ended and one for the other command is asked for.
+      await h.session.prompt('two');
+      expect(h.closed()).toBe(1);
+      expect(h.opened).toStrictEqual([OPENCODE_COMMAND, BUNDLED]);
+      expect(h.agent.calls('session/prompt').length).toBe(1);
     });
   });
 
@@ -616,6 +911,207 @@ export default async () => {
       // And the surface must have left `thinking` rather than waiting for an answer that is not coming.
       expect(h.session.snapshot.state).not.toBe('thinking');
       expect(h.session.snapshot.state).toBe('stopped');
+    });
+  });
+
+  // New chat and a sidebar row are the person leaving a chat. A turn that belongs to it is stopped the way
+  // the Stop button stops it, and nothing it says afterwards reaches the pane they went to.
+  await describe('agent-session — leaving a running turn', async () => {
+    const NEW_CWD = '/synthetic/project';
+    const OTHER = { id: 'ses_fixture_0002', cwd: '/fixture' };
+
+    await it('New chat stops the turn through session/cancel, and keeps late text off the empty pane', async () => {
+      const h = harness({ holdTurn: true, chunks: ['first words'] });
+      const sent = h.session.prompt('a long question');
+      await h.flush();
+      expect(h.entries.some((entry) => entry.text === 'first words')).toBe(true);
+      const drawn = h.entries.length;
+
+      h.session.startConversation(NEW_CWD);
+      expect(h.agent.calls('session/cancel').length).toBe(1);
+      // The turn is still settling, and says more before it does.
+      h.agent.say(SESSION.id, 'late words');
+      await h.flush();
+      await sent;
+
+      expect(h.entries.length).toBe(drawn);
+      expect(h.entries.some((entry) => entry.text === 'late words')).toBe(false);
+      // …but the conversation it belonged to keeps it: the record is the truth.
+      const kept = h.persisted.filter((batch) => batch.sessionId === SESSION.id).flatMap((b) => b.entries);
+      expect(kept.some((entry) => entry.text === 'late words')).toBe(true);
+    });
+
+    await it('ends idle on the new chat, with Send and not Stop, and no "Stopped."', async () => {
+      const h = harness({ holdTurn: true });
+      const sent = h.session.prompt('a long question');
+      await h.flush();
+      h.session.startConversation(NEW_CWD);
+      await sent;
+      const snapshot = h.session.snapshot;
+      expect(snapshot.state).toBe('idle');
+      expect(snapshot.startsConversation).toBe(true);
+      const view = composerView({ ...snapshot, agent: h.session.agent });
+      expect(view.action).toBe('send');
+      expect(view.buttonEnabled).toBe(true);
+      expect(view.status).toBe('');
+    });
+
+    await it('settles an open permission cancelled, naming turn-cancelled, like Stop', async () => {
+      const h = harness({
+        permissionOptions: [
+          { optionId: 'allow', name: 'Allow once', kind: 'allow_once' },
+          { optionId: 'reject', name: 'Decline', kind: 'reject_once' },
+        ],
+        onPermission: () => new Promise<string | null>(() => {}),
+      });
+      const turn = h.session.prompt('do a thing');
+      await h.waitUntil(() => h.snapshots.some((snapshot) => snapshot.state === 'waiting-for-you'));
+      h.session.startConversation(NEW_CWD);
+      await turn;
+      expect(h.agent.permissionOutcomes[0]?.outcome.outcome).toBe('cancelled');
+      const recorded = h.persisted.flatMap((batch) => batch.entries);
+      expect(recorded.find((entry) => entry.text.startsWith('not answered:'))?.text).toContain(
+        'turn-cancelled',
+      );
+      // …and the question's line is in the record of the chat it was about, not on the new pane.
+      expect(h.entries.some((entry) => entry.text.startsWith('not answered:'))).toBe(false);
+    });
+
+    await it('opening another session mid-turn does the same; the same session does not stop it', async () => {
+      const same = harness({ holdTurn: true });
+      const stays = same.session.prompt('hello');
+      await same.flush();
+      same.session.bind(SESSION);
+      expect(same.agent.calls('session/cancel').length).toBe(0);
+      same.agent.releaseTurn();
+      await stays;
+
+      const h = harness({ holdTurn: true, chunks: ['one'] });
+      const sent = h.session.prompt('hello');
+      await h.flush();
+      const drawn = h.entries.length;
+      h.session.bind(OTHER);
+      expect(h.agent.calls('session/cancel').length).toBe(1);
+      h.agent.say(SESSION.id, 'late words');
+      await sent;
+      expect(h.entries.length).toBe(drawn);
+      expect(h.session.snapshot.sessionId).toBe(OTHER.id);
+      expect(h.session.snapshot.state).toBe('idle');
+    });
+
+    await it('a Stop already pressed is not sent twice, and still ends idle on the other chat', async () => {
+      const h = harness({ holdTurn: true });
+      const sent = h.session.prompt('hello');
+      await h.flush();
+      h.session.stop();
+      h.session.startConversation(NEW_CWD);
+      expect(h.agent.calls('session/cancel').length).toBe(1);
+      await sent;
+      expect(h.session.snapshot.state).toBe('idle');
+    });
+
+    await it('New chat during the handshake: stopped, and the session is listed but not opened', async () => {
+      const h = harness({ bind: false });
+      h.session.startConversation(NEW_CWD);
+      const sent = h.session.prompt('hello');
+      h.session.startConversation(NEW_CWD);
+      await sent;
+      expect(h.agent.sent.map((entry) => entry.method)).not.toContain('session/prompt');
+      expect(h.session.snapshot.sessionId).toBe(null);
+      expect(h.session.snapshot.state).toBe('idle');
+    });
+
+    await it('with nothing running, New chat and bind cancel nothing', async () => {
+      const h = harness();
+      await h.session.prompt('hello');
+      h.session.startConversation(NEW_CWD);
+      h.session.bind(OTHER);
+      expect(h.agent.calls('session/cancel').length).toBe(0);
+    });
+  });
+
+  await describe('agent-session — New chat after the agent exited', async () => {
+    const NEW_CWD = '/synthetic/project';
+
+    async function exited(options: HarnessOptions = {}): Promise<Harness> {
+      const h = harness({ holdTurn: true, ...options });
+      const sent = h.session.prompt('hello');
+      await h.flush();
+      h.agent.vanish('the agent process ended with code 1');
+      await sent;
+      expect(h.session.snapshot.state).toBe('gone');
+      return h;
+    }
+
+    await it('says the true thing before: the composer and the agent note both point at New chat', async () => {
+      const h = await exited();
+      const view = composerView({ ...h.session.snapshot, agent: h.session.agent });
+      expect(view.reason).toContain('New chat');
+      expect(h.session.agent.note).toContain('New chat');
+      expect(h.session.agent.note).not.toContain('window');
+    });
+
+    await it('retires the dead handle and offers a usable composer', async () => {
+      const h = await exited();
+      h.session.startConversation(NEW_CWD);
+      expect(h.closed()).toBe(1);
+      expect(h.session.agentRunning).toBe(false);
+      const snapshot = h.session.snapshot;
+      expect(snapshot.state).toBe('idle');
+      expect(snapshot.attachment.status).toBe('none');
+      const view = composerView({ ...snapshot, agent: h.session.agent });
+      expect(view.action).toBe('send');
+      expect(view.buttonEnabled).toBe(true);
+      expect(view.entryEditable).toBe(true);
+    });
+
+    await it('the next prompt starts a fresh agent, not the dead one', async () => {
+      const h = await exited({ failAfterFirstOpen: true });
+      h.session.startConversation(NEW_CWD);
+      await h.session.prompt('again');
+      // A second process was started; the fixture refuses it, which is how the test sees the attempt.
+      expect(h.opened.length).toBe(2);
+      expect(h.agent.calls('session/new').length).toBe(0);
+    });
+
+    await it('waits for the old process to end before it spawns the replacement', async () => {
+      const h = await exited({ slowClose: true, failAfterFirstOpen: true });
+      h.session.startConversation(NEW_CWD);
+      const next = h.session.prompt('again');
+      await h.flush();
+      expect(h.closed()).toBe(1);
+      expect(h.opened.length).toBe(1);
+      h.finishClose();
+      await next;
+      expect(h.opened.length).toBe(2);
+    });
+  });
+
+  await describe('agent-session — a record that cannot be saved', async () => {
+    const NEW_CWD = '/synthetic/project';
+
+    await it('says the conversation was not saved, and why', async () => {
+      const h = harness({ bind: false, createFails: new Error('EACCES: cannot write the session file') });
+      h.session.startConversation(NEW_CWD);
+      await h.session.prompt('hello');
+      const attachment = h.session.snapshot.attachment;
+      expect(attachment.status === 'failed' && attachment.message).toBe(
+        unsavedMessage('EACCES: cannot write the session file'),
+      );
+      expect(h.session.agent.note).toContain('not saved');
+      expect(h.session.agent.note).toContain('EACCES');
+      expect(h.session.agent.note).toContain('New chat');
+    });
+
+    await it('leaves New chat working: the composer is usable again afterwards', async () => {
+      const h = harness({ bind: false, createFails: new Error('disk full') });
+      h.session.startConversation(NEW_CWD);
+      await h.session.prompt('hello');
+      expect(composerView({ ...h.session.snapshot, agent: h.session.agent }).buttonEnabled).toBe(false);
+      h.session.startConversation(NEW_CWD);
+      const view = composerView({ ...h.session.snapshot, agent: h.session.agent });
+      expect(view.buttonEnabled).toBe(true);
+      expect(h.session.snapshot.startsConversation).toBe(true);
     });
   });
 

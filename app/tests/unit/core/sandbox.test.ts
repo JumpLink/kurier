@@ -22,13 +22,14 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
   FLATPAK_SPAWN,
   currentSandboxFacts,
+  hostCwdArgv,
   hostProbeArgv,
   isSandboxed,
   toHostCommand,
@@ -288,6 +289,34 @@ export default async () => {
       const { inner } = shapeOf(toHostCommand(OPENCODE, SANDBOXED));
       expect(inner).toContain('exec -- "$0" "$@"');
       expect(hostProbeArgv('opencode', SANDBOXED)?.join('\n')).toContain('command -v -- "$0"');
+    });
+
+    await it('asks the host where its shell is — and only when sandboxed', async () => {
+      expect(hostCwdArgv({ flatpakInfoExists: false })).toBe(null);
+      const argv = hostCwdArgv(SANDBOXED);
+      expect(argv?.[0]).toBe('--host');
+      expect(argv?.at(-1)).toBe('exec 0<&3 1>&4 3<&- 4>&-\npwd');
+    });
+
+    await it('answers on the protocol fd, through the same wrapper, in the directory it was started in', async () => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'kurier-cwd-')));
+      try {
+        const home = join(root, 'home');
+        const work = join(root, 'work');
+        mkdirSync(home);
+        mkdirSync(work);
+        const argv = hostCwdArgv(SANDBOXED) ?? [];
+        // What `flatpak-spawn --host` would hand to the host: everything after `--host`.
+        const run = spawnSync(argv[1] ?? '', argv.slice(2), {
+          cwd: work,
+          encoding: 'utf8',
+          env: { HOME: home, SHELL: '/bin/sh', PATH: process.env['PATH'] ?? '/usr/bin:/bin' },
+        });
+        expect(run.status).toBe(0);
+        expect(run.stdout.trim()).toBe(work);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
 
     /**

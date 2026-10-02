@@ -32,7 +32,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_AGENT, findLauncher, launcherIds, requireLauncher } from './launcher.ts';
-import { describeResolved, type ResolvedAgent } from './resolve.ts';
+import { describeResolved, type ResolvedAgent, type ResolvedSource } from './resolve.ts';
 import type { AgentCommand } from './stdio.ts';
 
 /** The name `KU_APP_AGENT` takes for the fixture. */
@@ -69,6 +69,8 @@ export function standInCommand(script: string = standInScriptPath()): AgentComma
 
 export interface DevAgentChoice {
   readonly command: AgentCommand;
+  /** Which copy runs — what a new session's record names. A launcher or the stand-in is `host`. */
+  readonly source: ResolvedSource;
   /** A line the caller should print, or `null` when there is nothing to explain. */
   readonly note: string | null;
 }
@@ -91,19 +93,21 @@ export function chooseAgent(
     // stays the command, so the window starts and its composer says why the agent will not (the same
     // failure as before the bundled copy existed).
     const found = resolveDefault();
-    if (found) return { command: found.command, note: describeResolved(found) };
-    return { command: requireLauncher(DEFAULT_AGENT), note: null };
+    if (found) return { command: found.command, source: found.source, note: describeResolved(found) };
+    return { command: requireLauncher(DEFAULT_AGENT), source: 'host', note: null };
   }
   if (wanted === STAND_IN_AGENT_ID) {
     return {
       command: standInCommand(),
+      source: 'host',
       note: `using the stand-in agent (${STAND_IN_SCRIPT}) — a dev fixture, not a launcher`,
     };
   }
   const found = findLauncher(wanted);
-  if (found) return { command: found, note: null };
+  if (found) return { command: found, source: 'host', note: null };
   return {
     command: requireLauncher(DEFAULT_AGENT),
+    source: 'host',
     note: `KU_APP_AGENT=${wanted} is not an agent launcher — using ${DEFAULT_AGENT}. Try one of: ${launcherIds().join(', ')}`,
   };
 }

@@ -876,6 +876,14 @@ export class FixtureAgent {
     this.#closeListener?.(undefined);
   }
 
+  /**
+   * An agent message chunk outside any request: what a turn that is still streaming looks like to a
+   * client that has already moved on. Lets a test send the late text a stopped turn keeps producing.
+   */
+  say(sessionId: string, text: string): void {
+    this.#update({ sessionId, update: this.#agentChunk(text) });
+  }
+
   /** True while a prompt turn is in flight. Lets a test cancel precisely. */
   get turnRunning(): boolean {
     return this.#turnRunning;

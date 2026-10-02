@@ -19,6 +19,7 @@ import {
   resolveDefault,
   resolveDefaultWithNote,
   resolveRecorded,
+  sameCommand,
   type ResolveContext,
 } from '../../../src/core/agents/resolve.ts';
 import { gatherAgentFacts } from '../../../src/core/agents/probe.ts';
@@ -307,6 +308,32 @@ export default async () => {
 
     await it('says nothing for a host install', async () => {
       expect(describeResolved(resolveDefault(context([detection('alpha', 'host')]))!)).toBe(null);
+    });
+  });
+
+  await describe('sameCommand', async () => {
+    const host: AgentCommand = { id: 'alpha', title: 'Alpha', program: '/usr/bin/alpha', args: ['acp'] };
+
+    await it('is true for the same process, whatever the title says', async () => {
+      expect(sameCommand(host, { ...host, title: 'renamed' })).toBe(true);
+      expect(sameCommand(host, host)).toBe(true);
+    });
+
+    await it('tells a bundled copy from a host install of the same agent', async () => {
+      const found = resolveDefault(context([detection('alpha', 'bundled')]))!;
+      expect(sameCommand(host, found.command)).toBe(false);
+      const again = resolveDefault(context([detection('alpha', 'bundled')]))!;
+      expect(sameCommand(found.command, again.command)).toBe(true);
+    });
+
+    await it('tells apart a different program, arguments, directory or environment', async () => {
+      expect(sameCommand(host, { ...host, program: '/opt/alpha' })).toBe(false);
+      expect(sameCommand(host, { ...host, args: ['acp', '--x'] })).toBe(false);
+      expect(sameCommand(host, { ...host, cwd: '/synthetic' })).toBe(false);
+      expect(sameCommand({ ...host, env: { A: '1', B: '2' } }, { ...host, env: { B: '2', A: '1' } })).toBe(
+        true,
+      );
+      expect(sameCommand({ ...host, env: { A: '1' } }, { ...host, env: { A: '2' } })).toBe(false);
     });
   });
 
