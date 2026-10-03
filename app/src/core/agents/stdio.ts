@@ -118,6 +118,8 @@ export class StdioChannel implements RawChannel {
   #exitReason: Error | undefined = undefined;
   /** stdout has reached EOF (or been torn down), so no further chunk can arrive. */
   #isStdoutDone = false;
+  /** stderr has reached EOF (or been torn down), so no further log line can arrive. */
+  #isStderrDone = false;
 
   constructor(options: StdioChannelOptions) {
     const { program } = options.command;
@@ -155,6 +157,17 @@ export class StdioChannel implements RawChannel {
       this.#stderrBuffer += chunk;
       this.#flushStderr(options.onStderr);
     });
+    // stderr gates the end exactly like stdout does, and for the same reason — it is where the
+    // agent says what went wrong, so the channel must not end while a line is still on its way.
+    // Flushing here is what delivers a last line that arrives without a newline after `exit`
+    // already flushed what it had; without it that line is dropped on the floor.
+    const onStderrDone = (): void => {
+      this.#isStderrDone = true;
+      this.#flushStderr(options.onStderr);
+      this.#maybeEnd();
+    };
+    this.#child.stderr.on('end', onStderrDone);
+    this.#child.stderr.on('close', onStderrDone);
     this.#child.on('error', (error: Error) => this.#end(error));
     this.#child.on('exit', (code, signal) => {
       // An agent killed mid-write leaves a partial line in the stderr buffer, and that line is
@@ -243,18 +256,26 @@ export class StdioChannel implements RawChannel {
    * one-turn `kurier start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
    * before the stdio streams are drained, so the same code was a latent bug there too.
    *
-   * Node's own answer is the event called `close` (emitted once the process has ended *and* the
-   * stdio streams are closed), and that is what this reproduces — but through stdout's own EOF
-   * rather than through `close`, because the polyfill emits `close` from its `wait_async` callback
-   * immediately after `exit`, with no reference to the streams at all, so listening for it would
-   * reproduce the bug rather than fix it.
+   * Node's own answer is the event called `close` — emitted once the process has ended *and* the
+   * stdio streams are closed. This gate is that rule written out of the two streams' own events,
+   * so it does not depend on `close` being emitted correctly by whatever runtime is underneath.
    *
-   * fixed upstream in gjsify: `@gjsify/child_process`'s `spawn` emits `close` back to back with
-   * `exit` instead of waiting for the stdout/stderr pipes to end (`src/index.ts`, the
-   * `proc.wait_async` callback; `exec`/`execFile` do the same in the `communicate_async` one).
+   * **Both pipes, and stderr is not optional.** Gating on stdout alone ended the channel while
+   * the agent's last log line was still in flight. Measured on both runtimes: a child that writes
+   * to stderr and leaves a grandchild holding that pipe is `data, end, stderr` — the end arrives
+   * before the line, and the diagnostics a person needs are exactly the ones that go missing.
+   *
+   * The comment that used to stand here claimed `@gjsify/child_process` emits `close` back to back
+   * with `exit`, and that was true through 0.53.x and false from 0.54.0: `spawn`'s
+   * `_watchStdioForClose` now holds `close` until stdout *and* stderr have ended
+   * (`lib/esm/index.js`). The stale claim is what made this look unfixable, so the fix went the
+   * runtime-agnostic way instead of subscribing to an event that was only just made truthful.
+   *
+   * A child that leaves a grandchild holding a pipe therefore never ends the channel — which is
+   * exactly what Node's `close` does, so the wait is the compatible answer and not a hang.
    */
   #maybeEnd(): void {
-    if (!this.#hasExited || !this.#isStdoutDone) return;
+    if (!this.#hasExited || !this.#isStdoutDone || !this.#isStderrDone) return;
     this.#end(this.#exitReason);
   }
 

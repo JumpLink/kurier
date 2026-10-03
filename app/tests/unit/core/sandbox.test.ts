@@ -736,8 +736,8 @@ export default async () => {
           // *incomplete* output indistinguishable from one that resolved on all of it — on GJS,
           // where `exit` can beat the last chunk, that was a green test with zero assertions and
           // 4 fewer counted than Node. Settling first and asserting in the test body is also what
-          // keeps a failing `expect` out of the child's `exit` listener, where the polyfill's
-          // `emit` try/catch turns it into a swallowed error and a timeout instead of a diff.
+          // keeps a failing `expect` out of the child's own `exit` listener, where a throw would
+          // land in the runtime's event dispatch instead of in this test's result.
           channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
         }).then((out) => {
           expect(out).toContain('ARGV:one|two');
@@ -770,10 +770,11 @@ export default async () => {
      *
      * Both halves are needed to make it deterministic rather than lucky. The subshell holds the
      * write end of stdout open after the parent `sh` has exited, so `exit` is dispatched while
-     * stdout is still open — the ordering GJS's polyfill gets wrong and Node merely gets lucky
-     * about — and it writes its line only afterwards, so the late chunk is guaranteed to exist
-     * rather than to have raced. A channel that ends on `exit` therefore loses `LATE:` every run,
-     * on both runtimes, with no reliance on scheduling.
+     * stdout is still open — on GJS deterministically, because `spawn` emits `exit` from its
+     * `wait_async` callback, and on Node as a race that merely tends to land that way — and it
+     * writes its line only afterwards, so the late chunk is guaranteed to exist rather than to
+     * have raced. A channel that ends on `exit` therefore loses `LATE:` every run, on both
+     * runtimes, with no reliance on scheduling.
      */
     await it('keeps reading stdout after the child has exited, and ends on EOF', async () => {
       if (process.platform === 'win32') return;
@@ -802,6 +803,62 @@ export default async () => {
           // The end came after the drain, not before it.
           expect(delivered).toStrictEqual(['data:EARLY', 'data:LATE:after-exit']);
           expect(channel.isClosed).toBe(true);
+        });
+      });
+    });
+    await it('delivers every line of a burst written just before the child exits', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(
+          dir,
+          'burst',
+          '#!/bin/sh\ni=0\nwhile [ $i -lt 500 ]; do echo "line-$i"; i=$((i+1)); done\n',
+        );
+        const channel = new StdioChannel({
+          command: { id: 'burst', title: 'burst', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        let out = '';
+        channel.onData((chunk) => {
+          out += chunk;
+        });
+        return new Promise<string>((resolve, reject) => {
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
+        }).then((all) => {
+          const lines = all.split('\n').filter(Boolean);
+          expect(lines.length).toBe(500);
+          expect(lines[499]).toBe('line-499');
+        });
+      });
+    });
+
+    await it('ends only after the last stderr line, not when stdout closes', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        // The grandchild holds ONLY stderr — `>/dev/null` drops its stdout — and that is the whole
+        // point of the shape: a gate that waits for both pipes waits for this line, a gate that
+        // waits for stdout alone is already past it. Measured on gjs and node, before the gate was
+        // widened: `stdout, END, late-err`.
+        const program = writeProgram(
+          dir,
+          'lateerr',
+          '#!/bin/sh\necho "early-out"\n( sleep 0.2; echo "late-err" >&2 ) >/dev/null &\nexit 0\n',
+        );
+        const events: string[] = [];
+        const channel = new StdioChannel({
+          command: { id: 'lateerr', title: 'lateerr', program, args: [] },
+          onStderr: (line) => events.push(line),
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        channel.onData(() => events.push('stdout'));
+        channel.onEnd(() => events.push('END'));
+        // Resolving on the end PLUS a grace period, because the assertion is about order: the late
+        // line has to land inside the window for the ordering to be the thing under test.
+        return new Promise<void>((resolve) => {
+          channel.onEnd(() => setTimeout(resolve, 400));
+        }).then(() => {
+          expect(events).toStrictEqual(['stdout', 'late-err', 'END']);
         });
       });
     });
