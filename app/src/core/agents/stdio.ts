@@ -140,9 +140,10 @@ export class StdioChannel implements RawChannel {
       // decision; this layer only moves bytes and never looks inside a line.
       for (const listener of this.#dataListeners) listener(chunk);
     });
-    // The channel's end is gated on stdout EOF, not on the process's exit — see `#maybeEnd`.
-    // `end` is the complete answer; `close` also covers the other teardown (`destroy()` with an
-    // error emits `close` and never `end`), and it is idempotent, so both may fire.
+    // The channel's end is gated on the child's `close`, not on its `exit` — see `#maybeEnd`.
+    // stdout EOF is only the fallback for a runtime that never emits `close`. `end` is the complete
+    // answer; `close` also covers the other teardown (`destroy()` with an error emits `close` and
+    // never `end`), and it is idempotent, so both may fire.
     const onStdoutDone = (): void => {
       this.#isStdoutDone = true;
       this.#maybeEnd();
@@ -156,7 +157,8 @@ export class StdioChannel implements RawChannel {
       this.#flushStderr(options.onStderr);
     });
     this.#child.on('error', (error: Error) => this.#end(error));
-    this.#child.on('exit', (code, signal) => {
+    const onExited = (code: number | null, signal: NodeJS.Signals | null): void => {
+      if (this.#hasExited) return;
       // An agent killed mid-write leaves a partial line in the stderr buffer, and that line is
       // usually the most interesting thing it ever said — "failed to load config X" arrives
       // without a newline when the process is told to stop. Flushing it here is why `onStderr` sees
@@ -170,8 +172,15 @@ export class StdioChannel implements RawChannel {
         code === 0
           ? undefined
           : new Error(`${program} exited with code ${code ?? 'none'}${signal ? ` (${signal})` : ''}`);
+    };
+    this.#child.on('exit', (code, signal) => {
+      onExited(code, signal);
       // NOT `#end` here: the process being gone is only half of "the agent has finished talking".
       this.#maybeEnd();
+    });
+    this.#child.on('close', (code, signal) => {
+      onExited(code, signal);
+      this.#end(this.#exitReason);
     });
   }
 
@@ -244,14 +253,11 @@ export class StdioChannel implements RawChannel {
    * before the stdio streams are drained, so the same code was a latent bug there too.
    *
    * Node's own answer is the event called `close` (emitted once the process has ended *and* the
-   * stdio streams are closed), and that is what this reproduces — but through stdout's own EOF
-   * rather than through `close`, because the polyfill emits `close` from its `wait_async` callback
-   * immediately after `exit`, with no reference to the streams at all, so listening for it would
-   * reproduce the bug rather than fix it.
-   *
-   * fixed upstream in gjsify: `@gjsify/child_process`'s `spawn` emits `close` back to back with
-   * `exit` instead of waiting for the stdout/stderr pipes to end (`src/index.ts`, the
-   * `proc.wait_async` callback; `exec`/`execFile` do the same in the `communicate_async` one).
+   * stdio streams are closed), and that is what ends the channel. `@gjsify/child_process` emitted
+   * `close` back to back with `exit` through 0.53.x, which made it as bad as `exit`; since 0.54.0
+   * it waits for the pipes, and the regression test in `sandbox.test.ts` (a line written after the
+   * parent has exited) measures that on both runtimes. The `exit` + stdout-EOF path stays only as a
+   * fallback for a runtime that never emits `close`: it needs both halves, so it cannot lose a line.
    */
   #maybeEnd(): void {
     if (!this.#hasExited || !this.#isStdoutDone) return;
