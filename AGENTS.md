@@ -41,8 +41,33 @@ kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
 kurier auth [--agent opencode]             # trap 1's escape hatch
-kurier agents                              # launchers, and whether the binary is on PATH
+kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
 ```
+
+**Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
+`app/data/bundled-agents.json` under `BUNDLED_PREFIX` (`core/agents/catalog.ts`, the one place the
+prefix is written), never `/app/bin` — there it would shadow the person's own opencode, which carries
+their login. The prefix is `/app/extra/agents`, not `/app/libexec`: the archive is Flatpak `extra-data`,
+fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/README.md).
+`detectAgents` ignores a host hit under the prefix; `resolveAgent` takes the setting, else the first
+host install, else the first bundled copy (`core/agents/detect.ts`, pure over facts gathered by
+`probe.ts`). The catalog's `env` is flags only, never a credential.
+The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `core/settings.ts`, in
+`$XDG_CONFIG_HOME/kurier/settings.json` (`KURIER_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
+precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
+unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
+`kurier agents --use <id>[:bundled|host]|none` writes it.
+The GUI writes it from Preferences (`<Ctrl>comma`; `core/settings-view.ts` decides the rows, unavailable ones stay listed) and a change applies the next time kurier starts (the window resolves its agent once and keeps it); a settings file kurier could not read is never destroyed by a save (`saveDecision`: a newer `version` refuses, anything else is first moved to `settings.json.bak`); inside a Flatpak the dialog opens before the host answers (`Checking…`, then async). Hooks `KU_APP_PREFERENCES[_AGENT]` are in docs/dev-fixtures.md.
+An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
+With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
+use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
+`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under
+`<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real
+`~/.config/opencode` in reach and its login must not be shared; `kurier auth` logs in there too.
+The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
+(`host`|`bundled`; **absent = host**, the old records) and `resolveRecorded` resumes on that copy — a copy
+that is gone is an error naming why, never a fall to the other. The window resolves with
+`gatherResolveContext(env, false)`: no `--version` spawn, so it never waits on a child before it appears.
 
 **One turn, not a REPL**, and that is a decision rather than a missing feature. A REPL needs
 somewhere to put the approval surface, and the plan puts the surface in a later slice; a REPL now
@@ -91,12 +116,18 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
 2. **Fail closed on `request_permission`.** `denyAll` remains the default `PermissionGate`; the Adwaita
    surface passes its own, which asks a person and answers `cancelled` on every path where nobody chose
    — Escape, Stop, a closing window, an agent that died, a closed dialog. Never "auto-allow because the
-   agent asked", and **never "always allow"**: `allow_always`/`reject_always` are filtered out in the
-   projection (`core/permission.ts`), so kurier is never offered a promise it keeps nothing for.
-   There is no timeout on a question — a diff takes longer than any deadline kurier could pick.
+   agent asked". **`allow_always`/`reject_always` are passed through**, not filtered: the **agent**
+   remembers an "always" (ACP has no `allowed_always` — the answer is `selected` plus the agent's own
+   option id, and it decides whether to ask again), while kurier stores no policy at all. What still
+   holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
+   `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
+   says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
+   kurier could pick.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
-   access through that channel at all. File access is a decision, not a default.
+   access through that channel at all. File access is a decision, not a default — these two may be
+   enabled later for a **canvas surface**, where kurier would hold the real buffer and hand it over
+   deliberately rather than proxying a path the agent named.
 4. **`_meta` is passed through, never parsed.** `opencode acp` sends
    `_meta: {"opencode/child-session-updates": true}` and a `sessionCapabilities.fork` marker the v1
    schema does not define. Unknown `_meta` must never be an error — otherwise every agent with an
@@ -157,66 +188,68 @@ gjsify run app/dist/kurier.gjs.mjs <command>
 gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
 
-The GUI is looked at, not believed: start it **detached** (a foreground GJS process is killed by
-the agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on
-`/eu/jumplink/Kurier/devtools` (`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>`
-so no real conversation ends up in a screenshot, and `KU_APP_SESSION=<id>` to open a session without
-a pointer. GTK behaviour a comment relies on gets a probe in `scripts/probes/` that prints the
-numbers the comment quotes.
+**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
 
 ### Watching a turn without a model
 
 `scripts/stand-in-agent.mjs` is a real ACP peer over stdio — real framing, real method names, the
-`fork` marker `opencode acp` sends and the v1 schema does not define. It answers without a model, a
-network or a quota, so a turn can be streamed, stopped and killed as often as needed and looks the
-same twice. `KU_APP_AGENT=stand-in` selects it; it is reachable through the dev hooks and **not** in
-`LAUNCHERS`, which is the table of programs a person installs.
+`fork` marker `opencode acp` sends and the v1 schema does not define — and `KU_APP_AGENT=stand-in`
+selects it: it is reachable through the dev hooks and **not** in `LAUNCHERS`, which is the table of
+programs a person installs.
 
 **Every knob, every recipe and every measured GTK fact is in
-[docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, the config row's four
-values and its two known limits, the per-session option cache, the failure knobs (`KU_STANDIN_AUTH` /
-`KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and the two kinds of GTK probe with the commands that
-print the numbers. Two rules that change behaviour stay here:
+[docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, its three permission-option
+knobs, the config row's four values and its two known limits, the per-session option cache, the failure
+knobs (`KU_STANDIN_AUTH` / `KU_STANDIN_PROMPT_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and
+[the two kinds of GTK probe](docs/dev-fixtures.md#probes) with the commands that print the numbers. Two
+rules that change behaviour stay here:
 
 - **`KU_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed sentences, so its default is `4`
   and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply still
   arriving, where the newest bubble is below the fold — and the default was `5` against a list of four,
   which read as a knob that could grow and could not.
 - **A hook set to `0` or `false` is off**, in kurier and in the stand-in alike, so there is one rule
-  for "is this on" in the repo.
+  for "is this on" in the repo. The reading rules are in `frontends/gui/hook-value.ts`, not in
+  `hooks.ts`: `readHooks` imports the framework's reader, whose barrel imports `Adw`, so a test that
+  imported it could not run on Node at all — and the rules (unset, empty, `0` and `false` are off; a
+  comma list keeps its order and drops its blanks) are the part a future key gets wrong. One rule, two
+  copies: the stand-in agent has the same `flag()` and cannot import this file, so it is copied and
+  both files say so.
 
 ### The states only a hook can reach
 
-**Four pointer-only controls, and a hook for each.** `KU_APP_STOP=1` presses the composer's Stop once
-the turn is running; `KU_APP_STOP_ESCAPE=1` dismisses an open permission dialog the way Escape does —
-recorded as `not-answered: dismissed`, sent over the wire as `cancelled`, and stopping nothing else.
-`KU_APP_DISMISS_FAILURE=1` closes the failure dialog, and `KU_APP_SWITCH=id[,id…]` opens sessions in
-turn once a failure is on screen. All four go through the surface (the composer's own `clicked`,
-`dismissPermission('dismissed')`, the dialog's own `close()`, and `#open` — the same call a sidebar row
-makes) rather than around it, so a screenshot is of the window and not of a re-implementation.
+**Five pointer-only controls, and a hook for each** — `KU_APP_STOP`, `KU_APP_STOP_ESCAPE`,
+`KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL`, `KU_APP_SWITCH=id[,id…]`, what each does and the
+measurements that forced a hook rather than a pointer are in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#the-five-pointer-only-controls). What stays here is the rule
+they all follow: every one goes **through the surface** (the composer's own `clicked`,
+`dismissPermission('dismissed')`, the dialog's own `close()` and its own `response` signal, and `#open` —
+the same call a sidebar row makes) rather than around it, so a screenshot is of the window and not of a
+re-implementation.
 
-**Why four, measured rather than assumed.** `ActivateWidget` on an `Adw.AlertDialog` response button
-reports `true` and emits no `response` (the permission dialog too, so it is libadwaita), `SendKey`
-answers `false` for Escape, nothing in devtools moves a `Gtk.ListBox` selection, and a real pointer
-cannot stand in: under Wayland `XTestFakeMotionEvent` does not move the pointer, and under
-`GDK_BACKEND=x11` a dialog is mapped but never painted. **The failure dialog has one response, so
-`close()` and pressing Close are the same call** — `scripts/probes/alert-dialog-close.mjs` case 1
-measures that an external `close()` emits `closed` and then `response("close")`, and the same probe
-records that `Adw.AlertDialog` has no callable `response()` at all.
+**Three dialogs, and only three failures earn one.** Plan §6 asks for the auth trap and the reattach
+refusal to be *shown*, and `core/failure.ts` is where that is decided: `failureKind` classifies an error
+by its **type and the turn state** (`RpcError` -32000, `UnsupportedCapabilityError`,
+`FailureContext.promptSent`), never by its wording; `failureNotice` returns a dialog for `auth`, `model`
+and `unsupported` and **`null` for `start`** — a bad command or a handshake timeout is already the
+composer's caption. No failure is written to the transcript: no turn ran, so nothing to record.
 
-**The reading rules are in `frontends/gui/hook-value.ts`, not in `hooks.ts`.** `readHooks` imports the
-framework's reader, whose barrel imports `Adw`, so a test that imported it could not run on Node at
-all — and the rules (unset, empty, `0` and `false` are off; a comma list keeps its order and drops its
-blanks) are the part a future key gets wrong. One rule, two copies: the stand-in agent has the same
-`flag()` and cannot import this file, so it is copied and both files say so.
+**`'auth'` and `'model'` are told apart structurally, because the wire cannot** ([issue
+#2](https://github.com/JumpLink/kurier/issues/2), measured in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#ku_standin_prompt_auth1--the-same-error-code-a-different-kind)):
+a **geo-blocked provider 403** reaches `session/prompt` as the login trap's own `-32000`, so matching the
+message is one reword from wrong and matching the code is *already* wrong. What survives is whether a
+prompt had gone out — `AgentSession.#promptSent`, as a **required** `FailureContext.promptSent`, so a new
+call site cannot omit it and get the login-trap advice back. **A login that expires mid-turn lands here
+too**, which is why the notice names *both* remedies in provider-neutral words. This path keeps the agent
+(`agentStatus` reads `kind === 'model'` as attached) and the config row, whose model dropdown the one
+button opens, and writes no transcript line — the agent answered, so `agentExitedEntry` would be one.
 
-**Two dialogs, and only two failures earn one.** Plan §6 asks for the auth trap and the reattach
-refusal to be *shown*, and `core/failure.ts` is where that is decided: `failureKind` classifies an
-error by its **type** (`RpcError` -32000, `UnsupportedCapabilityError`) and never by its wording, and
-`failureNotice` returns a dialog for `auth` and `unsupported` and **`null` for `start`** — a bad
-command or a handshake timeout is already the composer's caption, and a modal over it says "something
-is wrong" without adding anything. Neither failure is written to the transcript: no turn ran, so there
-is nothing to record.
+**The free-model hint is order, never a choice.** `app/data/free-models.json` (ids, the date checked, the
+criterion, the [zen link](https://opencode.ai/docs/zen)) is applied by `freeModelFirst` to a **model**
+control's values only, leaving the rest in the agent's order — the one named exception to "the agent's
+order is the order it sent". It never selects, hides or guesses: exact ids, so a model that has gone stops
+matching. Plan §3 rejected the alternatives: a default rots, probing burns quota.
 
 **Once per failure, and never over a window that has moved on.** Two more functions in the same file
 answer the two questions a surface asks on every state move, and both are needed: `failureToShow` is
@@ -228,53 +261,38 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-The refusal is deliberately *not* fixable from the window. kurier stores no credential (`AGENTS.md`
-§ Privacy), so the only remedy it can name is the command a person runs in a terminal — the dialog
-says so and offers nothing else, because a button that could only copy a string would be a control
-pointing at nothing.
+**The auth refusal is deliberately *not* fixable from the window; the model refusal is.** kurier stores no
+credential (§ Privacy), so for `auth` the only remedy it can name is the command a person runs in a
+terminal — the dialog says so and offers nothing else, because a button that could only copy a string would
+be a control pointing at nothing. The `'model'` dialog is the other half: **Choose another model** opens
+the row's model dropdown and picks nothing, and `failureAction` withholds the button when the agent
+reported no model option — a button that opens nothing is the same defect pointed the other way.
 
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
-`session/request_permission`, carried over the real stdio chain, with all four option kinds on the wire
-so the `*_always` filtering has something to filter. `KU_APP_PERMISSION=1` is kurier's side: it puts a
-fixture request through **the same gate** the agent's requests go through, so a screenshot shows the
-gate's behaviour rather than a dialog built for the screenshot.
+`session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
+wire** — so a screenshot shows kurier's ordering, labels, styling and focus rules acting on the full
+set the agent offered, `*_always` included. `KU_APP_PERMISSION=1` is kurier's side: it puts a fixture
+request through **the same gate** the agent's requests go through, so a screenshot shows the gate's
+behaviour rather than a dialog built for the screenshot. It is a fallback, not a competitor, and it
+waits by polling for the gate to be asked rather than for a fixed delay (`window.ts`) — a fixed delay
+would either beat the agent's question or lose to it. The dialog's behaviour, the two halves and the
+measured GTK facts behind it are in
+[docs/dev-fixtures.md](docs/dev-fixtures.md#the-permission-dialog); what it does and does not do is
+decided in `app/src/core/permission.ts` and tested on both runtimes, while the widget only renders.
 
-**Stop is not pointer-reachable while the permission dialog is up, and that is libadwaita's doing.**
-An `Adw.AlertDialog` grabs input on the window it is presented over, so the composer's Stop button
-cannot be clicked from underneath it — measured under `GDK_BACKEND=x11` with a real `XWarpPointer`
-click at the button's coordinates: the click is swallowed and the turn keeps running. The controller
-enforces Stop's rule anyway (`stop()` settles the open question `cancelled` first), so the fail-closed
-behaviour does not depend on the pointer; the dialog's own **Decline** covers the case a person can
-reach, answering `reject_once` and letting the turn continue. A dialog is the right place for the
-answer to "may this run?", not for "end this turn".
+**Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
+measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd).
+The rules that survive here: the first added button is the bottom one and the last added is the topmost,
+so **both end slots are a decline**; `buildDialog` names `default_response` explicitly rather than letting
+the add order choose it; and `show()` grabs the focus.
 
-**`KU_APP_PERMISSION` is a fallback, not a competitor**, and the wait is a poll rather than a fixed
-delay (`window.ts`): with `KU_STANDIN_PERMISSION=1` the agent's question is the better thing to
-photograph and it arrives an unpredictable moment after the prompt goes out, so a fixed delay would
-either beat it or lose to it. It stages only once the gate has not been asked; with no turn running
-that is the first tick, because there is no agent that could ask.
-
-```bash
-# the agent's own question, mid-turn, over the real chain
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
-
-# just the dialog, with no agent at all
-KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
-```
-
-What the dialog does and does not do is decided in `app/src/core/permission.ts` and tested on both
-runtimes; the widget only renders.
-
-The three GTK facts behind the permission dialog are **measured, not read from the signal docs** —
-`Adw.Dialog` emits `closed` before `response`, `force_close()` emits neither, and with no
-`default_response` libadwaita focuses the *last added* response, which is the allow button whenever the
-agent sends it last. The probes that print the numbers, and the split between the two kinds of probe, are
-in [docs/dev-fixtures.md](docs/dev-fixtures.md#probes).
+**The button labels** are kurier's four short sentences; the agent's own names are not on them
+(captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd)). A button label must fit one line.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
 `Adw.NavigationSplitView` stops at on its own — not a preference. Narrower than that the window is
-unusable, and `gjs -m scripts/probes/window-min-width.mjs [floor]` prints the sweep that says so;
-pass a number to reproduce a different floor, or nothing to see what the window does without one.
+unusable. [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) has the
+reproduction sweep and the cost to the config row.
 
 **GJS is mandatory, not optional.** A pure Node test would be green and would not answer the real
 question. Both runtimes, as in postbote and beifahrer:
@@ -289,34 +307,29 @@ question. Both runtimes, as in postbote and beifahrer:
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.
 
-> **A green `gjsify test` used to mean "the last build is green", not "the source is green" — and on
-> every RELEASED gjsify it still does.** Measured here: editing `packages/session/src/model.ts` and
-> re-running left `app/dist/test.*.mjs` untouched (mtime unchanged) and printed **136 tests passed**
-> for code that no longer existed. Touching the entry, `app/tests/test.mts`, forced the rebuild.
+> **A green `gjsify test` meant "the last build is green", not "the source is green" — on every gjsify
+> before 0.53.0.** Measured here: editing `packages/session/src/model.ts` and re-running left
+> `app/dist/test.*.mjs` untouched (mtime unchanged) and printed **136 tests passed** for code that no
+> longer existed. Touching the entry, `app/tests/test.mts`, forced the rebuild. The cause was scope,
+> not staleness arithmetic: `packageBuildInputs` walks the package directory, and a workspace sibling
+> is reached only through a `node_modules` symlink pointing **outside** it. CI never saw it — a fresh
+> container has no `dist/`, so it always built, which is why the trap survived the whole 0.5x series
+> and then needed an `rm -rf` here after every source edit.
 >
-> The cause is scope, not staleness arithmetic: `packageBuildInputs` walks the package directory, and
-> a workspace sibling is reached only through a `node_modules` symlink pointing **outside** it. CI
-> cannot see this either — a fresh container has no `dist/`, so it always builds.
+> **0.53.0 carries the fix** (gjsify [#1896](https://github.com/gjsify/gjsify/pull/1896),
+> [#1905](https://github.com/gjsify/gjsify/issues/1905)): the build records what it actually READ into
+> `<outfile>.inputs.json` beside the bundle, from the bundler's own module graph. Re-verified here on
+> the release rather than on a checkout — `app/dist/test.gjs.mjs.inputs.json` lists
+> `packages/acp/src/*.ts` and `packages/session/src/*.ts` by exact path, and appending a line to
+> `packages/session/src/model.ts` moved the bundle's mtime with no `rm -rf`. **The failure mode is a
+> green run, which is the one thing a test suite cannot report about itself**, so that measurement is
+> worth repeating whenever the toolchain moves; treat a suspiciously fast green as this, not as a win.
 >
-> **The fix is upstream** — gjsify [#1896](https://github.com/gjsify/gjsify/pull/1896), "rebuild when
-> an input file changed", records what the build actually READ into `<outfile>.inputs.json` beside the
-> bundle, from the bundler's own module graph. Verified here against a checkout of `main`: the
-> manifest lists `packages/acp/src/*.ts` and `packages/session/src/*.ts` by exact path, and an edit to
-> either rebuilds without `rm -rf`. Tracked as [#1905](https://github.com/gjsify/gjsify/issues/1905).
->
-> **It is in no published version yet** — 0.52.0 shipped five days before the merge — so until the
-> next release: `rm -rf app/dist` after editing anything outside `app/tests/`, or run the tests
-> through a linked checkout (`gjsify link`, ADR 0065) whose CLI bundle carries the fix. The link's
-> `.gjsify-link.json` is git-ignored and `gjsify install --immutable` refuses to run while it exists,
-> so CI and a release build are unaffected either way.
->
-> Two traps in the same family, both measured, neither a kurier bug:
-> **the `gjsify` on `PATH` is the one that decides.** A global install in
-> `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`, so a run that
-> looks linked was a released CLI — and it reported a test result for a bundle from an earlier run.
-> Run `./node_modules/.bin/gjsify …` when the version matters. And under GJS the launcher executes
-> `dist/cli.gjs.mjs`, so in a gjsify checkout the source having the fix is not enough:
-> `gjsify workspace @gjsify/cli run build:gjs-bundle` (not `run build`, which only rebuilds `lib/`).
+> One trap survives, and it is the same family: **the `gjsify` on `PATH` is the one that decides.** A
+> global install in `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`,
+> so a run that looks like it used the pinned toolchain was a released CLI — and it happily reports a
+> test result for a bundle from an earlier run. `./node_modules/.bin/gjsify …` whenever the version
+> matters, which under the freshness rule means always.
 
 `refs/acp/schema.v1.json` is the normative artifact `packages/acp`'s types are written against,
 refreshed by `./scripts/update-acp-schema`. `scripts/check-schema.mjs` fails the build when the
@@ -390,13 +403,15 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 ## Conventions
 
 - `gjsify install` — never `npm install`, it prunes gjsify deps.
-- All `@gjsify/*` packages pinned to the **same exact version** (0.49.0 here). gjsify ships as one
-  release train; a CLI ↔ libs skew produces silently broken bundles.
+- All `@gjsify/*` packages pinned to the **same exact version** (0.54.0 here). gjsify ships as one
+  release train; a CLI ↔ libs skew produces silently broken bundles. One is absent: `@gjsify/napi`,
+  which nothing in kurier imports — its rewrite only fires for a compiled `.node` addon inside a
+  bundle, and every addon in this tree is build-time tooling that runs under Node. It was also
+  unpublishable through 0.53.0 (`packages/napi/**` is not a workspace member — its release leg builds
+  a meson prebuild per platform first, and the 0.53.0 tarball never landed); 0.54.0 publishes it
+  again, so the pin can come back if a build ever does carry an addon.
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
-- **After editing a workspace source, `rm -rf app/dist` before trusting a test result** — until
-  gjsify ships #1896. See the note above: the failure mode is a green run, which is the one a test
-  suite cannot report about itself.
 - **`./node_modules/.bin/gjsify`, not the `gjsify` on `PATH`**, whenever the toolchain version
   matters. The global install wins, and a run that looks linked is then a released CLI.
 - `typescript` pinned `^6.0.3`, **not** 7: `gjsify tsc` runs a bundle with 6.0.3 baked in,

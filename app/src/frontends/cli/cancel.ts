@@ -12,11 +12,11 @@
 
 import type { CommandModule } from 'yargs';
 
-import { requireLauncher } from '../../core/agents/launcher.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { openAgent } from '../../core/run.ts';
 import { createSessionStore } from '@kurier/session';
 
+import { agentForRecorded } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
@@ -48,7 +48,9 @@ const command: CommandModule = {
       return;
     }
 
-    const launcher = requireLauncher(agentId);
+    const resolved = agentForRecorded(agentId, record?.agentSource);
+    if (!resolved) return;
+    const launcher = resolved.command;
     const handle = await openAgent({
       command: launcher,
       gate: silentGate(),

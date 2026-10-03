@@ -13,14 +13,15 @@
 
 import type { CommandModule } from 'yargs';
 
-import { DEFAULT_AGENT, requireLauncher } from '../../core/agents/launcher.ts';
+import { conversationRecord } from '../../core/conversation.ts';
 import { installInterruptHandler } from '../../core/interrupt.ts';
 import { sessionsFile } from '../../core/paths.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
-import { LOCAL_PRINCIPAL, createSessionStore, newSession } from '@kurier/session';
+import { createSessionStore } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 
+import { agentForNew } from './choose.ts';
 import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
@@ -37,8 +38,7 @@ const command: CommandModule = {
       })
       .option('agent', {
         type: 'string',
-        default: DEFAULT_AGENT,
-        describe: 'which agent launcher to start',
+        describe: 'which agent launcher to start (default: your own install, else the bundled copy)',
       })
       .option('cwd', {
         type: 'string',
@@ -52,14 +52,15 @@ const command: CommandModule = {
       .strict(),
   handler: async (argv) => {
     const raw = argv as Record<string, unknown>;
-    const agentId = pickArgv<string>(raw, 'agent') ?? DEFAULT_AGENT;
     const cwd = pickArgv<string>(raw, 'cwd') ?? process.cwd();
     const prompt = pickArgv<string[]>(raw, 'prompt') ?? [];
     const denyAll = pickArgv<boolean>(raw, 'deny-all', 'denyAll') === true;
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
     const text = prompt.join(' ').trim();
 
-    const launcher = requireLauncher(agentId);
+    const resolved = agentForNew(pickArgv<string>(raw, 'agent'));
+    if (!resolved) return;
+    const launcher = resolved.command;
     const terminal = processTerminal();
     const store = createSessionStore(sessionsFile());
     const at = () => new Date().toISOString();
@@ -98,20 +99,15 @@ const command: CommandModule = {
       err(`${agent.agentInfo} — session ${session.sessionId} in ${cwd}`);
 
       const created = store.create(
-        newSession({
+        conversationRecord({
           id: session.sessionId,
           agent: launcher.id,
+          agentSource: resolved.source,
           cwd,
-          principal: LOCAL_PRINCIPAL,
-          boundTo: null,
+          prompt: text,
           at: at(),
-          // Recorded now, from the agent's own capabilities, so `resume` knows what this session
-          // was reattached with — not what it *should* have been.
-          reattach: agent.client.supportsLoadSession
-            ? 'load'
-            : agent.client.supportsResumeSession
-              ? 'resume'
-              : null,
+          supportsLoadSession: agent.client.supportsLoadSession,
+          supportsResumeSession: agent.client.supportsResumeSession,
         }),
       );
 

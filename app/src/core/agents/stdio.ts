@@ -21,6 +21,7 @@ import { accessSync, constants } from 'node:fs';
 
 import { channelTransport, type RawChannel, type Transport } from '@kurier/acp/transport';
 
+import { prepareIsolation } from './isolation.ts';
 import {
   currentSandboxFacts,
   FLATPAK_SPAWN,
@@ -50,6 +51,11 @@ export interface AgentCommand {
    * Scheibe 1, and a token in here would land in a session record's process listing.
    */
   readonly env?: Record<string, string>;
+  /**
+   * This is the copy shipped inside the build, under `/app/extra`. It runs where kurier runs — the
+   * sandbox — so `toHostCommand` leaves it alone: the host cannot see that path.
+   */
+  readonly bundled?: true;
 }
 
 export interface StdioChannelOptions {
@@ -119,6 +125,8 @@ export class StdioChannel implements RawChannel {
     // `opencode`, never the `flatpak-spawn` that happens to be carrying it. See sandbox.ts.
     this.command = options.command;
     this.#killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
+    // At launch rather than when the command is built: building one stays free of side effects.
+    if (options.command.bundled) prepareIsolation(options.command.env);
     const actual = resolveSpawnCommand(options.command, options.sandboxFacts ?? currentSandboxFacts());
     const { cwd, env } = actual;
     this.#child = spawn(actual.program, actual.args, {
@@ -280,10 +288,7 @@ export function stdioTransport(options: StdioChannelOptions): Transport {
  * A separate export so the decision is a unit test, not a win32 box: the predicate is pure and
  * takes `platform` as an argument precisely so this runs on the CI the repo actually has.
  */
-export function needsWindowsShell(
-  program: string,
-  platform: NodeJS.Platform = process.platform,
-): boolean {
+export function needsWindowsShell(program: string, platform: NodeJS.Platform = process.platform): boolean {
   return platform === 'win32' && /\.(cmd|bat)$/i.test(program);
 }
 
@@ -313,6 +318,54 @@ export function which(
   if (local) return local;
   const probe = hostProbeArgv(program, facts);
   return probe ? probeOnHost(probe) : null;
+}
+
+/**
+ * `which` without blocking the caller: the same three answers, but the host question is a child process
+ * awaited, not `spawnSync`. For a surface that must keep drawing while the host answers (the preferences
+ * dialog inside a Flatpak). Outside a Flatpak there is no host question and this resolves at once.
+ */
+export async function whichAsync(
+  program: string,
+  env: NodeJS.ProcessEnv = process.env,
+  facts = currentSandboxFacts(),
+): Promise<string | null> {
+  if (program.includes('/')) return isExecutable(program, env) ? program : null;
+  const local = whichOnPath(program, env);
+  if (local) return local;
+  const probe = hostProbeArgv(program, facts);
+  return probe ? probeOnHostAsync(probe) : null;
+}
+
+/** The async twin of `probeOnHost`: same argv, same cap, same acceptance rule; stdin and stderr ignored. */
+function probeOnHostAsync(argv: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let settled = false;
+    const finish = (answer: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(answer);
+    };
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(FLATPAK_SPAWN, argv, { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      resolve(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(null);
+    }, HOST_PROBE_TIMEOUT_MS);
+    child.stdout?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.on('error', () => finish(null));
+    child.on('close', (code) => finish(code === 0 ? parseHostProbeOutput(stdout) : null));
+  });
 }
 
 /** The pure PATH walk, now PATHEXT-aware. */
@@ -373,7 +426,15 @@ function probeOnHost(argv: string[]): string | null {
     timeout: HOST_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) return null;
-  const found = (result.stdout ?? '')
+  return parseHostProbeOutput(result.stdout ?? '');
+}
+
+/**
+ * The path in a host probe's stdout, or `null`. Shared by the blocking probe and the async one, so the two
+ * cannot disagree about what counts as an answer.
+ */
+export function parseHostProbeOutput(stdout: string): string | null {
+  const found = stdout
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)

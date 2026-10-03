@@ -59,6 +59,15 @@ export interface ConfigRowControl {
   /** The tooltip: the agent's `description` when it sent one, otherwise the name it must show. */
   readonly description: string;
   /**
+   * The agent's own category for this control, or `null` when it sent none.
+   *
+   * **Carried through rather than dropped, because `modelControl` needs it.** The widget does not draw
+   * a category and would have no use for the field; the *surface* does, when a failure dialog asks
+   * whether there is a model dropdown to open (`core/failure.ts`'s `failureAction`), and deciding that
+   * by re-reading the raw options in the window would be a second opinion about what may be drawn.
+   */
+  readonly category: string | null;
+  /**
    * The values in the agent's order, each already labelled — `group: name` for a grouped list.
    *
    * `ConfigValue` and not a slimmer shape of our own: the row has no use for `group` beyond the label
@@ -100,6 +109,29 @@ export interface ConfigRowView {
 export interface ConfigSelection {
   readonly controlId: string;
   readonly value: string;
+}
+
+/**
+ * The category the model control carries, as `opencode acp` 2.0.19 sends it. Measured, not guaranteed
+ * — the same standing as `MODE_CONTROL_ID` below, and for the same reason.
+ */
+const MODEL_CATEGORY = 'model';
+
+/**
+ * The row's model control, or `null` when the agent reported no model option.
+ *
+ * **This is the whole of "is there a dropdown to open", and it is asked here rather than in the
+ * window.** `core/failure.ts`'s `failureAction` needs the answer to decide whether the `'model'`
+ * failure dialog may carry a "Choose another model" button, and the honest source for it is the view
+ * the row drew — a window that looked at the raw options, or at `ConfigRowView.controls[0]`, would be
+ * guessing at a list whose order and membership it does not own.
+ *
+ * **`category`, not the id `'model'`.** Same reasoning as `modelFirst` in `core/config.ts`: an agent
+ * that does not categorise gets no button rather than a button that opens the thought level, and a
+ * button pointing at the wrong dropdown is worse than no button.
+ */
+export function modelControl(view: ConfigRowView): ConfigRowControl | null {
+  return view.controls.find((control) => control.category === MODEL_CATEGORY) ?? null;
 }
 
 /**
@@ -153,6 +185,7 @@ function projectSelects(options: SessionConfigOption[] | null): ConfigRowControl
       id: control.id,
       name: control.name,
       description: control.description ?? control.name,
+      category: control.category,
       values: control.values,
       // `currentValue` is one of the values — that is what `narrowConfigSelect` guarantees — so this
       // is never `-1` for a control that got this far. Written as the index anyway, because the index

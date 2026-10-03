@@ -16,20 +16,29 @@
  * DISPLAY=:0 ./node_modules/.bin/gjsify run /tmp/permission-focus.gjs.mjs
  * ```
  *
- * **What it asserts, for three option sets:** the focus is never a button kurier would allow with, it
- * is the declining button when the agent offered one, and nothing is text-selected when it lands on
- * the diff body (the grey highlight that was visible in `s6-dialog-1024.png`).
+ * **What it asserts, for six option sets:** the focus is never a button kurier would allow with, it is
+ * the *narrow* declining button when the agent offered one, and nothing is text-selected when it lands
+ * on the diff body (the grey highlight that was visible in `s6-dialog-1024.png`).
  *
- * **A GTK fact this rests on, measured in `scripts/probes/alert-dialog-close.mjs` case 9:** with no
- * `default_response` set, libadwaita focuses the *last added* response — the allow button in the
- * fixture below. A focused `Gtk.Button` is activated by Enter and by Space regardless of any default
- * widget, so that is a dialog where a person typing in the composer, pressing Enter as the dialog
- * appears, allows a tool call without reading it.
+ * **Four of the six carry the `*_always` kinds, in both orders** — because that pair is what the probe
+ * exists for since kurier began passing them through: `allow_always` is on screen, and Enter must
+ * still not reach it. The last case is the one that only exists because of that change: an agent
+ * offering `allow_once` and `allow_always` and nothing rejecting leaves no safe button to focus, so the
+ * focus has to reach the diff body instead.
+ *
+ * **The GTK facts this rests on, both measured in `scripts/probes/alert-dialog-close.mjs` case 9:** with
+ * no `default_response` set, libadwaita focuses the **first** added response — *not* the last, which is
+ * what `Adw-1.gir` says and what this file's own header used to repeat; and the row is laid out
+ * **bottom-up from the add order**, so the last added is the topmost button. A focused `Gtk.Button` is
+ * activated by Enter and by Space regardless of any default widget, so the first slot has to be safe on
+ * its own: `orderOptions` puts `reject_once` there, which is why the two cases below that list an allow
+ * first still come up on "Decline".
  */
 import Adw from '@girs/adw-1';
 import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
+import { optionLabel } from '../../src/core/permission.ts';
 import { PermissionDialog } from '../../src/frontends/gui/permission-dialog.ts';
 import type { PermissionQuestion, PermissionView } from '../../src/core/permission.ts';
 import type { PermissionOption } from '@kurier/acp/types';
@@ -44,14 +53,18 @@ function viewOf(options: PermissionOption[]): PermissionView {
     tool: 'Write src/greeting.ts',
     kind: 'edit',
     locations: ['src/greeting.ts:3'],
-    rawInput: "{\n  \"path\": \"src/greeting.ts\"\n}\n",
+    rawInput: '{\n  "path": "src/greeting.ts"\n}\n',
     options,
   };
 }
 
-const CASES: readonly { readonly label: string; readonly options: PermissionOption[]; readonly expect: string }[] = [
+const CASES: readonly {
+  readonly label: string;
+  readonly options: PermissionOption[];
+  readonly expect: string;
+}[] = [
   {
-    label: 'allow first, then reject (what opencode sends)',
+    label: 'allow first, then reject (the order opencode sends)',
     options: [
       { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
       { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
@@ -59,7 +72,7 @@ const CASES: readonly { readonly label: string; readonly options: PermissionOpti
     expect: 'Decline',
   },
   {
-    label: 'reject first, then allow — the order that used to matter',
+    label: "reject first, then allow — kurier's order",
     options: [
       { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
       { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
@@ -67,11 +80,81 @@ const CASES: readonly { readonly label: string; readonly options: PermissionOpti
     expect: 'Decline',
   },
   {
-    label: 'an agent that offers only an allow button — no "always" survives the projection',
+    label: 'an agent that offers only an allow button',
     options: [{ optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' }],
     expect: '(the diff body — nothing to decline with)',
   },
+  {
+    label: 'all four kinds, agent order — the two "always" buttons are shown',
+    options: [
+      { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
+      { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
+      { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
+    ],
+    expect: 'Decline',
+  },
+  {
+    label: 'all four kinds, "always" first — kurier\'s order and focus win',
+    options: [
+      { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
+      { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
+      { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
+    ],
+    expect: 'Decline',
+  },
+  {
+    label: 'two allows and no decline — the state where focus must reach the diff body',
+    options: [
+      { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
+    ],
+    expect: '(the diff body — nothing to decline with)',
+  },
 ];
+
+/**
+ * Sample the focus on every idle iteration until the dialog settles, and keep every distinct value.
+ *
+ * **The turn-by-turn sequence is the second half of the measurement** — it catches a focus that *passes
+ * through* an allow button and lands somewhere safe afterwards, which a single settled reading cannot.
+ * It cannot catch the first turn (see `readMapWindow`), because a timer is dispatched after kurier's own
+ * idle; the two measurements together cover both ends.
+ */
+const MAX_SAMPLES = 60;
+
+function sampleUntilSettled(window: Adw.Window, onDone: (samples: readonly string[]) => void): void {
+  const samples: string[] = [];
+  let turns = 0;
+  const tick = (): boolean => {
+    turns += 1;
+    const dialog = findDialog(window);
+    if (dialog !== null) {
+      const focused = dialog.get_focus();
+      const what =
+        focused === null
+          ? 'null'
+          : focused instanceof Gtk.Button
+            ? String(focused.get_label())
+            : focused.constructor.name;
+      // **Distinct values, deduplicated** — the transition is the interesting thing, so a focus that
+      // sits on the same widget for fifty turns contributes one entry. `turns`, not `samples.length`,
+      // is what the stopping rule counts: a focus that never changes is still a focus that settled.
+      if (samples[samples.length - 1] !== what) samples.push(what);
+    }
+    const settled = samples.some((value) => value !== 'null');
+    const more = !(settled && turns >= 8) && turns < MAX_SAMPLES;
+    // **One exit, and it always reports.** A source whose callback returns `false` is removed and
+    // nothing else would ever call `onDone`, so it is called from inside the tick — otherwise a probe
+    // that stops sampling without reporting is a probe that hangs, unattended.
+    if (!more) onDone(samples);
+    return more;
+  };
+  // The first tick runs on the idle queue too, not synchronously: called directly it would read the
+  // dialog before `present()` has mapped anything and see nothing at all.
+  GLib.idle_add(GLib.PRIORITY_DEFAULT, tick);
+}
 
 /** Find the `Adw.AlertDialog` under a widget, so the measurement is on what is actually on screen. */
 function findDialog(widget: Gtk.Widget): Adw.AlertDialog | null {
@@ -155,35 +238,51 @@ function next(): void {
   // Never answered: this probe is about the focus, and the dialog waits, which is the correct
   // behaviour and the reason the measurement has to be taken from the outside.
   void permissions.show(question);
-  // Several frames: `show()` moves the focus after `map` plus one idle, so a measurement taken in the
-  // same turn as `present()` would see libadwaita's fallback and report a defect that is not there.
-  GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+  sampleUntilSettled(window, (samples) => {
     const dialog = findDialog(window);
+    print(`  focus per turn: ${samples.join(' -> ')}`);
     if (dialog === null) {
       print('  FAILED: no dialog under the window');
       failures += 1;
     } else {
       const focused = describeFocus(dialog);
       const selection = selectedText(dialog);
-      const isAllowButton = focused === testCase.options.find((o) => o.kind === 'allow_once')?.name;
-      print(`  get_focus(): ${focused}`);
+      print(`  settled get_focus(): ${focused}`);
       print(`  selected text: ${selection === null ? 'none' : JSON.stringify(selection)}`);
       print(`  expected: ${testCase.expect}`);
-      if (isAllowButton === true) {
-        print('  FAILED: the focus is on the allow button');
+      // Two claims, both strict. **Every** sampled turn must not name an allowing button, not just the
+      // settled one: the transition between libadwaita's own assignment and kurier's grab is a real
+      // turn, and that is where a stray Enter would land. And the settled focus must be the *narrow*
+      // decline when one was offered — an accidental Enter must not set a session-wide refusal for a
+      // question about one file.
+      const allowLabels = new Set(
+        testCase.options.filter((o) => o.kind.startsWith('allow')).map((o) => optionLabel(o)),
+      );
+      const badSample = samples.filter((sample) => allowLabels.has(sample));
+      if (badSample.length > 0) {
+        print(`    FAILED: an allow button held the focus in a turn (${badSample.join(', ')})`);
         failures += 1;
-      } else if (testCase.options.some((o) => o.kind.startsWith('reject')) && !focused.startsWith('Decline')) {
-        print('  FAILED: a rejecting option was offered and the focus is not on it');
+      }
+      if (allowLabels.has(focused)) {
+        print('    FAILED: the settled focus is on the allow button');
+        failures += 1;
+      } else if (
+        // The `reject_once` **this case actually offered**, not a label built from whichever option
+        // happened to be first: `optionLabel` is kurier's sentence for the kind, so a synthetic
+        // label from another option would not be the string on the button.
+        testCase.options.some((o) => o.kind === 'reject_once') &&
+        focused !== optionLabel(testCase.options.find((o) => o.kind === 'reject_once')!)
+      ) {
+        print('    FAILED: a reject_once was offered and the settled focus is not on it');
         failures += 1;
       } else if (selection !== null && selection.length > 0) {
-        print('  FAILED: text is selected, which draws the grey highlight');
+        print('    FAILED: text is selected, which draws the grey highlight');
         failures += 1;
       }
     }
     permissions.close();
     window.destroy();
     next();
-    return GLib.SOURCE_REMOVE;
   });
 }
 

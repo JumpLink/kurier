@@ -207,6 +207,21 @@ export interface FixtureAgentOptions {
   permissionBurst?: number;
   /** Refuse every call with `-32_000 auth_required` until `authenticate` arrived. Trap 1's shape. */
   requireAuth?: boolean;
+  /**
+   * Answer `session/prompt` with `-32_000` and nothing else, while every other call succeeds.
+   *
+   * **Issue #2's shape, and the only way to reach it from a unit test.** Measured against `opencode acp`
+   * 2.0.19 with no login: a geo-blocked provider turns `session/prompt` into
+   * `-32000 "Authentication required: provider authentication required"` — the same class and the same
+   * code as `requireAuth`, on an agent that handshook, loaded the session and answered. Nothing on the
+   * wire separates them except that one has a prompt behind it, so a fixture that could only produce
+   * `requireAuth` would let a client that shows the login dialog on this path pass.
+   *
+   * **`requireAuth` is untouched by it and they are independent**, because a client has to be able to
+   * hold both facts: no prompt sent (a real login trap) and a prompt sent (a refusal). Passing both is
+   * meaningless — `session/load` would fail first — and the option says so by not being exclusive.
+   */
+  promptAuth?: boolean;
   /** Send `_meta` on every response, plus an unknown capability marker, to prove passthrough. */
   chattyMeta?: boolean;
   /** How many pages `session/list` answers before the cursor runs out. Defaults to 1. */
@@ -509,6 +524,18 @@ export class FixtureAgent {
 
       case CLIENT_METHODS.prompt: {
         if (!this.#authenticated) return this.#authRequired(id);
+        if (this.#options.promptAuth === true) {
+          // **The login trap's exact code, on an agent that is logged in and healthy.** Only the turn
+          // state tells the two apart, and that is the point of the option — see `promptAuth`. No echo
+          // and no chunk first, because the measured turn carries neither.
+          this.#send(
+            encodeFailure(id as RequestId, {
+              code: -32_000,
+              message: 'Authentication required: provider authentication required',
+            }),
+          );
+          return;
+        }
         const sessionId = String(params?.['sessionId'] ?? SESSION_ID);
         void this.#runTurn(id, sessionId, (params?.['prompt'] as ContentBlock[]) ?? []);
         return;
@@ -847,6 +874,14 @@ export class FixtureAgent {
     if (this.#closed) return;
     this.#closed = true;
     this.#closeListener?.(undefined);
+  }
+
+  /**
+   * An agent message chunk outside any request: what a turn that is still streaming looks like to a
+   * client that has already moved on. Lets a test send the late text a stopped turn keeps producing.
+   */
+  say(sessionId: string, text: string): void {
+    this.#update({ sessionId, update: this.#agentChunk(text) });
   }
 
   /** True while a prompt turn is in flight. Lets a test cancel precisely. */

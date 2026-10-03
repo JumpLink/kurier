@@ -1,0 +1,7 @@
+{
+  "checked": "2026-10-02",
+  "link": "https://opencode.ai/docs/zen",
+  "criterion": "Free to run without a paid Zen key AND documented as zero-retention. A model that is merely free is time-limited and may be trained on, which is a privacy decision and not kurier's to make for a person.",
+  "rule": "A hint that sorts these ids to the top of a model dropdown. Never an auto-selection, never a filter, and an id that has gone away is simply never matched.",
+  "ids": ["opencode/space-bunny-free", "opencode/longcat-2.5-preview-free"]
+}

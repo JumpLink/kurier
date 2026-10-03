@@ -59,6 +59,8 @@ try {
 
 try {
   await parsed;
+  // fixed upstream in gjsify: natural end of main ignores process.exitCode (PR pending)
+  if (process.exitCode) process.exit();
 } catch (err) {
   reportError(err);
   // On GJS the top-level await above leaves a pending main loop if the promise never settles, so

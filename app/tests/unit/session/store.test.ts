@@ -32,6 +32,18 @@ export default async () => {
       });
     });
 
+    await it('keeps agentSource through a write, and reads an old record without it', async () => {
+      await withTempDir(async (dir) => {
+        const file = join(dir, 'sessions.json');
+        const store = createSessionStore(file);
+        store.create(newSession({ id: 'a', agent: 'opencode', agentSource: 'bundled', cwd: '/tmp', at: AT }));
+        store.create(newSession({ id: 'b', agent: 'opencode', cwd: '/tmp', at: AT }));
+        const reread = createSessionStore(file);
+        expect(reread.get('a')?.agentSource).toBe('bundled');
+        expect(reread.get('b')?.agentSource).toBe(undefined);
+      });
+    });
+
     await it('a missing file reads as empty, not an error', async () => {
       await withTempDir(async (dir) => {
         const store = createSessionStore(join(dir, 'does-not-exist.json'));

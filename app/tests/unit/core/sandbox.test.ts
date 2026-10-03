@@ -29,6 +29,7 @@ import { join } from 'node:path';
 import {
   FLATPAK_SPAWN,
   currentSandboxFacts,
+  hostCwdArgv,
   hostProbeArgv,
   isSandboxed,
   toHostCommand,
@@ -139,6 +140,66 @@ export default async () => {
     });
   });
 
+  await describe('toHostCommand — a bundled command', async () => {
+    const BUNDLED: AgentCommand = {
+      ...OPENCODE,
+      program: '/app/extra/agents/opencode/opencode',
+      env: { XDG_CONFIG_HOME: '/data/kurier/agents/opencode/config' },
+      bundled: true,
+    };
+
+    await it('is returned as the very same object even when sandboxed', async () => {
+      // It lives in /app/extra, which the host cannot see: rewriting it would start a program that
+      // does not exist there.
+      expect(toHostCommand(BUNDLED, SANDBOXED)).toBe(BUNDLED);
+    });
+
+    await it('is returned unchanged when not sandboxed', async () => {
+      expect(toHostCommand(BUNDLED, NOT_SANDBOXED)).toBe(BUNDLED);
+    });
+
+    await it('leaves a non-bundled command rewritten as before', async () => {
+      expect(toHostCommand(OPENCODE, SANDBOXED).program).toBe(FLATPAK_SPAWN);
+      expect(toHostCommand({ ...OPENCODE, bundled: undefined }, SANDBOXED).program).toBe(FLATPAK_SPAWN);
+    });
+
+    await it('is spawned directly, with its own environment, and its directories exist after launch', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const root = join(dir, 'agents', 'fake');
+        const config = join(root, 'config');
+        const program = writeProgram(
+          dir,
+          'bundled',
+          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$KURIER_BLANKED"\n',
+        );
+        const channel = new StdioChannel({
+          command: {
+            id: 'fake',
+            title: 'fake',
+            program,
+            args: [],
+            env: { XDG_CONFIG_HOME: config, KURIER_BLANKED: '' },
+            bundled: true,
+          },
+          onStderr: () => {},
+          sandboxFacts: SANDBOXED,
+        });
+        return new Promise<string>((resolve, reject) => {
+          let out = '';
+          channel.onData((chunk) => {
+            out += chunk;
+          });
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
+        }).then((out) => {
+          expect(out).toContain(`XDG:${config}`);
+          expect(out).toContain('BLANK:[]');
+          expect(existsSync(config)).toBe(true);
+        });
+      });
+    });
+  });
+
   await describe('toHostCommand — inside a sandbox', async () => {
     await it('starts flatpak-spawn, not the agent', async () => {
       expect(toHostCommand(OPENCODE, SANDBOXED).program).toBe(FLATPAK_SPAWN);
@@ -184,8 +245,8 @@ export default async () => {
     await it('folds cwd into --directory and drops it from the returned command', async () => {
       // cwd is now a property of the HOST process. Left on the returned command it would also be
       // applied to the sandbox-side flatpak-spawn, which fails ENOENT on a host-only path.
-      const rewritten = toHostCommand({ ...OPENCODE, cwd: '/home/jumplink/proj' }, SANDBOXED);
-      expect(rewritten.args).toContain('--directory=/home/jumplink/proj');
+      const rewritten = toHostCommand({ ...OPENCODE, cwd: '/home/someone/proj' }, SANDBOXED);
+      expect(rewritten.args).toContain('--directory=/home/someone/proj');
       expect(rewritten.cwd).toBe(undefined);
     });
 
@@ -229,6 +290,34 @@ export default async () => {
       const { inner } = shapeOf(toHostCommand(OPENCODE, SANDBOXED));
       expect(inner).toContain('exec -- "$0" "$@"');
       expect(hostProbeArgv('opencode', SANDBOXED)?.join('\n')).toContain('command -v -- "$0"');
+    });
+
+    await it('asks the host where its shell is — and only when sandboxed', async () => {
+      expect(hostCwdArgv({ flatpakInfoExists: false })).toBe(null);
+      const argv = hostCwdArgv(SANDBOXED);
+      expect(argv?.[0]).toBe('--host');
+      expect(argv?.at(-1)).toBe('exec 0<&3 1>&4 3<&- 4>&-\npwd');
+    });
+
+    await it('answers on the protocol fd, through the same wrapper, in the directory it was started in', async () => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'kurier-cwd-')));
+      try {
+        const home = join(root, 'home');
+        const work = join(root, 'work');
+        mkdirSync(home);
+        mkdirSync(work);
+        const argv = hostCwdArgv(SANDBOXED) ?? [];
+        // What `flatpak-spawn --host` would hand to the host: everything after `--host`.
+        const run = spawnSync(argv[1] ?? '', argv.slice(2), {
+          cwd: work,
+          encoding: 'utf8',
+          env: { HOME: home, SHELL: '/bin/sh', PATH: process.env['PATH'] ?? '/usr/bin:/bin' },
+        });
+        expect(run.status).toBe(0);
+        expect(run.stdout.trim()).toBe(work);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
 
     /**
@@ -522,7 +611,9 @@ export default async () => {
         // lower-case `opencode.cmd` npm actually writes — a case-insensitive filesystem opens the
         // same file either way, so the exact casing in the returned string is not part of the
         // contract `which` makes.
-        expect(which('opencode', env, NOT_SANDBOXED)?.toLowerCase()).toBe(join(dir, 'opencode.cmd').toLowerCase());
+        expect(which('opencode', env, NOT_SANDBOXED)?.toLowerCase()).toBe(
+          join(dir, 'opencode.cmd').toLowerCase(),
+        );
       });
     });
 

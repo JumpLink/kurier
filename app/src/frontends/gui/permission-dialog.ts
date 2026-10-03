@@ -35,22 +35,30 @@
  * `scripts/probes/alert-dialog-close.mjs`, which sets and reads it back), the view is non-editable and
  * cursorless because this is something to read and copy, not something to change before answering, and
  * it is selectable because the natural reaction to a surprising diff is to select a line of it.
+ *
+ * **The body's tree is in `permission-body.blp`; this file fills it.** The rows, their order, the wrap,
+ * the margins and the scroller's cap are markup. What stays here is what a question changes — every
+ * string, the `CSS.*` class names `css.ts` owns, the hidden-or-shown locations row, and the buffer.
+ * The widget the template produces is a `Gtk.Box` subclass of its own, because a template needs a
+ * `GType` to hang on: this dialog is not one (`PermissionDialog` below is a plain class that owns an
+ * `Adw.AlertDialog` and a promise), and pretending otherwise would put a GObject on a thing that has
+ * no signal, no property and no lifetime of its own.
  */
 
 import Adw from '@girs/adw-1';
 import GLib from '@girs/glib-2.0';
+import GObject from '@girs/gobject-2.0';
 import Gtk from '@girs/gtk-4.0';
 
 import {
+  agentNames,
   initialFocusResponseId,
   optionLabel,
   type PermissionQuestion,
   type PermissionView,
 } from '../../core/permission.ts';
 import { CSS } from './css.ts';
-
-/** The cap on the raw-input body. A dialog taller than its content pushes its own buttons off screen. */
-const BODY_MAX_HEIGHT_PX = 240;
+import BodyTemplate from './permission-body.blp';
 
 /** What kurier says when the agent reported no raw input at all. */
 const NO_RAW_INPUT = 'The agent did not say what it wanted to do with this.';
@@ -74,6 +82,50 @@ const NO_LOCATIONS = 'The agent did not say where.';
  * `allow_*`, which is the whole point.
  */
 const DISMISSAL_ID = 'close';
+
+/**
+ * The body, as a `Gtk.Box` of its own type so `permission-body.blp` has a `GType` to hang on.
+ *
+ * **A subclass rather than an inline child, and that is the shape a template forces.** `Template` is a
+ * property of a registered class, so "the tree in the template" means "a class whose tree is the
+ * template" — and the body was already a `Gtk.Box` with four labelled rows, so promoting it to a type
+ * adds a name rather than a layer.
+ *
+ * **`InternalChildren`, not public fields.** The rows are the template's, and the names mirror its ids
+ * the way `window.ts`'s do: the constructor fills them and `buildDialog` reads them. There is no
+ * accessor surface because nothing outside this file has a reason to reach the body.
+ *
+ * **The `CSS.*` classes are applied here, not declared in the template.** `css.ts` owns those names as
+ * constants; a `.blp` cannot import a TypeScript constant, so spelling them as literals in the markup
+ * would be a second source of truth for the stylesheet's class names, kept in step by hand. The
+ * template owns the tree and the geometry; this owns the words and the classes.
+ */
+const PermissionBody = GObject.registerClass(
+  {
+    GTypeName: 'KurierPermissionBody',
+    Template: BodyTemplate,
+    InternalChildren: ['titleLabel', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'],
+  },
+  class extends Gtk.Box {
+    // Not `private`: `buildDialog` is a module function, not a method, so a private member would not
+    // be reachable from the only place that fills it.
+    declare readonly _titleLabel: Gtk.Label;
+    declare readonly _kindLabel: Gtk.Label;
+    declare readonly _locationsLabel: Gtk.Label;
+    declare readonly _namesLabel: Gtk.Label;
+    declare readonly _rawInput: Gtk.TextView;
+
+    constructor() {
+      super();
+      // The stylesheet's names, applied through the widget rather than written into the markup.
+      this._kindLabel.add_css_class(CSS.dim);
+      this._locationsLabel.add_css_class(CSS.mono);
+      this._locationsLabel.add_css_class(CSS.dim);
+      this._namesLabel.add_css_class(CSS.dim);
+      this._rawInput.add_css_class(CSS.gateInput);
+    }
+  },
+);
 
 /**
  * One question, shown modally over the window.
@@ -239,103 +291,29 @@ export class PermissionDialog {
  * "what the focus lands on" and "what the dialog shows" the same object.
  */
 function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput: Gtk.TextView } {
-  // The inset is a *widget* margin, set through the property setter rather than in the constructor
-  // literal, and the names are `margin-start`/`margin-end` — the hyphenated widget properties, not the
-  // camelCase CSS spelling and not `margin-left`. `Gtk.Box`'s constructor props are typed against the
-  // hyphenated names, so the literal would have to spell it `'margin-start': 6`, and the setter is
-  // the same property without the quoting.
-  //
-  // **`margin-start`/`margin-end` exist as widget properties in GTK 4 but not in its CSS**, and the
-  // two are not interchangeable: `css.ts` records that the CSS parser rejects the logical names with
-  // "No property named …" *while still loading the rest of the stylesheet*, so a stylesheet using them
-  // looks like it worked. The property setters below go through GObject, not through the parser, so
-  // this is the one place the logical names are safe.
-  const body = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 10 });
-  body.margin_start = 6;
-  body.margin_end = 6;
+  const body = new PermissionBody();
 
-  const title = new Gtk.Label({
-    label: view.tool,
-    // Agent text. No markup, ever.
-    useMarkup: false,
-    wrap: true,
-    selectable: true,
-    xalign: 0,
-    // `title-4`, not `CSS.title`: that constant is `title-1`, which is the size of a *window* title
-    // (see `window.ts` on why the sidebar bar does not use it). The tool title is the strongest line
-    // in a dialog, not the loudest one in the app.
-    cssClasses: ['title-4'],
-  });
-  body.append(title);
+  // Every string below is text an agent wrote, and every label is `use-markup: false` in the template
+  // — `GtkLabel`'s default is the opposite, which is why the template says so on all four.
+  body._titleLabel.label = view.tool;
+  body._kindLabel.label = view.kind;
+  body._locationsLabel.label = view.locations.length > 0 ? view.locations.join('\n') : NO_LOCATIONS;
+  // "The agent did not say where" rather than an empty row. An empty box reads as *there is nothing
+  // here*, which is a different claim from *the agent did not say*, and the difference is the whole
+  // reason a person can tell a vague request from a complete one.
+  body._locationsLabel.set_visible(true);
 
-  // The kind, as a small dimmed line rather than as a heading: it is metadata about the tool, and a
-  // `read`/`edit`/`execute` word in a heading font would give it the weight of the question itself.
-  body.append(
-    new Gtk.Label({
-      label: view.kind,
-      useMarkup: false,
-      wrap: true,
-      selectable: true,
-      xalign: 0,
-      cssClasses: [CSS.dim],
-    }),
-  );
-
-  if (view.locations.length > 0) {
-    // One label for all of them, newline-separated, so several paths read as one list instead of N
-    // blocks — and so the path does not become the most prominent thing in the dialog.
-    body.append(
-      new Gtk.Label({
-        label: view.locations.join('\n'),
-        useMarkup: false,
-        wrap: true,
-        selectable: true,
-        xalign: 0,
-        cssClasses: [CSS.mono, CSS.dim],
-      }),
-    );
-  } else {
-    // "The agent did not say where" rather than an empty row. An empty box reads as *there is
-    // nothing here*, which is a different claim from *the agent did not say*, and the difference is
-    // the whole reason a person can tell a vague request from a complete one.
-    body.append(
-      new Gtk.Label({
-        label: NO_LOCATIONS,
-        useMarkup: false,
-        wrap: true,
-        selectable: true,
-        xalign: 0,
-        cssClasses: [CSS.dim],
-      }),
-    );
+  // The agent's own names for its options, as one caption line — and only when at least one of them
+  // says something the kurier labels do not. This is where the wording went when it came off the
+  // buttons, so nothing the agent told the person is lost.
+  const names = agentNames(view.options);
+  if (names !== null) {
+    body._namesLabel.label = names;
+    body._namesLabel.set_visible(true);
   }
-
-  // The raw input, verbatim, scrollable and capped. `readOnly` + `cursorVisible: false` because this
-  // is a thing to read; editable text in an approval dialog invites an edit before an approval, and
-  // the answer would be about a request kurier never received.
-  const rawView = new Gtk.TextView({
-    editable: false,
-    cursorVisible: false,
-    monospace: true,
-    wrapMode: Gtk.WrapMode.WORD_CHAR,
-    leftMargin: 8,
-    rightMargin: 8,
-    topMargin: 6,
-    bottomMargin: 6,
-    cssClasses: [CSS.gateInput],
-  });
   // `len: -1` is the binding's way of saying "to the end of the string" — `Gtk.TextBuffer.set_text`
   // takes a length in bytes and a one-argument call is a type error, not a default.
-  rawView.get_buffer()?.set_text(view.rawInput ?? NO_RAW_INPUT, -1);
-  const scroller = new Gtk.ScrolledWindow({
-    child: rawView,
-    // The measured cap. Without it a thousand-line diff makes a dialog whose buttons are below the fold.
-    maxContentHeight: BODY_MAX_HEIGHT_PX,
-    propagateNaturalHeight: true,
-    hscrollbarPolicy: Gtk.PolicyType.NEVER,
-    vscrollbarPolicy: Gtk.PolicyType.AUTOMATIC,
-  });
-  body.append(scroller);
+  body._rawInput.get_buffer()?.set_text(view.rawInput ?? NO_RAW_INPUT, -1);
 
   const dialog = new Adw.AlertDialog({ heading: 'The agent wants permission' });
   // `extra_child` rather than a longer heading: the heading is one kurier sentence and stays that way,
@@ -373,7 +351,7 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
       dialog.set_response_appearance(option.optionId, Adw.ResponseAppearance.SUGGESTED);
     }
   }
-  return { dialog, rawInput: rawView };
+  return { dialog, rawInput: body._rawInput };
 }
 
 /** An empty selection on a text view, so focusing it does not grey anything out. */

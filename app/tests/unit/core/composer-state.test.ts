@@ -114,9 +114,40 @@ export default async () => {
       });
     });
 
+    await describe('with no agent started yet', async () => {
+      await it('sends, because the first prompt is what starts the agent', async () => {
+        // The defect this pins: `none` used to disable Send with a sentence promising that the first
+        // prompt starts the agent, so the one message that would have started it could not be sent.
+        const view = composerView(from('idle', NOTHING));
+        expect(view.action).toBe('send');
+        expect(view.buttonEnabled).toBe(true);
+        expect(view.reason).toBe('');
+      });
+    });
+
+    await describe('with a new conversation waiting', async () => {
+      await it('sends with no session id, because Send is what creates one', async () => {
+        const view = composerView({ ...from('idle', NOTHING, null), startsConversation: true });
+        expect(view.buttonEnabled).toBe(true);
+        expect(view.reason).toBe('');
+      });
+
+      await it('still refuses with no session and nothing waiting', async () => {
+        expect(composerView(from('idle', NOTHING, null)).buttonEnabled).toBe(false);
+        expect(
+          composerView({ ...from('idle', NOTHING, null), startsConversation: false }).buttonEnabled,
+        ).toBe(false);
+      });
+
+      await it('does not outrank a dead agent', async () => {
+        const gone = from('idle', { status: 'gone', reason: 'x' }, null);
+        expect(composerView({ ...gone, startsConversation: true }).buttonEnabled).toBe(false);
+      });
+    });
+
     await describe('with no agent attached', async () => {
       await it('shows a disabled send that says why', async () => {
-        const view = composerView(from('idle', NOTHING));
+        const view = composerView(from('idle', { status: 'gone', reason: 'exited with code 1' }));
         expect(view.action).toBe('send');
         expect(view.buttonEnabled).toBe(false);
         expect(view.reason.length).toBeGreaterThan(0);
@@ -124,7 +155,7 @@ export default async () => {
 
       await it('still lets a person type, because the text is kept for when one arrives', async () => {
         // Refusing input into a field that is enabled a second later is the surprise, not the help.
-        expect(composerView(from('idle', NOTHING)).entryEditable).toBe(true);
+        expect(composerView(from('idle', { status: 'attaching' })).entryEditable).toBe(true);
       });
 
       await it('says the agent is starting, rather than that it is missing', async () => {
@@ -235,6 +266,21 @@ export default async () => {
         expect(keepsDraft('waiting-for-you')).toBe(true);
         expect(keepsDraft('gone')).toBe(false);
       });
+    });
+  });
+
+  await describe('an unavailable agent', async () => {
+    await it('turns Send and the entry off and says why, on screen', async () => {
+      const view = composerView({ ...at('idle', NOTHING, null), unavailable: 'No agent found.' });
+      expect(view.buttonEnabled).toBe(false);
+      expect(view.entryEditable).toBe(false);
+      expect(view.reason).toBe('No agent found.');
+    });
+
+    await it('is not in the way of Stop', async () => {
+      const view = composerView({ ...at('thinking'), unavailable: 'No agent found.' });
+      expect(view.action).toBe('stop');
+      expect(view.buttonEnabled).toBe(true);
     });
   });
 };

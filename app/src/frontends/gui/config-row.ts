@@ -45,6 +45,7 @@ import {
   configSelection,
   emptyConfigRow,
   isConfigChange,
+  modelControl,
   type ConfigRowControl,
   type ConfigRowView,
 } from '../../core/config-row.ts';
@@ -92,6 +93,16 @@ export class ConfigRow {
    * the same time — and it costs one boolean.
    */
   #rendering = false;
+  /**
+   * The dropdown this widget drew per control id, so a caller can point **at** one.
+   *
+   * **Rebuilt from scratch in `#render`, because the row is.** Everything here is rebuilt whole on
+   * every agent answer (see the header), so a map that outlived a render would name widgets GTK has
+   * already collected — and a stale `Gtk.DropDown` asked to pop down is a use-after-free wearing a
+   * control's clothes. Holding the widget is also the only thing that makes `openModelDropdown` mean
+   * "the dropdown the person sees" rather than "a dropdown we once made".
+   */
+  readonly #dropdowns = new Map<string, Gtk.DropDown>();
 
   constructor(options: ConfigRowOptions) {
     this.#onSelect = options.onSelect;
@@ -158,6 +169,7 @@ export class ConfigRow {
     }
     this.#rendering = true;
     try {
+      this.#dropdowns.clear();
       while (this.#flow.get_first_child() !== null) {
         const child = this.#flow.get_first_child();
         if (!child) break;
@@ -211,6 +223,11 @@ export class ConfigRow {
     });
 
     dropdown.connect('notify::selected', () => this.#onSelected(control, dropdown));
+    // Registered here rather than returned, because `#render` throws the reference away and the one
+    // caller that needs it later (`openModelDropdown`) cannot be handed a widget from a method whose
+    // return value nobody keeps. Keyed by the control id, so the map is read by the same name the rest
+    // of the row is.
+    this.#dropdowns.set(control.id, dropdown);
 
     const row = new Gtk.Box({
       orientation: Gtk.Orientation.HORIZONTAL,
@@ -247,4 +264,54 @@ export class ConfigRow {
     if (!isConfigChange(this.#view, selection.controlId, selection.value)) return;
     this.#onSelect(selection.controlId, selection.value);
   }
+
+  /**
+   * Whether the row has a model dropdown at all — the fact `core/failure.ts`'s `failureAction` needs
+   * before it offers a "Choose another model" button.
+   *
+   * **A getter over the last rendered view, not over the raw options.** The view is what the person
+   * sees; a window that answered this from the agent's raw list could offer a button for a control
+   * `projectConfigOptions` had dropped, and it would open nothing.
+   */
+  hasModelControl(): boolean {
+    return modelControl(this.#view) !== null;
+  }
+
+  /**
+   * Pop the model dropdown down. `false` when there is nothing to open.
+   *
+   * **This is the only way out of the process for "open the dropdown", and the caller is a failure
+   * dialog** (`core/failure.ts`'s `'choose-model'`). It does not pick anything: the person still chooses
+   * a value, the row still sends the set through `onSelect`, and `isConfigChange` still decides whether
+   * that is a change. A dialog that picked a model on the person's behalf would be kurier holding
+   * configuration authority over the agent, which is the "always allow" mistake in different clothes.
+   */
+  openModelDropdown(): boolean {
+    const control = modelControl(this.#view);
+    if (control === null) return false;
+    const dropdown = this.#dropdowns.get(control.id);
+    if (dropdown === undefined) return false;
+    activateDropdown(dropdown);
+    return true;
+  }
+}
+
+/**
+ * Open a `Gtk.DropDown`'s popover, which is the call a click, Enter and Space all end at.
+ *
+ * **A cast, and here is why one is the honest answer rather than a workaround.** `gtk_drop_down_activate`
+ * is what a press on the control does, and it is **not declared in `node_modules/@girs/gtk-4.0`** — that
+ * class block lists `get_model`, `set_selected`, `set_enable_search` and the four factories, and nothing
+ * else. The other way in, `gtk_drop_down_get_popup`, is not even introspectable: `typeof dropdown.get_popup`
+ * is `undefined` on GTK 4.22.5.
+ *
+ * **Measured, not assumed:** on a realized dropdown inside a presented `Adw.ApplicationWindow`,
+ * `activate()` flips the control's internal `Gtk.Popover` from `visible=false` to `visible=true` on the
+ * next main-loop turn (`gjs -m`, `GDK_BACKEND=x11`) — see the sibling probe the AGENTS.md dev-fixtures
+ * recipe points at. The alternatives are worse: a second widget for the same value is a second control
+ * for one setting, and reaching for the popover by walking `get_first_child()` would make the open depend
+ * on GTK's internal child order.
+ */
+function activateDropdown(dropdown: Gtk.DropDown): void {
+  (dropdown as Gtk.DropDown & { activate(): void }).activate();
 }

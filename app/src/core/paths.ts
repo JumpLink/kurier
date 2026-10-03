@@ -33,3 +33,26 @@ export function sessionsFile(env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env['KURIER_SESSIONS_FILE']?.trim();
   return explicit || join(dataDir(env), 'sessions.json');
 }
+
+/** `$XDG_CONFIG_HOME`, or the XDG default. An explicit value must be absolute, per the spec. */
+export function xdgConfigHome(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env['XDG_CONFIG_HOME']?.trim();
+  return explicit && explicit.startsWith('/') ? explicit : join(homedir(), '.config');
+}
+
+/**
+ * The settings file: a preference, so config rather than data. Mode `0600` in a `0700` directory, like
+ * the session file, though it holds no credential and no conversation (`core/settings.ts`).
+ */
+export function settingsFile(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env['KURIER_SETTINGS_FILE']?.trim();
+  return explicit || join(xdgConfigHome(env), 'kurier', 'settings.json');
+}
+
+/**
+ * The dismissed-notices file: ids only, in the data directory. `KURIER_NOTICES_FILE` overrides it.
+ */
+export function noticesFile(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env['KURIER_NOTICES_FILE']?.trim();
+  return explicit || join(dataDir(env), 'notices.json');
+}

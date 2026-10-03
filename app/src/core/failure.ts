@@ -17,12 +17,15 @@
  * sentence `withAuthHint` built and has no attachment to hang a kind on, which is the right amount of
  * machinery for a line of stderr. So "both arrive as one exception" is a statement about the GUI.
  *
- * **Three kinds and no more, because each one has a different consequence for a person.**
+ * **Four kinds, because each one has a different consequence for a person.**
  *
  * - `auth` — the only failure with a **command to run somewhere else**. It gets a dialog, and the
  *   dialog names `kurier auth` and says why a window cannot do it instead (plan §6: "A window has no
  *   terminal to inherit … inventing an in-window login would be storing a credential this project
  *   deliberately has no safe place for").
+ * - `model` — **the same wire error, arrived at after a turn started.** See the section on
+ *   `FailureContext` below; this is the kind that issue <https://github.com/JumpLink/kurier/issues/2>
+ *   is about.
  * - `unsupported` — the agent ran and refused. Nothing a person can do to this session on this agent,
  *   and the window would otherwise show an empty transcript with no explanation, which plan §6 calls
  *   out by name ("shown as a refusal, not as an empty transcript"). It gets a dialog too, because the
@@ -30,6 +33,30 @@
  * - `start` — the agent never got going: a bad command, a handshake timeout, an unknown protocol
  *   version. The composer's caption already says it, it is not permanent, and a modal the person must
  *   dismiss before they can read the log is noise. **No dialog.**
+ *
+ * ## Why `'auth'` and `'model'` are told apart structurally, and never by wording
+ *
+ * Measured 2026-10-02 against `opencode acp` 2.0.19 with **no login**: the anonymous default model
+ * `opencode/fledge-alpha-free` is geo-blocked from Germany (HTTP 403), and opencode reports any
+ * provider 403 on `session/prompt` as JSON-RPC `-32000 "Authentication required: provider
+ * authentication required"`. That is the **same error class and the same code** as the real login trap
+ * at `session/new`/`session/load`. Before this kind existed, kurier showed the auth dialog on that path
+ * — naming `kurier auth`, which does not help anybody: logging in is not what is wrong. Upstream
+ * record: issue #2.
+ *
+ * So the split cannot be made from the message (a reword away) and cannot be made from the code (the
+ * codes are identical). What survives is a fact kurier already tracks: **had a prompt gone out?**
+ * `AgentSession.#promptSent` is that fact, and it is passed in as `FailureContext.promptSent`. It is a
+ * **required** parameter rather than an optional one, so a new call site cannot silently classify a
+ * mid-turn refusal as a login trap by omitting it.
+ *
+ * **And honestly: this is a better question than a perfect one.** A login that genuinely expires
+ * *between* two turns also arrives as `-32000` after a prompt was sent, and it lands here too. That is
+ * why the `'model'` notice names **both** remedies in provider-neutral words and why its button offers
+ * the one kurier can actually perform — changing a model through the protocol. Saying so in the dialog
+ * rather than in a comment is the point: a person who really has lost their login is told about
+ * `kurier auth`, and a person whose free model is blocked from their country is told to pick another
+ * one, and neither is told something false.
  *
  * **A refusal is not written to the transcript.** The transcript is a record of what happened, and no
  * turn ran: an entry here would be a fabricated event, the same rule that keeps `KU_APP_PERMISSION`'s
@@ -42,7 +69,21 @@ import { isAuthRequired, UnsupportedCapabilityError } from '@kurier/acp';
 import type { AgentAttachment } from './turn.ts';
 
 /** What sort of "this did not work" this is. The names are kurier's, not the protocol's. */
-export type FailureKind = 'auth' | 'unsupported' | 'start';
+export type FailureKind = 'auth' | 'model' | 'unsupported' | 'start';
+
+/**
+ * The one fact about the turn that decides between `auth` and `model`.
+ *
+ * **Required, not optional.** The whole of issue #2 was a call site that could not tell these two
+ * apart; an optional `promptSent` would put that back for every future caller, since omitting it is
+ * legal TypeScript and lands on `'auth'` — the advice that does not help. Making it required means the
+ * compiler asks the question at each call site, and `agent-session.ts`'s `#promptSent` is the only
+ * honest answer.
+ */
+export interface FailureContext {
+  /** Whether `session/prompt` has already gone out for this turn. `AgentSession.#promptSent`. */
+  readonly promptSent: boolean;
+}
 
 /**
  * The error `withAuthHint` throws, so the kind survives the hint.
@@ -66,18 +107,26 @@ export class AuthRequiredError extends Error {
 /**
  * The one classification, and the only place an error is asked which kind of failure it is.
  *
- * **Both branches match on the error's own type, never on its text.** Matching a message would make
- * the whole decision hostage to wording: an agent is free to put "auth" in an unrelated error, and a
- * future reword of kurier's own sentence would silently stop being recognised. `isAuthRequired` is
- * the protocol's own predicate (`RpcError` with `-32000`) and `UnsupportedCapabilityError` is the
- * class `AcpClient.reattach` rejects with (trap 2) — both are facts about the wire, not about prose.
+ * **Every branch matches on the error's own type or on the turn state, never on its text.** Matching a
+ * message would make the whole decision hostage to wording: an agent is free to put "auth" in an
+ * unrelated error, and a future reword of kurier's own sentence would silently stop being recognised.
+ * `isAuthRequired` is the protocol's own predicate (`RpcError` with `-32000`) and
+ * `UnsupportedCapabilityError` is the class `AcpClient.reattach` rejects with (trap 2) — both are facts
+ * about the wire, not about prose.
+ *
+ * **The auth branches read the turn state as well, and that is the fix for issue #2.** `isAuthRequired`
+ * alone cannot separate the two: `opencode acp` 2.0.19 answers a geo-blocked provider 403 on
+ * `session/prompt` with the same `-32000` it answers the real login trap with. A prompt having gone out
+ * is the structural difference — before it, the agent was never asked to do anything and a refusal can
+ * only be about the login; after it, the likeliest cause is the model, and the remedy kurier can
+ * perform is a different model. The header says why the notice names both remedies anyway.
  *
  * `AuthRequiredError` is checked first because it is what `withAuthHint` leaves behind: it is the
  * same failure as the raw `RpcError` and must not be classified as `start`.
  */
-export function failureKind(error: unknown): FailureKind {
-  if (error instanceof AuthRequiredError) return 'auth';
-  if (isAuthRequired(error)) return 'auth';
+export function failureKind(error: unknown, context: FailureContext): FailureKind {
+  if (error instanceof AuthRequiredError) return context.promptSent ? 'model' : 'auth';
+  if (isAuthRequired(error)) return context.promptSent ? 'model' : 'auth';
   if (error instanceof UnsupportedCapabilityError) return 'unsupported';
   return 'start';
 }
@@ -93,8 +142,57 @@ export interface FailureNotice {
    * credential (`AGENTS.md` § Privacy: there is no `secret` tier and adding one needs a reason), so
    * the only honest remedy it can name is the command a person runs themselves. An empty string is
    * never returned: a caller that has nothing to run gets `null` and shows no command line.
+   *
+   * `null` for `'model'` **on purpose**, and the notice's own body says why: it names `kurier auth` as
+   * one of two remedies rather than as the one. `FailureDialog` renders `command` as a bolded "Run this
+   * in a terminal" call to action, which is the wrong shape for a sentence whose other half is a button
+   * this window *can* press.
    */
   readonly command: string | null;
+  /**
+   * What this dialog offers to do, if anything. `null` for the three kinds that owe nothing but a
+   * sentence. `failureAction` turns it into the action a surface may actually offer — the notice says
+   * *what* could help, the action says whether the window is in a state to do it.
+   */
+  readonly action: FailureAction | null;
+}
+
+/**
+ * The one action a failure dialog can offer.
+ *
+ * **A closed union with one member, and that is not a placeholder.** It exists so the *widget* never
+ * has to know what a failure was in order to know what a button does: `FailureDialog` is handed an
+ * action name and a callback, and the decision of which name is kurier's (`failureNotice`) and whether
+ * it is available is core's (`failureAction`). A second member is added when a second failure earns a
+ * second remedy, and adding it will break the widget's exhaustive handling rather than silently leaving
+ * a button that does nothing.
+ */
+export type FailureAction = 'choose-model';
+
+/**
+ * Whether the dialog's action is available at all.
+ *
+ * **`modelChoice` is a fact about the agent, not about the failure.** The button opens the config row's
+ * model dropdown, and an agent that reports no model option has no such dropdown — so the button would
+ * be the "control that points at nothing" this window exists to avoid. The sentence is still worth
+ * showing without it: it explains why the turn failed, and its second remedy needs no button.
+ */
+export interface FailureActionContext {
+  readonly modelChoice: boolean;
+}
+
+/**
+ * The action this dialog may offer, or `null` for a Close-only dialog.
+ *
+ * **Separate from `failureNotice` on purpose, because the two answers come from different places.**
+ * What *could* help is a property of the failure and belongs with its sentence; whether this window can
+ * do it is a property of what the agent reported and belongs to the surface. Folding them together
+ * would mean `failureNotice` had to know about config rows, and the "which failure is this" question
+ * would stop being answerable without a surface.
+ */
+export function failureAction(notice: FailureNotice, context: FailureActionContext): FailureAction | null {
+  if (notice.action !== 'choose-model') return null;
+  return context.modelChoice ? 'choose-model' : null;
 }
 
 /** The command `AGENTS.md` § "Trap 1" already tells a person to run. Named here so it is named once. */
@@ -148,11 +246,14 @@ export function staleDialog(shown: AgentAttachment | null, attachment: AgentAtta
  * caption and worth a line in the log, and it is over in a moment; a modal over the transcript says
  * "something is wrong" without saying anything the caption does not, and it has to be dismissed
  * before the person can get on with the window. The two permanent failures are different: one needs a
- * command run in a terminal, and the other leaves a window with nothing in it and no explanation.
+ * command run in a terminal, and the other leaves a window with nothing in it and no explanation. The
+ * third is `'model'`, which needs a person to pick something different and says so.
  *
  * **Every string is fixed English and every one is kurier's own.** The failure may have arrived with
  * agent text in it, and none of it goes in here — the same reason every label in the permission dialog
- * passes `useMarkup: false`. `AGENTS.md` fixes the house rule: fixed English, no `Intl`.
+ * passes `useMarkup: false`. `AGENTS.md` fixes the house rule: fixed English, no `Intl`. Note that the
+ * `'model'` body names the provider but never a model id and never an agent's own words: kurier does not
+ * own the model and cannot know which of its limits bit.
  */
 export function failureNotice(kind: FailureKind): FailureNotice | null {
   switch (kind) {
@@ -164,6 +265,23 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
           'to hand that login to — so kurier cannot do it for you. Everything else keeps working; ' +
           'the prompt on screen was not sent.',
         command: AUTH_COMMAND,
+        action: null,
+      };
+    case 'model':
+      return {
+        heading: 'The model refused the request',
+        // **Both remedies, in provider-neutral words, and neither of them asserted.** Three causes are
+        // indistinguishable on this path — a region block, a rate limit and a login that expired
+        // mid-turn all arrive as the same `-32000` — so the sentence names all three and does not pick
+        // one. The `kurier auth` advice that used to stand alone here was *wrong* for the case it was
+        // written for (issue #2), and dropping it entirely would be wrong for the case that remains; so
+        // it stays, as one half of a sentence, and the button is the half kurier can actually perform.
+        body:
+          'The provider turned this request down. It may be limited by region or rate, or it may need ' +
+          'a login. Choose another model, or run kurier auth in a terminal.',
+        // `null`, not `AUTH_COMMAND`: see `FailureNotice.command`. This dialog's remedy is a button.
+        command: null,
+        action: 'choose-model',
       };
     case 'unsupported':
       return {
@@ -173,6 +291,7 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
           'attach it to a conversation that already exists. An agent kurier cannot reattach to is ' +
           'refused, not shown as an empty transcript.',
         command: null,
+        action: null,
       };
     case 'start':
       return null;

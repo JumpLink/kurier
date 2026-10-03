@@ -1,5 +1,11 @@
 /**
- * The window: the shell, the surface, and the wiring between them.
+ * The window: the behaviour, and the wiring between the shell and the surface.
+ *
+ * **The tree is in `window.blp`; this file is what happens to it.** Every pane, header bar and
+ * status page that does not depend on a running agent is declared once, in the template, and read
+ * back here as an internal child. What stays in TypeScript is the three widgets whose content is a
+ * running agent's — the session list, the transcript, the composer — plus every decision the window
+ * makes about them.
  *
  * **This file decides nothing.** Every question it answers — may Send be pressed, what does the
  * status line say, where does the scroll go — is answered by `core/`, and the window's job is to pass
@@ -14,8 +20,8 @@
  * sidebar. The rule this window follows is not "fewer controls" but "no control that points at
  * nothing": every element is here because something in the kernel produced it.
  *
- * **The shell is built here rather than taken from `createNavShell`.** That is a real decision with a
- * measured reason, not a preference: the packaged shell takes a `readonly NavItem[]` and hands
+ * **The shell is declared here rather than taken from `createNavShell`.** That is a real decision with
+ * a measured reason, not a preference: the packaged shell takes a `readonly NavItem[]` and hands
  * back a plain `Gtk.Stack` with no `Gtk.ListBox` in it, so the list cannot grow when a session
  * arrives, has no handle for `Gtk.ListBox`'s `set_header_func` (which is how "Today" / "Yesterday"
  * groups work), and has no bottom bar — and the composer *has to* be in a bottom bar, because it is
@@ -46,8 +52,8 @@
  *   sits at x=260, and at y=46 a (29,29,34) border runs across it with (63,63,67) at x=260.
  * - Below that, at y ≥ 47, both shapes show one unbroken (29,29,34) column at x=259.
  *
- * So `ToolbarView` is the shape, see `buildSidebar`. There is no public property on
- * `AdwNavigationSplitView` to hide the separator at all — only `collapsed`, `content`,
+ * So `ToolbarView` is the shape, and the template says so where the shape is. There is no public
+ * property on `AdwNavigationSplitView` to hide the separator at all — only `collapsed`, `content`,
  * `min_/max_sidebar_width`.
  *
  * **One agent subprocess for this whole window, and the window never touches it.** `AgentSession` owns
@@ -58,18 +64,25 @@
  */
 
 import Adw from '@girs/adw-1';
+import Gio from '@girs/gio-2.0';
 import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
+// Type-only, and the reason it reads that way: the `Gtk.Stack` the window names is the template's
+// `contentStack`, and the only mention of `Gtk` left in this file is that declaration. The import
+// that used to *build* one is gone with `buildSplitView`.
 import Gtk from '@girs/gtk-4.0';
 
-import { labelOf, type SessionRecord, type TranscriptEntry } from '@kurier/session';
+import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@kurier/session';
 
 import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
+import type { RecordedResolution } from '../../core/agents/resolve.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
+import { displayCwd } from '../../core/cwd.ts';
+import type { EmptyStateView, NoticeView } from '../../core/empty-state.ts';
 import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
-import { failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
+import { failureAction, failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
 import { agentStatus } from '../../core/turn.ts';
 import {
   APP_NAME,
@@ -83,8 +96,10 @@ import { Composer } from './composer.ts';
 import { ConfigRow } from './config-row.ts';
 import { FailureDialog } from './failure-dialog.ts';
 import { PermissionDialog } from './permission-dialog.ts';
+import { PreferencesDialog, type PreferencesActions } from './preferences.ts';
 import { SessionList } from './session-list.ts';
 import { TranscriptView } from './transcript-view.ts';
+import Template from './window.blp';
 
 /**
  * How often `KU_APP_PERMISSION` reconsiders, and how long it waits for a real request before it
@@ -121,6 +136,8 @@ const PERMISSION_STAGE_DEADLINE_MS = 8_000;
  * screenshot taken afterwards shows the state the hook set out to create.
  */
 const FAILURE_HOOK_STEP_MS = 250;
+/** Finer than the failure hooks: the stand-in's chunks are ~900 ms apart, and the hook must land between two. */
+const MIDTURN_HOOK_STEP_MS = 50;
 
 /**
  * What the window needs in order to own a turn.
@@ -140,8 +157,30 @@ export interface MainWindowOptions {
    * error page instead of killing the app before there is a window to say why.
    */
   readonly loadSessions: () => readonly SessionRecord[];
-  /** Which agent to start on the first prompt. Resolved from `KU_APP_AGENT` in `main.ts`. */
+  /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else the available setting, else host install, else bundled. */
   readonly agent: AgentCommand;
+  /** Which copy `agent` is — what a new conversation's record names. */
+  readonly agentSource?: AgentSource;
+  /**
+   * Where a new chat runs, and the home it is abbreviated against. `null` when no directory could be
+   * found at all: then there is no New chat and the window opens on the session list alone.
+   */
+  readonly newChat: { readonly cwd: string; readonly home: string | null } | null;
+  /** Write a new conversation's record. `SessionStore.create`. */
+  readonly createSession?: (record: SessionRecord) => void;
+  /**
+   * The agent a stored session names, on the copy that held it — `resolveRecorded`. Left out when
+   * `KU_APP_AGENT` pins an agent, so a fixture record naming `opencode` is still answered by the stand-in.
+   */
+  readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
+  /** What the preferences dialog reads and writes. Absent: no Preferences entry. */
+  readonly preferences?: PreferencesActions;
+  /** Nothing could be resolved: the content pane says so and Send is off. Absent: an agent exists. */
+  readonly noAgent?: Extract<EmptyStateView, { kind: 'no-agent' }>;
+  /** The privacy banner to show under the content header, until it is dismissed. */
+  readonly notice?: NoticeView;
+  /** Remember that the notice was dismissed. */
+  readonly rememberNotice?: (id: NoticeView['id']) => void;
   /** Persist streamed transcript lines. Called once per arriving batch, in order. */
   readonly appendTurns?: (sessionId: string, entries: TranscriptEntry[]) => void;
   /** The clock, injected so a screenshot run is the only place a real one is used. */
@@ -149,11 +188,60 @@ export interface MainWindowOptions {
 }
 
 export class MainWindow extends Adw.ApplicationWindow {
+  // The GType name is also the template's `template $KurierMainWindow` — the two must agree, and
+  // `window.blp` is where the tree is.
   static readonly GTypeName = 'KurierMainWindow';
 
-  readonly #split: Adw.NavigationSplitView;
+  /** The split view, and the breakpoint target. `window.blp` owns the widths. */
+  declare readonly _split: Adw.NavigationSplitView;
+  /**
+   * The sidebar pane and its `Adw.WindowTitle`, both named in the template and both titled here.
+   *
+   * **`APP_NAME` is the only place the app's name is spelled.** A template cannot import a
+   * TypeScript constant, so the two `Adw.NavigationPage` titles and the sidebar's `Adw.WindowTitle`
+   * are set from the constructor instead of being written into `window.blp` as literals that would
+   * have to be kept in step with `constants.ts` by hand.
+   */
+  declare readonly _sidebarPage: Adw.NavigationPage;
+  declare readonly _sidebarTitle: Adw.WindowTitle;
+  /** Holds the session list. `Adw.Bin` in the template, so nothing wraps the list but a bin. */
+  declare readonly _sidebarHost: Adw.Bin;
+  /** Retitled when a session opens — which is also what turns the content header's title on. */
+  declare readonly _contentPage: Adw.NavigationPage;
+  /** Holds the transcript. One view for the whole window, refilled per session. See the constructor. */
+  declare readonly _transcriptHost: Adw.Bin;
+  /**
+   * The content pane's two states — "nothing is open" and "this session" — in one `Gtk.Stack`.
+   *
+   * A stack rather than swapping `Adw.ToolbarView.set_content`, and the reason is the composer: the
+   * header bar and the composer belong to the *pane* and must survive the switch. A session list of
+   * thirty rows behind thirty `NavigationPage`s would rebuild the composer's scroller on every click,
+   * which loses the entry's scroll position and its text — the two things a person is in the middle
+   * of. Two named children and one assignment is the whole mechanism, and the three named states are
+   * the template's.
+   */
+  declare readonly _contentStack: Gtk.Stack;
+  declare readonly _contentHeader: Adw.HeaderBar;
+  /**
+   * Holds the agent's config row, directly above the composer in the same bottom bar.
+   *
+   * Its own field rather than a part of the composer because the two have different clocks: the
+   * composer re-renders on every turn state move, this re-renders when the agent answers about its
+   * options. One host per widget keeps that split visible in the markup.
+   */
+  declare readonly _configHost: Adw.Bin;
+  /** Holds the composer, as the content pane's bottom bar. Plan §7 step 4. */
+  declare readonly _composerHost: Adw.Bin;
+  /** One dim line under the composer naming the directory a new chat will run in. Hidden otherwise. */
+  declare readonly _cwdCaption: Gtk.Label;
+  declare readonly _noticeBanner: Adw.Banner;
+  declare readonly _noAgentPage: Adw.StatusPage;
+  declare readonly _noAgentBody: Gtk.Label;
+  declare readonly _noAgentCommands: Gtk.Box;
+  declare readonly _noAgentDocs: Gtk.Label;
+  declare readonly _noAgentPreferences: Gtk.Button;
+
   readonly #sessions: SessionList;
-  readonly #placeholder: Adw.StatusPage;
   /** One transcript view for the whole window, refilled per session. See the constructor. */
   readonly #transcript: TranscriptView;
   /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
@@ -173,7 +261,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   readonly #permissions: PermissionDialog;
   /**
-   * The modal a start failure earns. Plan §6's auth trap and its reattach refusal.
+   * The modal a failure earns: plan §6's auth trap, its reattach refusal, and a provider refusal after
+   * a prompt was sent (issue #2, which offers a different model).
    *
    * **Its own field, and only ever raised from `#onSnapshot`.** What to say is `core/failure.ts`'s
    * decision; all this file does is notice that the controller reported a failure *of a kind that has
@@ -191,22 +280,19 @@ export class MainWindow extends Adw.ApplicationWindow {
    * decision itself is `failureToShow` in `core/failure.ts`; this is only where the answer is kept.
    */
   #shownFailure: AgentAttachment | null = null;
-  readonly #contentPage: Adw.NavigationPage;
-  readonly #contentHeader: Adw.HeaderBar;
-  /**
-   * The content pane's two states — "nothing is open" and "this session" — in one `Gtk.Stack`.
-   *
-   * A stack rather than swapping `Adw.ToolbarView.set_content`, and the reason is the composer: the
-   * header bar and the composer belong to the *pane* and must survive the switch. A session list of
-   * thirty rows behind thirty `NavigationPage`s would rebuild the composer's scroller on every click,
-   * which loses the entry's scroll position and its text — the two things a person is in the middle
-   * of. Two named children and one assignment is the whole mechanism.
-   */
-  readonly #contentStack: Gtk.Stack;
   /** The turn machinery. One per window, one agent subprocess behind it. */
   readonly #agent: AgentSession;
   /** The session on screen, or `null` while none is. The only place the window answers "which". */
   #openRecord: SessionRecord | null = null;
+  /** The records the sidebar lists, newest first — the list a new conversation is added to. */
+  #records: SessionRecord[] = [];
+  readonly #loadSessions: () => readonly SessionRecord[];
+  readonly #newChat: MainWindowOptions['newChat'];
+  /** The `KU_APP_NEW_CHAT` poll, so a close cannot fire it into a window that is gone. */
+  #newChatSource: number | null = null;
+  #midTurnSource: number | null = null;
+  /** Lines from the agent (not the person's own) drawn so far; `KU_APP_NEW_CHAT_MIDTURN` waits for one. */
+  #streamed = 0;
   /**
    * The spawn-time closer, once the agent has one. Written by the `onCloser` hook below.
    *
@@ -223,27 +309,45 @@ export class MainWindow extends Adw.ApplicationWindow {
   #permissionSource: number | null = null;
   /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
   #permissionTicks = 0;
+  #preferences: PreferencesDialog | null = null;
+  /** Why no prompt can be sent at all (no agent found), or `undefined`. Feeds the composer. */
+  readonly #unavailable: string | undefined;
+  #notice: NoticeView | null = null;
+  #rememberNotice: ((id: NoticeView['id']) => void) | undefined;
 
   /**
-   * `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`, and the one timer that runs both.
+   * `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`, and the one timer that runs all
+   * three.
    *
-   * **One state object and one timer for two hooks, because they are one photograph.** "The person
-   * closes the dialog" and "the person opens another conversation" are the same moment seen from two
-   * sides, and running them from two timers would let the second one fire in between and photograph a
-   * walk that nobody made.
+   * **One state object and one timer for the failure-dialog hooks, because they are one photograph.**
+   * "The person closes the dialog", "the person picks another model" and "the person opens another
+   * conversation" are the same moment seen from three sides, and running them from three timers would
+   * let the second one fire in between and photograph a walk that nobody made.
    *
    * `waiting` is the half that is not a timestamp: the hooks do nothing until a failure is *on
    * screen*, because a dismissal before the dialog exists dismisses nothing and a session switch
    * before the failure is just a different starting point.
    */
-  #failureHooks: { dismiss: boolean; switchTo: string[]; waiting: boolean; source: number | null } = {
+  #failureHooks: {
+    dismiss: boolean;
+    chooseModel: boolean;
+    switchTo: string[];
+    waiting: boolean;
+    source: number | null;
+  } = {
     dismiss: false,
+    chooseModel: false,
     switchTo: [],
     waiting: false,
     source: null,
   };
 
   constructor(app: Adw.Application, options: MainWindowOptions) {
+    // **The size is a constructor argument, not template markup, and the reason is that
+    // `constants.ts` carries the measurement.** `WINDOW_MIN_WIDTH_PX` in particular is 360 because
+    // `scripts/probes/window-min-width.mjs` swept the real window and found the toolkit stops there
+    // by itself — a sweep with its table in the comment, which a `.blp` literal would have replaced
+    // with a number nobody can check. The tree is in the template; the numbers are here.
     super({
       application: app,
       title: APP_NAME,
@@ -257,8 +361,15 @@ export class MainWindow extends Adw.ApplicationWindow {
       heightRequest: 400,
     });
 
+    // The app's name, in the three places the template left for it. See `_sidebarPage`.
+    this._sidebarPage.title = APP_NAME;
+    this._contentPage.title = APP_NAME;
+    this._sidebarTitle.title = APP_NAME;
+
+    this.#unavailable = options.noAgent?.sendReason;
+    this.#loadSessions = options.loadSessions;
+    this.#newChat = options.newChat;
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
-    this.#placeholder = buildPlaceholder();
     this.#permissions = new PermissionDialog(this);
     this.#failures = new FailureDialog();
     // **One transcript view for the whole window, refilled — not a stack child per session.**
@@ -283,10 +394,14 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#agent = new AgentSession({
       command: options.agent,
       ...(options.appendTurns ? { append: options.appendTurns } : {}),
+      ...(options.createSession ? { create: options.createSession } : {}),
+      ...(options.agentSource ? { source: options.agentSource } : {}),
+      ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
       ...(options.now ? { now: options.now } : {}),
       events: {
         onSnapshot: (snapshot) => this.#onSnapshot(snapshot),
         onEntries: (entries) => this.#onEntries(entries),
+        onConversation: (record, current) => this.#onConversation(record, current),
         onNotice: (message) => this.#onNotice(message),
         // Kept so `close-request` can end a process that exists while the handshake is still running
         // and no turn has been awaited — the orphan `onSpawn` exists to prevent. `shutdown()` below
@@ -315,7 +430,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       // to be kept in step with the controller's defaults by hand — and the first version of this line
       // did exactly that, and then the controller's constructor emitted its own state into a composer
       // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
-      input: composerInput(this.#agent.snapshot),
+      input: composerInput(this.#agent.snapshot, this.#unavailable),
       onSend: (text) => this.#onSend(text),
       // **Stop takes the dialog down with it, and names the reason before it does.** The window
       // contributes only the ordering — `agent.stop()` settles the question itself — so the two calls
@@ -328,46 +443,168 @@ export class MainWindow extends Adw.ApplicationWindow {
         this.#agent.stop();
       },
     });
-    this.#contentStack = new Gtk.Stack({ vexpand: true });
-    const panes = buildSplitView(
-      this.#sessions.widget,
-      this.#placeholder,
-      this.#transcript.widget,
-      this.#composer.widget,
-      // **The config row goes inside the composer's bottom bar, not into `Adw.ToolbarView`'s own.**
-      // `Adw.ToolbarView` has exactly one bottom bar, and that one belongs to the composer. Putting the
-      // row above the entry inside that same bar is what makes it "directly above the composer" in the
-      // plan's sense (§7 step 7) rather than a sibling that could be reordered or, worse, given its own
-      // raised border and read as a second pane.
-      this.#config.widget,
-      this.#contentStack,
-    );
-    this.#split = panes.split;
-    this.#contentPage = panes.contentPage;
-    this.#contentHeader = panes.contentHeader;
+    // **The four TypeScript-built widgets into the template's four hosts, and nothing else.** The
+    // shell is markup; what an agent says is code, and code cannot be written into a template. Each
+    // `Adw.Bin` is a placeholder with exactly one child, so this is a substitution rather than a
+    // nesting — the tree that renders is the tree `window.blp` draws.
+    this._sidebarHost.child = this.#sessions.widget;
+    this._transcriptHost.child = this.#transcript.widget;
+    this._composerHost.child = this.#composer.widget;
+    // **The config row goes inside the composer's bottom bar, not into `Adw.ToolbarView`'s own.**
+    // `Adw.ToolbarView` has exactly one bottom bar, and that one belongs to the composer. The row is
+    // the template's box above it, so it lands "directly above the composer" in the plan's sense (§7
+    // step 7) rather than as a sibling that could be reordered or, worse, given its own raised border
+    // and read as a second pane.
+    this._configHost.child = this.#config.widget;
 
-    // `content`, not `set_child`: `Adw.ApplicationWindow` refuses the GtkWindow setter with
-    // "gtk_window_set_child() is not supported for AdwApplicationWindow", and the property is the
-    // documented replacement. A property rather than a `set_content()` method — that method belongs
-    // to `Adw.ToolbarView`, which is a different class and an easy one to reach for by mistake.
-    this.content = this.#split;
-
-    // **After** the content, and the order is load-bearing. Measured on libadwaita 1.9.3: adding a
-    // breakpoint before the content is set trips
-    // `adw_breakpoint_bin_add_breakpoint: assertion 'ADW_IS_BREAKPOINT_BIN (self)' failed`, and the
-    // collapse then silently never happens. With the content in place first, the same breakpoint
-    // sets `collapsed` on the first frame at 500 px — checked by running it, not by reading it.
+    // **After** the content, and the order is load-bearing. The content is the template's, so it is
+    // already in place — but the breakpoint still has to come after `super()` returned, and it is
+    // worth saying why that is not a detail: measured on libadwaita 1.9.3, adding a breakpoint before
+    // the content is set trips `adw_breakpoint_bin_add_breakpoint: assertion 'ADW_IS_BREAKPOINT_BIN
+    // (self)' failed`, and the collapse then silently never happens. With the content in place first,
+    // the same breakpoint sets `collapsed` on the first frame at 500 px — checked by running it, not
+    // by reading it.
     this.#applyBreakpoint();
+    if (options.noAgent) this.#showNoAgent(options.noAgent, options.preferences !== undefined);
+    if (options.notice) this.#showNotice(options.notice, options.rememberNotice);
+    if (options.preferences) this.#installPreferences(app, options.preferences);
+    this.#installNewChat(app);
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
   }
 
+  /** The nothing-found page: what `emptyStateView` said, on screen, with the commands selectable. */
+  #showNoAgent(view: Extract<EmptyStateView, { kind: 'no-agent' }>, hasPreferences: boolean): void {
+    this._noAgentPage.title = view.title;
+    this._noAgentBody.label = view.body;
+    for (const command of view.commands) {
+      const label = new Gtk.Label({
+        label: command,
+        selectable: true,
+        useMarkup: false,
+        wrap: true,
+        xalign: 0,
+      });
+      label.add_css_class('monospace');
+      this._noAgentCommands.append(label);
+    }
+    this._noAgentDocs.label = `or see ${view.docsUrl}`;
+    this._noAgentPreferences.visible = hasPreferences;
+    this._contentStack.visibleChildName = 'no-agent';
+  }
+
+  #showNotice(view: NoticeView, remember: ((id: NoticeView['id']) => void) | undefined): void {
+    this.#notice = view;
+    this.#rememberNotice = remember;
+    this._noticeBanner.title = view.text;
+    this._noticeBanner.buttonLabel = view.button;
+    this._noticeBanner.connect('button-clicked', () => this.#dismissNotice());
+    this._noticeBanner.revealed = true;
+  }
+
+  #dismissNotice(): void {
+    const view = this.#notice;
+    if (!view) return;
+    this.#notice = null;
+    this._noticeBanner.revealed = false;
+    this.#rememberNotice?.(view.id);
+  }
+
+  /**
+   * The Preferences entry: `app.preferences`, `<Ctrl>comma`, and a primary menu in the content header.
+   * The action is the one entry point, so the menu, the accelerator and `KU_APP_PREFERENCES` all run the
+   * same call.
+   */
+  #installPreferences(app: Adw.Application, actions: PreferencesActions): void {
+    const dialog = new PreferencesDialog(actions);
+    this.#preferences = dialog;
+    // Installed once: the window is the app's only one (`AdwaitaApp` memoises `createWindow`), so this
+    // constructor runs once per process and the action and its accelerator are never added twice.
+    const action = new Gio.SimpleAction({ name: 'preferences' });
+    action.connect('activate', () => dialog.show(this));
+    app.add_action(action);
+    app.set_accels_for_action('app.preferences', ['<Ctrl>comma']);
+  }
+
+  /**
+   * `win.new-chat`: the sidebar button, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate this one action.
+   * Window-scoped rather than `app.`: what it resets is this window's composer. Disabled when no
+   * directory could be found, so the button is insensitive rather than pointing at nothing.
+   */
+  #installNewChat(app: Adw.Application): void {
+    const action = new Gio.SimpleAction({ name: 'new-chat', enabled: this.#newChat !== null });
+    action.connect('activate', () => this.#startNewChat());
+    this.add_action(action);
+    app.set_accels_for_action('win.new-chat', ['<Ctrl>n']);
+  }
+
+  /**
+   * The empty composer: no session is open and the first prompt makes one. **Starts nothing** — the
+   * agent and `session/new` wait for the prompt, so a window nobody types in owns no process.
+   *
+   * The draft is left alone: a person who was writing something and reached for New chat has not asked
+   * to lose it. `show_content` brings the pane forward on a collapsed window, where this is a tap on the
+   * sidebar's own header.
+   */
+  #startNewChat(): void {
+    const chat = this.#newChat;
+    if (!chat) return;
+    this.#failures.close();
+    this.#openRecord = null;
+    this.#sessions.clearSelection();
+    // The agent stops a running turn itself (`startConversation`), settling any open question
+    // `cancelled`; the dialog widget goes down after it, like Stop's.
+    this.#agent.startConversation(chat.cwd);
+    this.#permissions.close();
+    this.#transcript.setEntries([]);
+    this._contentStack.visibleChildName = this.#unavailable ? 'no-agent' : 'new';
+    this._contentPage.title = APP_NAME;
+    this._contentHeader.showTitle = false;
+    this._cwdCaption.label = `in ${displayCwd(chat.cwd, chat.home)}`;
+    this._cwdCaption.visible = !this.#unavailable;
+    this._split.showContent = true;
+  }
+
+  /**
+   * A new conversation has its session and its record. The sidebar gets the row at the top and, when the
+   * person is still in that chat, marks it open — the transcript already shows what they sent, so this
+   * does not go through `#open`, which would replace it with the (empty) stored copy.
+   */
+  #onConversation(record: SessionRecord, current: boolean): void {
+    this.#records = [record, ...this.#records.filter((existing) => existing.id !== record.id)];
+    this.#sessions.setSessions(this.#records);
+    if (!current) return;
+    this.#sessions.select(record.id);
+    this.#openRecord = record;
+    this._contentPage.title = labelOf(record);
+    this._contentHeader.showTitle = true;
+    this._cwdCaption.visible = false;
+    this._contentStack.visibleChildName = 'open';
+  }
+
   #load(loadSessions: () => readonly SessionRecord[]): void {
     try {
-      this.#sessions.setSessions(loadSessions());
+      this.#records = [...loadSessions()];
+      this.#sessions.setSessions(this.#records);
+      // First run: nothing to list, so the window is the chat. With sessions it stays on the list's
+      // "pick one" page, as before.
+      if (this.#records.length === 0) this.#startNewChat();
     } catch (error) {
       this.#sessions.showError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * The record as the store holds it now. The window's list was read at startup, and a session that
+   * streamed or was created since is longer on disk — showing the startup copy would be a transcript
+   * that loses its own last answer. A read that fails falls back to the copy in hand.
+   */
+  #fresh(record: SessionRecord): SessionRecord {
+    try {
+      return this.#loadSessions().find((candidate) => candidate.id === record.id) ?? record;
+    } catch {
+      return record;
     }
   }
 
@@ -378,9 +615,9 @@ export class MainWindow extends Adw.ApplicationWindow {
    * (`Adw-1.gir`: `default-value="FALSE"`, and read back at runtime), so on a narrow window the
    * sidebar is what shows, and until a row set it nothing ever brought the content pane forward.
    * Peer review caught that. Setting it is also what makes libadwaita's own back button appear —
-   * see `buildContent`.
+   * see `window.blp`'s content header.
    *
-   * **The `Adw.StatusPage` is left exactly as the constructor built it.** It used to be refilled here
+   * **The `Adw.StatusPage` is left exactly as the template declared it.** It used to be refilled here
    * with the session's title, agent and directory, which was the whole content pane while the
    * transcript did not exist. Now the transcript *is* the content pane, and a page one click away
    * carrying the same title is a second answer to "which session am I looking at" — the defect
@@ -397,9 +634,11 @@ export class MainWindow extends Adw.ApplicationWindow {
    * method stay a pure view operation — no await, no failure path, no process to leak when a person
    * clicks through a list.
    */
-  #open(record: SessionRecord): void {
+  #open(listed: SessionRecord): void {
+    const record = this.#fresh(listed);
     const label = labelOf(record);
     this.#openRecord = record;
+    this._cwdCaption.visible = false;
     // **A session switch takes the failure dialog down, and keeps `#shownFailure`.** The dialog is about
     // the window, not about the session — but a person who clicked another conversation while a modal
     // sentence about the last one was up is now looking at a *different* conversation, and a modal that
@@ -407,7 +646,15 @@ export class MainWindow extends Adw.ApplicationWindow {
     // `#open` then emits, and `failureToShow` answers `null` for the failure this window already showed,
     // so closing it here does not buy it back on the next state move — that was the whole defect.
     this.#failures.close();
-    this.#agent.bind({ id: record.id, cwd: record.cwd });
+    // The recorded agent travels with the session, so the first prompt reattaches it on the copy that
+    // holds its history (`resolveRecorded`) rather than on the window's single agent.
+    this.#agent.bind({
+      id: record.id,
+      cwd: record.cwd,
+      agent: record.agentSource ? { id: record.agent, source: record.agentSource } : { id: record.agent },
+    });
+    // `bind` stopped a turn that belongs to another chat; its question, if any, is already settled.
+    this.#permissions.close();
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
     // map, so an index would be a second naming scheme for the same three states.
@@ -416,12 +663,12 @@ export class MainWindow extends Adw.ApplicationWindow {
     // turns is a third thing, not the second one: `kurier start` with no prompt produces exactly
     // that. Showing the transcript's blank column for it reads as a failed load, and showing
     // "No session open" for a session that *is* open is a lie in the title bar's own words.
-    this.#contentStack.visibleChildName = record.turns.length === 0 ? 'empty' : 'open';
-    this.#contentPage.title = label;
+    this._contentStack.visibleChildName = record.turns.length === 0 ? 'empty' : 'open';
+    this._contentPage.title = label;
     // The title can be shown now: it names the session, not the app, so it is no longer the
-    // double title `buildContent` hides it against.
-    this.#contentHeader.showTitle = true;
-    this.#split.showContent = true;
+    // double title the template's content header hides it against.
+    this._contentHeader.showTitle = true;
+    this._split.showContent = true;
   }
 
   /**
@@ -439,7 +686,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     const condition = Adw.BreakpointCondition.parse(`max-width: ${COLLAPSE_WIDTH_PX}px`);
     if (!condition) return;
     const breakpoint = new Adw.Breakpoint({ condition });
-    breakpoint.add_setter(this.#split, 'collapsed', true);
+    breakpoint.add_setter(this._split, 'collapsed', true);
     this.add_breakpoint(breakpoint);
   }
 
@@ -456,7 +703,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * event as a state change arriving.
    */
   #onSend(text: string): void {
-    if (text.trim() === '') return;
+    if (text.trim() === '' || this.#unavailable) return;
     this.#composer.clearDraft();
     void this.#agent.prompt(text);
   }
@@ -473,7 +720,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * truth about whether the app is alive.
    */
   #onSnapshot(snapshot: AgentSnapshot): void {
-    this.#composer.setInput(composerInput(snapshot));
+    this.#composer.setInput(composerInput(snapshot, this.#unavailable));
     // `keepsDraft` is the decision and it lives in core; the window only carries it out. An agent that
     // exited can never receive what is in the entry, and leaving it there collects words that go
     // nowhere — so `gone` is the one state that discards it.
@@ -483,9 +730,10 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /**
-   * Put up the dialog a start failure has earned — **once per failure, and never a stale one.**
+   * Put up the dialog a failure has earned — **once per failure, and never a stale one.**
    *
-   * Two decisions, both made in `core/failure.ts` and both about as easy to get wrong as they look:
+   * Three decisions, all of them made in `core/failure.ts` and all about as easy to get wrong as they
+   * look:
    *
    * - `failureToShow(attachment, shown)` — is this failure still owed a dialog? It is `null` for a
    *   failure this window has already shown (identity, not "is one open": a dismissal closes the dialog
@@ -494,6 +742,10 @@ export class MainWindow extends Adw.ApplicationWindow {
    * - `staleDialog(shown, attachment)` — is a dialog that is up now about something the window has
    *   moved on from? A dialog is modal, so one left up over an attached agent or another session both
    *   lies and blocks the window.
+   * - `failureAction(notice, { modelChoice })` — may the dialog carry its button? The `'model'` notice
+   *   (a provider refusal, issue #2) offers "Choose another model", and it may only if the agent
+   *   reported a model option at all. Without one the button would open nothing, so the dialog is
+   *   built with Close alone and the sentence still says what to do instead.
    *
    * **`#shownFailure` is only forgotten when a dialog is genuinely closed as stale.** Clearing it on
    * every session switch would put the *same* auth dialog straight back up, because the attachment is
@@ -509,7 +761,32 @@ export class MainWindow extends Adw.ApplicationWindow {
     const notice: FailureNotice | null = failureToShow(attachment, this.#shownFailure);
     if (notice === null) return;
     this.#shownFailure = attachment;
-    this.#failures.show(notice, this);
+    const action = failureAction(notice, { modelChoice: this.#config.hasModelControl() });
+    this.#failures.show(
+      notice,
+      this,
+      action === 'choose-model' ? { onChooseModel: () => this.#openModelDropdown() } : {},
+    );
+  }
+
+  /**
+   * Open the model dropdown, for the failure dialog's "Choose another model".
+   *
+   * **Through the row's own method and nothing else** — no `set_selected`, no request, no value. A
+   * dialog that picked a model on the person's behalf would be kurier deciding configuration for the
+   * agent, which is the "always allow" mistake in different clothes; what this does is put the list in
+   * front of them.
+   *
+   * **One line in the log either way, and that is deliberate.** The pointer cannot press this button —
+   * `ActivateWidget` on an `Adw.AlertDialog` response reports `true` and emits no `response` (measured,
+   * `scripts/probes/alert-dialog-close.mjs`), which is why the whole dismissal half of a failure dialog
+   * needed a hook. So a screenshot run has to be able to say afterwards whether the button reached the
+   * dropdown or whether there was no model option to open, and "no log line" would not distinguish
+   * "worked" from "never ran".
+   */
+  #openModelDropdown(): void {
+    const opened = this.#config.openModelDropdown();
+    console.log(`kurier: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
   }
 
   /**
@@ -522,10 +799,13 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #onEntries(entries: TranscriptEntry[]): void {
     this.#transcript.appendEntries(entries);
+    this.#streamed += entries.filter((entry) => entry.kind !== 'user').length;
     // A session that was showing `'empty'` has just said something. Left as it is, the pane keeps the
     // "Nothing here yet" status page *underneath* the new bubble, and the sentence contradicts what is
     // on top of it.
-    if (this.#contentStack.visibleChildName === 'empty') this.#contentStack.visibleChildName = 'open';
+    // The same for a new chat, whose first line is drawn before its session exists.
+    const visible = this._contentStack.visibleChildName;
+    if (visible === 'empty' || visible === 'new') this._contentStack.visibleChildName = 'open';
   }
 
   /**
@@ -587,6 +867,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         GLib.source_remove(this.#failureHooks.source);
         this.#failureHooks.source = null;
       }
+      if (this.#newChatSource !== null) {
+        GLib.source_remove(this.#newChatSource);
+        this.#newChatSource = null;
+      }
+      if (this.#midTurnSource !== null) {
+        GLib.source_remove(this.#midTurnSource);
+        this.#midTurnSource = null;
+      }
       if (!this.#agent.turnRunning && !this.#agent.agentRunning) return false;
       this.#closing = true;
       void (async () => {
@@ -625,7 +913,7 @@ export class MainWindow extends Adw.ApplicationWindow {
         // A hook that cannot be parsed is a typo, and a typo that silently did nothing is how a surface
         // ends up with a screenshot nobody can account for. Named loudly, with the format.
         console.log(`kurier: KU_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`);
-      } else if (!this.#openRecord) {
+      } else if (!this.#hasChat()) {
         console.log('kurier: KU_APP_CONFIG — no session is open, so there is no agent to ask');
       } else {
         console.log(
@@ -673,6 +961,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         return GLib.SOURCE_CONTINUE;
       });
     }
+    if (hooks.noticeDismiss === true) {
+      if (this.#notice) {
+        console.log('kurier: KU_APP_NOTICE_DISMISS — pressing the banner’s Got it');
+        this._noticeBanner.emit('button-clicked');
+      } else {
+        console.log('kurier: KU_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
+      }
+    }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
     // `KU_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
     // turn against whatever agent was selected — no staged fake stream — because a fake one would test
@@ -680,28 +976,118 @@ export class MainWindow extends Adw.ApplicationWindow {
     // anything from the session file: a screenshot must not carry a real conversation out of it.
     if (hooks.thinking === true) {
       const prompt = hooks.prompt ?? 'Summarise this repository in three sentences.';
-      const record = this.#openRecord;
-      if (!record) {
+      if (this.#unavailable) {
+        // The composer refuses to send here, so the hook does too: a hook that could send where a person
+        // cannot would photograph a window that does not exist.
+        console.log(`kurier: KU_APP_THINKING — not sent: ${this.#unavailable}`);
+      } else if (!this.#hasChat()) {
         console.log('kurier: KU_APP_THINKING — no session is open, so there is nowhere to send it');
       } else {
-        console.log(`kurier: KU_APP_THINKING — sending to ${record.id}`);
+        console.log(
+          `kurier: KU_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
+        );
         this.#composer.clearDraft();
         void this.#agent.prompt(prompt);
       }
     }
     this.#applyStopHook(hooks);
+    this.#applyNewChatHook(hooks);
+    this.#applyNewChatMidTurnHook(hooks);
     this.#applyFailureHooks(hooks);
+    this.#applyPreferencesHooks(hooks);
   }
 
   /**
-   * Arm `KU_APP_DISMISS_FAILURE` and `KU_APP_SWITCH`.
+   * `KU_APP_NEW_CHAT`: press New chat — through `win.new-chat`, the action the button and `<Ctrl>n` run.
    *
-   * **Both are about one control that nothing outside the process can press.** `ActivateWidget` on the
-   * failure dialog's response button reports `true` and dismisses nothing, and neither can a pointer
-   * (measured; `hooks.ts` has the three-way result), so the sidebar row and the dialog's own Close
-   * are the last two pointer-only controls in this window. A guard that cannot be observed is a guard
-   * that has not been checked, and the guard in question is the one that decides whether a failure is
-   * shown once or on every state move.
+   * **After the running turn, not during it.** Combined with `KU_APP_THINKING` the point is to photograph
+   * the empty composer *after* a chat exists, and a New chat in the middle of the first answer would
+   * photograph a half-streamed one. Nothing running: it fires at once.
+   */
+  #applyNewChatHook(hooks: KurierHooks): void {
+    if (hooks.newChat !== true) return;
+    const press = (): void => {
+      console.log('kurier: KU_APP_NEW_CHAT — activating win.new-chat');
+      // The action itself, not `this.activate_action(…)`: on a window GJS resolves that name to
+      // `Gio.ActionGroup`'s, which takes the name *without* the `win.` prefix and returns nothing — the
+      // prefixed spelling is a silent no-op (measured: the first version of this hook did nothing and
+      // logged success). `activate` on the action is what the button's `action-name` ends up calling.
+      const action = this.lookup_action('new-chat');
+      if (!action) console.log('kurier: KU_APP_NEW_CHAT — no such action on this window');
+      else action.activate(null);
+    };
+    if (!this.#agent.turnRunning) {
+      press();
+      return;
+    }
+    this.#newChatSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FAILURE_HOOK_STEP_MS, () => {
+      if (this.#agent.turnRunning) return GLib.SOURCE_CONTINUE;
+      this.#newChatSource = null;
+      press();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  /**
+   * `KU_APP_NEW_CHAT_MIDTURN`: press New chat once the running turn has streamed something and is still
+   * going — the one-keystroke path that used to leave the old answer streaming into the empty pane.
+   * Through the same action as the button. Polls, because the turn starts a moment after the hook runs.
+   */
+  #applyNewChatMidTurnHook(hooks: KurierHooks): void {
+    if (hooks.newChatMidTurn !== true) return;
+    this.#midTurnSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MIDTURN_HOOK_STEP_MS, () => {
+      if (!this.#agent.turnRunning || this.#streamed === 0) return GLib.SOURCE_CONTINUE;
+      this.#midTurnSource = null;
+      console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
+      const action = this.lookup_action('new-chat');
+      if (!action) console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — no such action on this window');
+      else action.activate(null);
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  /** A session is open, or a new chat is waiting for its first prompt — either way a prompt has somewhere to go. */
+  #hasChat(): boolean {
+    return this.#openRecord !== null || this.#agent.snapshot.startsConversation;
+  }
+
+  /** `KU_APP_PREFERENCES` opens the dialog through its action; `KU_APP_PREFERENCES_AGENT` also chooses a row. */
+  #applyPreferencesHooks(hooks: KurierHooks): void {
+    if (hooks.preferences !== true && hooks.preferencesAgent === undefined) return;
+    const dialog = this.#preferences;
+    const app = this.application;
+    if (!dialog || !app) {
+      console.log('kurier: KU_APP_PREFERENCES — this window has no preferences dialog');
+      return;
+    }
+    console.log('kurier: KU_APP_PREFERENCES — opening the dialog through app.preferences');
+    app.activate_action('preferences', null);
+    const key = hooks.preferencesAgent;
+    if (key === undefined) return;
+    // The rows are final once the host detection (if any) has answered; the dialog says when.
+    void dialog.ready().then(() => {
+      const outcome = dialog.select(key);
+      const said: Record<typeof outcome, string> = {
+        chose: `chose ${key} through the dialog`,
+        unchanged: `${key} is already the saved choice — nothing written`,
+        refused: 'the dialog is locked (the settings file is not overwritten) — nothing written',
+        failed: `choosing ${key} did not save — see the dialog`,
+        missing: `no row ${key} in the dialog`,
+      };
+      console.log(`kurier: KU_APP_PREFERENCES_AGENT — ${said[outcome]}`);
+    });
+  }
+
+  /**
+   * Arm `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`.
+   *
+   * **All three are about controls that nothing outside the process can press.** `ActivateWidget` on the
+   * failure dialog's response button reports `true` and dismisses nothing, `Adw.AlertDialog` has no
+   * callable `response()`, and neither can a pointer (measured; `hooks.ts` has the three-way result), so
+   * the sidebar row, the dialog's own Close and the dialog's model button are the last three
+   * pointer-only controls in this window. A guard that cannot be observed is a guard that has not been
+   * checked, and the guards in question are the ones that decide whether a failure is shown once or on
+   * every state move, and whether its one button reaches the dropdown it names.
    *
    * **Armed but idle until a failure is on screen** — see `#failureHooksStep`. Nothing here runs at
    * startup, so a run that sets these hooks and never fails is a run that did what it was asked and
@@ -709,8 +1095,9 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #applyFailureHooks(hooks: KurierHooks): void {
     const switchTo = hooks.switchTo ?? [];
-    if (hooks.dismissFailure !== true && switchTo.length === 0) return;
+    if (hooks.dismissFailure !== true && hooks.chooseModel !== true && switchTo.length === 0) return;
     this.#failureHooks.dismiss = hooks.dismissFailure === true;
+    this.#failureHooks.chooseModel = hooks.chooseModel === true;
     this.#failureHooks.switchTo = [...switchTo];
     this.#failureHooks.waiting = true;
     this.#failureHooks.source = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FAILURE_HOOK_STEP_MS, () =>
@@ -730,8 +1117,14 @@ export class MainWindow extends Adw.ApplicationWindow {
    * **The dismissal is the dialog's own `close()`, and that *is* the person's Close.** This dialog has
    * one response, and `scripts/probes/alert-dialog-close.mjs` (case 1) measures that an external
    * `close()` emits `closed` and then `response("close")` — the same pair with the same argument the
-   * button produces. There is no second way to dismiss it: `Adw.AlertDialog` has no callable
-   * `response()`, which the same probe records.
+   * button produces. That is still right on the `'model'` dialog, which has a second response: the
+   * dismissal reports `"close"` and never the remedy.
+   *
+   * **The other arm is a press, and it goes through the dialog too.** `KU_APP_CHOOSE_MODEL` calls
+   * `FailureDialog.chooseModel()`, which emits the `response` signal libadwaita's own handler answers
+   * to — so the modal takes itself down and the dropdown opens in libadwaita's order. Calling
+   * `ConfigRow.openModelDropdown()` directly would photograph a popover with the modal still up, which
+   * is not a state a person can be in.
    */
   #failureHooksStep(): boolean {
     const hooks = this.#failureHooks;
@@ -748,6 +1141,26 @@ export class MainWindow extends Adw.ApplicationWindow {
         // session switch causes, and a walk that began in the same tick would be photographed with
         // the dialog never having been visibly closed.
         return GLib.SOURCE_CONTINUE;
+      }
+      if (hooks.chooseModel) {
+        // **One press, and the log says whether it happened.** `chooseModel` answers `false` for a
+        // dialog that is not up or that carries no such response — which is the state this run *should*
+        // be in with `KU_STANDIN_CONFIG` unset, and a screenshot in that state has to be recognisable
+        // as "the button was never offered" rather than as a broken fixture.
+        const pressed = this.#failures.chooseModel();
+        console.log(
+          `kurier: KU_APP_CHOOSE_MODEL — ${
+            pressed ? 'pressing Choose another model' : 'the dialog offers no such button'
+          }`,
+        );
+        hooks.chooseModel = false;
+        // **The timer stops here**, so a `KU_APP_SWITCH` walk in the same run is not photographed over
+        // an open popover: one press is the whole photograph, and the walk would close the session the
+        // dropdown is standing in. The popover appears inside that call and paints on the next frame.
+        if (pressed) {
+          hooks.source = null;
+          return GLib.SOURCE_REMOVE;
+        }
       }
     }
     const next = hooks.switchTo.shift();
@@ -782,7 +1195,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #applyStopHook(hooks: KurierHooks): void {
     if (hooks.stop !== true && hooks.stopEscape !== true) return;
-    if (!this.#openRecord) {
+    if (!this.#hasChat()) {
       console.log('kurier: KU_APP_STOP — no session is open, so there is no turn to stop');
       return;
     }
@@ -830,7 +1243,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * case is settled there rather than guessed at again here.
    */
   #stagePermission(): void {
-    if (!this.#openRecord) {
+    if (!this.#hasChat()) {
       console.log('kurier: KU_APP_PERMISSION — no session is open, so there is nothing to ask about');
       return;
     }
@@ -850,169 +1263,42 @@ export class MainWindow extends Adw.ApplicationWindow {
  * the window assembled the input itself, the join between the two core modules would be a second
  * implementation of it — and this file's header is about not having decisions here.
  */
-function composerInput(snapshot: AgentSnapshot): ComposerInput {
+function composerInput(snapshot: AgentSnapshot, unavailable?: string): ComposerInput {
   return {
+    ...(unavailable ? { unavailable } : {}),
     state: snapshot.state,
     agent: agentStatus(snapshot.attachment),
     sessionId: snapshot.sessionId,
+    startsConversation: snapshot.startsConversation,
   };
 }
 
-/**
- * The content pane, before a session is chosen.
- *
- * An `Adw.StatusPage` rather than an empty white area, because "nothing here yet" and "something
- * failed to load" look identical in an empty box — and only one of them is true right now. The
- * wording is about kurier rather than about the agent: no agent is running yet, and copy that
- * implies otherwise is a small lie in the first screen anybody sees.
- *
- * `vexpand` so it centres in the pane: an empty area with content jammed under the header reads as a
- * layout bug rather than as a deliberate empty state.
- */
-function buildPlaceholder(): Adw.StatusPage {
-  return new Adw.StatusPage({
-    iconName: 'mail-send-receive-symbolic',
-    title: 'No session open',
-    // Neither "on the left" (on a narrow window the list is a page of its own) nor "start one"
-    // (there is no control for that yet, and copy that points at one is a control that isn't there).
-    description: 'Pick a session from the list to see it here.',
-    vexpand: true,
-  });
-}
-
-/** The sidebar pane: a title bar with the app's name, and the list under it. */
-function buildSidebar(list: Gtk.Widget): Adw.NavigationPage {
-  const box = new Adw.ToolbarView({ vexpand: true });
-  // An `Adw.HeaderBar` is a **top bar of an `Adw.ToolbarView`**, never a child of a plain `Gtk.Box`.
-  // That is the documented shape since libadwaita 1.4 and it is what `@gjsify/adwaita-app`'s own
-  // `createNavShell` builds. It also decides how the pane's edge looks: a bare header bar does not
-  // merge with the pane beside it, and `Adw.NavigationSplitView` then draws its separator straight
-  // through the header row — a vertical rule across the top of the window that no GNOME app has.
-  // The pixels are in `scripts/probes/headerbar-ab.mjs` and in the file header.
-  box.add_top_bar(
-    new Adw.HeaderBar({
-      // No `show*TitleButtons: false` here. It hid the close button on the collapsed window, where
-      // this bar is the only one on screen; left alone, libadwaita puts the window buttons on
-      // whichever bar sits at the window's edge, in both shapes.
-      // `Adw.WindowTitle`, not a `Gtk.Label` with `title-1`: that name class is for a *window*
-      // title, and at that size a sidebar label reads as shouting.
-      titleWidget: new Adw.WindowTitle({ title: APP_NAME, subtitle: '' }),
-    }),
-  );
-  box.set_content(list);
-  return new Adw.NavigationPage({ title: APP_NAME, child: box });
-}
-
-/**
- * The content pane. One page, reused per session later — see the plan's §7 step 4.
- *
- * `showTitle: false`, and **that is not cosmetic.** An `Adw.HeaderBar` inside an
- * `Adw.NavigationPage` shows that page's title, so naming this page "kurier" printed the app's name
- * twice across the top of the window — the sidebar said it and the empty content pane said it
- * again, which is this file's own "no control that points at nothing" rule committed by a title
- * instead of by a button. libadwaita says the same in as many words: "AdwNavigationPage … is
- * missing a title. To hide a header bar title, consider using AdwHeaderBar:show-title instead."
- *
- * **The back button is libadwaita's, not ours.** An `Adw.HeaderBar` in the content page of a
- * collapsed `Adw.NavigationSplitView` grows one by itself as soon as `show_content` is true. This
- * file once claimed the opposite and shipped its own button, from a measurement that rested on an
- * API that does not exist: there is no `get_start_widget()` in libadwaita 1.9.3 (0 hits in
- * `Adw-1.gir`), and `show_content` was `false` — its default — in every state measured, so nothing
- * could have been seen to go back to. The screenshot after the session list first set it to `true`
- * then showed two back buttons side by side. What the collapsed window was missing was never a
- * button; it was `MainWindow.#open`.
- *
- * The title comes back once there is a session to name — `MainWindow.#open` turns it on.
- */
-function buildContent(
-  header: Adw.HeaderBar,
-  placeholder: Adw.StatusPage,
-  transcript: Gtk.Widget,
-  composer: Gtk.Widget,
-  configRow: Gtk.Widget,
-  stack: Gtk.Stack,
-): Adw.NavigationPage {
-  const box = new Adw.ToolbarView({ vexpand: true });
-  box.add_top_bar(header);
-  // **The stack, not a swap of `set_content`.** The empty state and a session are two answers to one
-  // question, and a `Gtk.Stack` holds both so switching back and forth is a `visibleChildName`
-  // assignment rather than a reparent. That matters because the *composer* is a bottom bar of this
-  // `Adw.ToolbarView` and not part of either child: putting the composer inside whichever child is
-  // showing would rebuild its entry on every session switch, and the composer's whole job is to
-  // survive one.
-  stack.add_named(placeholder, 'closed');
-  stack.add_named(transcript, 'open');
-  // The third state: a session that is open and has said nothing yet. `kurier start` with no prompt
-  // writes exactly such a record, so it arrives from the real CLI and not only from a hand-made
-  // fixture — an empty pane there would look like a failure to load somebody's conversation.
-  stack.add_named(
-    new Adw.StatusPage({
-      iconName: 'mail-send-receive-symbolic',
-      title: 'Nothing here yet',
-      description: 'No prompt has been sent in this session yet. The first one starts it.',
-      vexpand: true,
-      cssClasses: ['compact'],
-    }),
-    'empty',
-  );
-  box.set_content(stack);
-  // **The composer is the bottom bar, and `RAISED_BORDER` is a measured choice.** Plan §7 step 4 puts it
-  // here and §3 draws it under the conversation. The style is what decides whether the bar reads as
-  // part of the pane or as a floating panel: `FLAT` (the default, and what the sidebar's own
-  // `Adw.ToolbarView` uses) draws nothing under it, so the composer's rounded frame would sit directly
-  // on the transcript's own background with no separation at all. `RAISED_BORDER` gives an opaque
-  // background plus a persistent border, which is the one shape that reads correctly in both light and
-  // dark without a shadow that then has to be explained.
-  box.set_bottom_bar_style(Adw.ToolbarStyle.RAISED_BORDER);
-  // **The bar is a vertical box of [config row, composer], in that order.** One bottom bar, two things
-  // in it, and the order is the plan's: what you pick here applies to what you are about to send in
-  // the entry below it. A `Gtk.Box` rather than a second `Adw.ToolbarView` bottom bar because there is
-  // only one bottom bar, and because a second raised surface would read as two panes stacked rather
-  // than as one control area.
-  const bottom = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 0 });
-  bottom.append(configRow);
-  bottom.append(composer);
-  box.add_bottom_bar(bottom);
-  return new Adw.NavigationPage({ title: APP_NAME, child: box });
-}
-
-/** The content pane's header bar. `MainWindow.#open` turns `showTitle` on and names the page. */
-function buildContentHeader(): Adw.HeaderBar {
-  return new Adw.HeaderBar({ showTitle: false });
-}
-
-interface Panes {
-  readonly split: Adw.NavigationSplitView;
-  /** Retitled when a session opens. */
-  readonly contentPage: Adw.NavigationPage;
-  readonly contentHeader: Adw.HeaderBar;
-}
-
-/** The split view, with a page per side — see the file header on why there are two header bars. */
-function buildSplitView(
-  sidebar: Gtk.Widget,
-  placeholder: Adw.StatusPage,
-  transcript: Gtk.Widget,
-  composer: Gtk.Widget,
-  configRow: Gtk.Widget,
-  stack: Gtk.Stack,
-): Panes {
-  const contentHeader = buildContentHeader();
-  const contentPage = buildContent(contentHeader, placeholder, transcript, composer, configRow, stack);
-  const split = new Adw.NavigationSplitView({
-    sidebar: buildSidebar(sidebar),
-    content: contentPage,
-    minSidebarWidth: 260,
-    maxSidebarWidth: 340,
-    // Not collapsed on a wide monitor: a sidebar that starts hidden hides the list for no reason,
-    // which is the "control that points at nothing" in its other direction. The breakpoint collapses
-    // it when the window genuinely has no room — and **only** the breakpoint may do that. Measured:
-    // a breakpoint applies on a condition *change*, so one manual `collapsed = false` while the
-    // window is already narrow means it never collapses again, at any width, in that process. A
-    // client moves between the panes with `show_content`; libadwaita owns `collapsed`.
-    collapsed: false,
-  });
-  return { split, contentPage, contentHeader };
-}
-
-GObject.registerClass(MainWindow);
+GObject.registerClass(
+  {
+    GTypeName: MainWindow.GTypeName,
+    Template,
+    // **The children the constructor fills and the methods that act on the shell.** The three
+    // `*Host` bins are where the TypeScript-built widgets go; the rest are the shell itself,
+    // named here so a method can reach it without searching the markup for the right nesting.
+    InternalChildren: [
+      'split',
+      'sidebarPage',
+      'sidebarTitle',
+      'sidebarHost',
+      'contentPage',
+      'contentHeader',
+      'contentStack',
+      'transcriptHost',
+      'configHost',
+      'composerHost',
+      'cwdCaption',
+      'noticeBanner',
+      'noAgentPage',
+      'noAgentBody',
+      'noAgentCommands',
+      'noAgentDocs',
+      'noAgentPreferences',
+    ],
+  },
+  MainWindow,
+);

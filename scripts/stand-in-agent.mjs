@@ -39,6 +39,7 @@
  * | `KU_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
  * | `KU_STANDIN_USAGE`          | unset   | Push a `usage_update` after the answer, cost and all.                     |
  * | `KU_STANDIN_AUTH`           | unset   | Refuse `session/load` with `-32000` — trap 1, the auth dialog.        |
+ * | `KU_STANDIN_PROMPT_AUTH`    | unset   | Refuse `session/prompt` with the same `-32000` — issue #2, the model dialog. |
  * | `KU_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
  *
  * ```sh
@@ -77,6 +78,7 @@ const CONFIG_REFUSE = flag('KU_STANDIN_CONFIG_REFUSE');
 const CONFIG_PUSH = flag('KU_STANDIN_CONFIG_PUSH', true);
 const USAGE = flag('KU_STANDIN_USAGE');
 const AUTH = flag('KU_STANDIN_AUTH');
+const PROMPT_AUTH = flag('KU_STANDIN_PROMPT_AUTH');
 const NO_RESUME = flag('KU_STANDIN_NO_RESUME');
 
 /**
@@ -91,6 +93,17 @@ let configOptions = CONFIG ? buildConfigOptions() : null;
 
 /** Fixed, so two screenshots are comparable. `session/load` keeps whatever id it was asked for. */
 const SESSION_ID = 'ses_standin_0001';
+
+/**
+ * A fresh id per `session/new`: the first is `SESSION_ID`, so a one-chat run is unchanged, and the next
+ * ones are numbered. Two New chats in one window would otherwise answer the same id, and the store
+ * refuses a record that already exists.
+ */
+let sessionsCreated = 0;
+function newSessionId() {
+  sessionsCreated += 1;
+  return sessionsCreated === 1 ? SESSION_ID : `${SESSION_ID}_${sessionsCreated}`;
+}
 const TOOL_CALL_ID = 'standin_read_1';
 
 /**
@@ -158,10 +171,9 @@ let nextRequestId = 1_000_000;
  * Ask the client to run a tool, and wait for what it says.
  *
  * **A request the agent makes of the client, in the direction the schema has it.** The options are
- * all four `session/request_permission` kinds, deliberately: the dialog is supposed to show two of
- * them, and a fixture that only offered `allow_once`/`reject_once` would let a dialog that renders
- * `allow_always` pass against a stand-in that never sent one. Every option the real path has to
- * filter, this sends.
+ * every `session/request_permission` kind kurier can show, by default all four: a fixture that only
+ * offered `allow_once`/`reject_once` would let a dialog that renders `allow_always` — and the ordering,
+ * styling and focus rules that go with it — pass against a stand-in that never sent one.
  *
  * Resolves with whatever came back, `null` for an error answer — **including a `cancelled` outcome,
  * which is a real answer and not a failure here.** That is the point: `KU_STANDIN_PERMISSION=1` plus
@@ -190,15 +202,46 @@ function askPermission(sessionId) {
           content: "export const greeting = 'hello from the stand-in agent';\n",
         },
       },
-      options: [
-        { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
-        { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
-        { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
-        { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
-      ],
+      options: permissionOptions(),
     },
   });
   return answer;
+}
+
+/**
+ * The options this permission request carries, on the wire in the order a real agent would send them.
+ *
+ * **The knob is for the *order* and for the *set*, not for whether "always" exists.** `KU_STANDIN_PERMISSION_ONCE=1`
+ * sends only the two `*_once` kinds — which is what an agent that offers no lasting grant looks like,
+ * and the one shape kurier's dialog has no `reject` to fall back on in a two-allow list. `KU_STANDIN_PERMISSION_ALWAYS_FIRST=1`
+ * lists the two `*_always` options *first*, the order that used to decide where libadwaita put the
+ * focus, so a screenshot can show kurier's order winning rather than the agent's.
+ *
+ * Default all four, in the order a real agent sends them (`opencode acp` included), so the plain
+ * `KU_STANDIN_PERMISSION=1` photographs the dialog kurier actually shows. `reject_always` never goes
+ * missing from the default: without a rejecting option the dialog has nothing safe to focus, and that
+ * is a state worth being able to reach — which is what `KU_STANDIN_PERMISSION_ONCE=1` plus
+ * `KU_STANDIN_PERMISSION_NO_REJECT=1` is for.
+ */
+function permissionOptions() {
+  const allowOnce = { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' };
+  const allowAlways = {
+    optionId: 'allow_always',
+    name: 'Always allow in this session',
+    kind: 'allow_always',
+  };
+  const rejectOnce = { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' };
+  const rejectAlways = {
+    optionId: 'reject_always',
+    name: 'Always decline in this session',
+    kind: 'reject_always',
+  };
+  if (flag('KU_STANDIN_PERMISSION_ONCE')) return [allowOnce, rejectOnce];
+  if (flag('KU_STANDIN_PERMISSION_ALWAYS_FIRST')) {
+    return [allowAlways, rejectAlways, allowOnce, rejectOnce];
+  }
+  if (flag('KU_STANDIN_PERMISSION_NO_REJECT')) return [allowOnce, allowAlways];
+  return [allowOnce, allowAlways, rejectOnce, rejectAlways];
 }
 
 /** Match an incoming answer to the request that is waiting for it. */
@@ -240,7 +283,7 @@ input.on('line', (line) => {
     case 'logout':
       return reply(id, {});
     case 'session/new':
-      return reply(id, sessionState(SESSION_ID));
+      return reply(id, sessionState(newSessionId()));
     case 'session/load':
     case 'session/resume':
       // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code kurier's
@@ -284,6 +327,22 @@ async function runTurn(id, sessionId, prompt) {
   const token = { cancelled: false, released: null };
   turn = token;
   try {
+    if (PROMPT_AUTH) {
+      // **Issue #2's exact wire shape, and the reason this knob exists at all.** Measured 2026-10-02
+      // against `opencode acp` 2.0.19 with no login: the anonymous default model
+      // `opencode/fledge-alpha-free` is geo-blocked from Germany (HTTP 403), and opencode reports any
+      // provider 403 on `session/prompt` as `-32000 "Authentication required: provider authentication
+      // required"` — the same class and the same code as the login trap this script's `KU_STANDIN_AUTH`
+      // produces at `session/load`. Nothing on the wire distinguishes them except that one has a prompt
+      // behind it, which is what `failureKind`'s `promptSent` reads.
+      //
+      // **Nothing streams first.** The measured turn carries no `stopReason` and no text at all, and a
+      // fixture that echoed the prompt or wrote a thought before refusing would make the window look as
+      // though the agent had started answering — which is the state a screenshot of this dialog must not
+      // be taken in.
+      process.stderr.write('stand-in: the provider refused the turn\n');
+      return replyError(id, -32_000, 'Authentication required: provider authentication required');
+    }
     if (ECHO) {
       // Real agents echo the prompt back as `user_message_chunk`, and kurier drops its own echo: the
       // surface draws the prompt the instant Send is pressed. Echoing here keeps that path exercised.

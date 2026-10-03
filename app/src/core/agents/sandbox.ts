@@ -196,6 +196,9 @@ const HOST_EXEC = HOST_INNER_PRELUDE;
 const HOST_PROBE = 'exec 0<&3 1>&4 3<&- 4>&-\ncommand -v -- "$0"';
 
 /** `--env=K=V` tokens for `flatpak-spawn`. One argv entry each; no shell ever sees these. */
+/** The inner script of a host question about the directory: what `pwd` says in the host's login shell. */
+const HOST_CWD = 'exec 0<&3 1>&4 3<&- 4>&-\npwd';
+
 function envArgs(env: Record<string, string> | undefined): string[] {
   if (!env) return [];
   return Object.entries(env).map(([key, value]) => `--env=${key}=${value}`);
@@ -263,7 +266,8 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
  * the reason `killGraceMs` defaults to a real 2 s rather than 0.
  */
 export function toHostCommand(command: AgentCommand, facts: SandboxFacts): AgentCommand {
-  if (!isSandboxed(facts)) return command;
+  // A bundled agent lives in `/app/extra`, which the host cannot see, and runs where kurier runs.
+  if (!isSandboxed(facts) || command.bundled) return command;
   return {
     id: command.id,
     title: command.title,
@@ -282,4 +286,14 @@ export function toHostCommand(command: AgentCommand, facts: SandboxFacts): Agent
 export function hostProbeArgv(program: string, facts: SandboxFacts): string[] | null {
   if (!isSandboxed(facts)) return null;
   return hostArgv(HOST_PROBE, [program]);
+}
+
+/**
+ * The argv that asks the host where its shell is — `flatpak-spawn --host` starts it in the directory
+ * kurier was launched from when the host can see it, else in the host's home. `null` when kurier is not
+ * sandboxed, for the same reason `hostProbeArgv` answers `null`: there is nothing to ask.
+ */
+export function hostCwdArgv(facts: SandboxFacts): string[] | null {
+  if (!isSandboxed(facts)) return null;
+  return hostArgv(HOST_CWD, []);
 }

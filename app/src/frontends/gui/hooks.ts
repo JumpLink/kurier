@@ -37,7 +37,7 @@ export interface KurierHooks extends FrameworkHooks {
   session?: string;
 
   /**
-   * `KU_APP_AGENT` — which agent this window talks to. Unset means the CLI's default launcher.
+   * `KU_APP_AGENT` — which agent this window talks to. Unset means what the CLI resolves: the saved setting if available, else the person's own install, else the bundled copy.
    *
    * Not an `AgentCommand` and not a path: an *agent id*, resolved in `core/agents/dev-agent.ts`. The
    * two accepted values are a real launcher (`opencode`) and `stand-in`, the dev fixture — and the
@@ -168,6 +168,68 @@ export interface KurierHooks extends FrameworkHooks {
    * not an entry, so `KU_APP_SWITCH=,` asks for no session at all rather than for one called `''`.
    */
   switchTo?: string[];
+
+  /**
+   * `KU_APP_CHOOSE_MODEL` — press the `'model'` failure dialog's **Choose another model**, once it is up.
+   *
+   * **The fifth pointer-only control, and the one that needed a new hook rather than an old one.**
+   * `KU_APP_DISMISS_FAILURE` presses Close through `FailureDialog.close()`, which is the same call a
+   * dismissal makes. This dialog's other response has no such shortcut: `Adw.AlertDialog` has no
+   * callable `response()` at all, and `ActivateWidget` on its button reports `true` and emits nothing
+   * (both measured — `scripts/probes/alert-dialog-close.mjs`). So the state only the button reaches —
+   * the config row's model dropdown, popped down and ready to pick from, which is the whole answer the
+   * dialog exists to give — had no way to be looked at.
+   *
+   * **Through `FailureDialog.chooseModel()`, not around the dialog.** That emits the same `response`
+   * signal libadwaita's own handler answers to, so the modal closes itself and the dropdown opens in
+   * libadwaita's own order. A hook that called `ConfigRow.openModelDropdown()` directly would
+   * photograph a dropdown with the modal still up — a state a person cannot be in.
+   */
+  chooseModel?: boolean;
+
+  /**
+   * `KU_APP_PREFERENCES` — open the preferences dialog through its own `app.preferences` action.
+   * A flag, so `KU_APP_PREFERENCES=0` leaves it closed.
+   */
+  preferences?: boolean;
+
+  /**
+   * `KU_APP_PREFERENCES_AGENT` — choose a row in that dialog by key (`auto`, `opencode:host`,
+   * `opencode:bundled`) through its own handler, and open the dialog first. A combo or radio row is
+   * what the devtools plane cannot operate (see above), so this is the only way to photograph the
+   * dialog after a choice.
+   */
+  preferencesAgent?: string;
+
+  /**
+   * `KU_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
+   * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `KU_APP_NEW_CHAT=0` stays where it is.
+   */
+  newChat?: boolean;
+
+  /**
+   * `KU_APP_NEW_CHAT_MIDTURN` — press New chat **while a turn is streaming**: once the agent has
+   * answered with something, and the turn is still running. Combined with `KU_APP_THINKING` and a slow
+   * stand-in (`KU_STANDIN_DELAY_MS`), it reaches the state `KU_APP_NEW_CHAT` waits its way around.
+   */
+  newChatMidTurn?: boolean;
+
+  /**
+   * `KU_APP_CWD` — where a new chat runs, **instead of asking the host or reading the process cwd**.
+   * A screenshot shows this path under the composer, and the real one is a private directory name, so
+   * every screenshot run pins a synthetic one. It beats `KURIER_CWD`; a path that does not exist falls
+   * through to the next candidate like any other (`core/cwd.ts`).
+   */
+  cwd?: string;
+
+  /** `KU_APP_NOTICE` — force the bundled-agent condition, so the privacy banner can be photographed outside a Flatpak. */
+  notice?: boolean;
+
+  /** `KU_APP_NOTICE_DISMISS` — press the banner's "Got it" through the banner's own `button-clicked`. */
+  noticeDismiss?: boolean;
+
+  /** `KU_APP_NO_AGENT` — force the nothing-found resolution; beats `KU_APP_AGENT`. */
+  noAgent?: boolean;
 }
 
 /**
@@ -207,6 +269,17 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     // A list, read here because a variable's syntax is read here: the decision of *which* session to
     // open is the window's `#open`, and the order is the variable's own.
     switchTo: hookList(env, 'SWITCH'),
+    // A flag for the same reason `DISMISS_FAILURE` is one: it changes the state under test, so it has to
+    // honour its own off-switch. `KU_APP_CHOOSE_MODEL=0` must leave the dialog up, not press it.
+    chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
+    preferences: hookFlag(env, 'PREFERENCES'),
+    preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),
+    newChat: hookFlag(env, 'NEW_CHAT'),
+    newChatMidTurn: hookFlag(env, 'NEW_CHAT_MIDTURN'),
+    cwd: hookValue(env, 'CWD'),
+    notice: hookFlag(env, 'NOTICE'),
+    noticeDismiss: hookFlag(env, 'NOTICE_DISMISS'),
+    noAgent: hookFlag(env, 'NO_AGENT'),
     thinking: hookFlag(env, 'THINKING'),
     prompt: hookValue(env, 'PROMPT'),
   };

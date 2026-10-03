@@ -1,0 +1,107 @@
+using Gtk 4.0;
+
+/**
+ * The approval dialog's body: the rows, in the order a question needs them.
+ *
+ * What the tool is, what kind of thing it wants to do, where, and then the raw input in full.
+ * `Adw.PreferencesGroup` would put every one of those in a list row with its own heading, which is a
+ * settings screen around a question; a plain box reads as a question.
+ *
+ * **The structure and the geometry are here; the words and the `CSS.*` class names are not.** Every
+ * string in this dialog is text an agent wrote, so it arrives from TypeScript — a template cannot
+ * carry a label that changes per question. The class names are in `css.ts` as constants for the same
+ * reason `APP_NAME` is in `constants.ts`: a `.blp` cannot import a TypeScript constant, and a literal
+ * here would be a second place to keep in step with the stylesheet by hand.
+ *
+ * **`use-markup: false` on every label, without exception, and it is not the default.** `GtkLabel`'s
+ * `use-markup` is TRUE in GTK 4, so a template that leaves it out renders agent text through Pango —
+ * which would let `<b>allowed</b>` or a `<span>` smuggle formatting into a control whose button labels
+ * are the decision. Every label here says it.
+ *
+ * **The locations row is declared hidden rather than left out.** Whether an agent named any paths is
+ * a fact about the question, not about the widget, and one template has to serve both; TypeScript
+ * shows the row when there is something in it.
+ *
+ * **`margin-start`/`margin-end` are widget properties here, and only here.** They exist in GTK 4 as
+ * properties and *not* in its CSS, and `css.ts` records that the CSS parser rejects the logical
+ * names while still loading the rest of the stylesheet — so a stylesheet using them looks like it
+ * worked. A property in a template goes through GObject rather than the parser, which is what makes
+ * the logical names safe on this side of the line.
+ */
+template $KurierPermissionBody: Gtk.Box {
+  orientation: vertical;
+  spacing: 10;
+  margin-start: 6;
+  margin-end: 6;
+
+  // The tool title: the strongest line in the dialog, not the loudest one in the app. `title-4`
+  // rather than `CSS.title`, because that constant is `title-1` — the size of a *window* title, see
+  // `window.ts` on why the sidebar bar does not use it. A literal, so unlike the `CSS.*` names it
+  // can live here.
+  Gtk.Label titleLabel {
+    use-markup: false;
+    wrap: true;
+    selectable: true;
+    xalign: 0;
+    styles [
+      "title-4",
+    ]
+  }
+
+  // The kind, as a small dimmed line rather than as a heading: it is metadata about the tool, and a
+  // `read`/`edit`/`execute` word in a heading font would give it the weight of the question itself.
+  Gtk.Label kindLabel {
+    use-markup: false;
+    wrap: true;
+    selectable: true;
+    xalign: 0;
+  }
+
+  // One row for every path, newline-separated, so several locations read as one list instead of N
+  // blocks — and so a path does not become the most prominent thing in the dialog. TypeScript either
+  // fills this with the paths or replaces it with kurier's own "the agent did not say where", and
+  // shows it either way.
+  Gtk.Label locationsLabel {
+    use-markup: false;
+    wrap: true;
+    selectable: true;
+    xalign: 0;
+    visible: false;
+  }
+
+  // The agent's own names for its options, as one caption line — and only when at least one of them
+  // says something the kurier labels do not. Agent text, so `use-markup: false` like everything else
+  // here; and dimmed, because it is metadata about the buttons rather than part of the question. This
+  // is where the wording went when it came off the buttons, so nothing the agent told the person is
+  // lost. Declared hidden rather than left out for the same reason as the locations row: whether an
+  // agent named its options is a fact about the question, not about the widget.
+  Gtk.Label namesLabel {
+    use-markup: false;
+    wrap: true;
+    selectable: true;
+    xalign: 0;
+    visible: false;
+  }
+
+  // The raw input, verbatim, scrollable and capped. `editable: false` + `cursor-visible: false`
+  // because this is a thing to read; editable text in an approval dialog invites an edit before an
+  // approval, and the answer would then be about a request kurier never received. `max-content-height`
+  // is the cap — without it a thousand-line diff makes a dialog whose buttons are below the fold, and
+  // `propagate-natural-height` is what lets a short one shrink to its content.
+  Gtk.ScrolledWindow {
+    max-content-height: 240;
+    propagate-natural-height: true;
+    hscrollbar-policy: never;
+    vscrollbar-policy: automatic;
+    child: Gtk.TextView rawInput {
+      editable: false;
+      cursor-visible: false;
+      monospace: true;
+      wrap-mode: word-char;
+      left-margin: 8;
+      right-margin: 8;
+      top-margin: 6;
+      bottom-margin: 6;
+    };
+  }
+}

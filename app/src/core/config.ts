@@ -43,6 +43,8 @@ import type {
   SetSessionConfigOptionRequest,
 } from '@kurier/acp/types';
 
+import { freeModelFirst } from './free-models.ts';
+
 /**
  * One value in a `select`, as the surface shows it.
  *
@@ -98,6 +100,8 @@ export type ConfigControl = ConfigSelectControl | ConfigSwitchControl;
  *
  * Options **within** a category keep the order the agent sent them in, always. An agent that puts
  * its recommended model first knows something about its user; re-sorting by name throws that away.
+ * The one exception is the free-model hint on a `model` control, which moves *named* ids up and leaves
+ * every other value exactly where the agent put it — see `modelFirst` below and `free-models.ts`.
  */
 const CATEGORY_ORDER: readonly KnownConfigCategory[] = ['model', 'model_config', 'thought_level', 'mode'];
 
@@ -170,9 +174,27 @@ function projectOne(option: SessionConfigOption): ConfigControl | null {
     kind: 'select',
     ...common,
     currentValue: select.currentValue,
-    values: values.map(labelWithGroup),
+    values: modelFirst(common.category, values.map(labelWithGroup)),
     searchable: values.length > SEARCH_THRESHOLD,
   };
+}
+
+/**
+ * The free-model hint's one place to apply, and the exception it is to the rule above.
+ *
+ * **Only a control the agent itself called a `model`.** Not its id — `MODE_CONTROL_ID`'s note about
+ * guessing at ids applies in reverse here too: `category: 'model'` is what `opencode acp` 2.0.19 sends
+ * and what the schema's `KnownConfigCategory` names, and an agent that does not categorise its options
+ * gets no hint rather than a hint that might have been applied to the thought level. A wrong hint is
+ * worse than none: it would put a rate-limited model above a person's own.
+ *
+ * **Order, not selection, and nothing here can be mistaken for a preference.** `currentValue` on the
+ * line above is still the agent's, so `projectSelects`' `findIndex` still finds it and the dropdown still
+ * shows what is in use — the free ids are simply nearer the top. `core/free-models.ts` has the rest of
+ * the reasoning and the three things this deliberately does not do.
+ */
+function modelFirst(category: string | null, values: ConfigValue[]): ConfigValue[] {
+  return category === 'model' ? freeModelFirst(values) : values;
 }
 
 /**

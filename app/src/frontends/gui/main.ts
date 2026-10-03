@@ -27,7 +27,16 @@ import { runAdwaitaApp } from '@gjsify/adwaita-app';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 
 import { chooseAgent } from '../../core/agents/dev-agent.ts';
-import { sessionsFile } from '../../core/paths.ts';
+import { BUNDLED_AGENTS } from '../../core/agents/catalog.ts';
+import { gatherCwdFacts, gatherResolveContext, gatherResolveContextAsync } from '../../core/agents/probe.ts';
+import { NO_AGENT_MESSAGE, resolveDefaultWithNote, resolveRecorded } from '../../core/agents/resolve.ts';
+import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
+import { resolveCwd } from '../../core/cwd.ts';
+import { emptyStateView, noticeView } from '../../core/empty-state.ts';
+import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
+import { noticesFile, sessionsFile, settingsFile } from '../../core/paths.ts';
+import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
+import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
 import { readHooks } from './hooks.ts';
 import { MainWindow } from './window.ts';
@@ -45,16 +54,66 @@ void Gtk;
 const hooks = readHooks();
 
 /**
+ * What the settings said about themselves: an unreadable file, or a choice that is not available here.
+ * **Carried as values, printed to the terminal for now** — the window shows them in a later slice, and
+ * until then a person watching the terminal is the only one who can be told.
+ */
+const settingsNotes: string[] = [];
+
+/**
  * Which agent this window will start on its first prompt.
  *
  * **Resolved once, here, and handed to the window as an `AgentCommand`.** The alternative — the window
  * reading `KU_APP_AGENT` itself — would put an environment lookup and a fallback rule in a widget file,
  * and `hooks.ts` exists precisely so that every environment read happens once at startup and can be
  * reasoned about as a whole. An unknown id prints its line here, where a person watching the terminal
- * will see it, and falls back rather than refusing to start.
+ * will see it, and falls back rather than refusing to start. With no hook the agent is resolved as the CLI
+ * resolves it: the saved setting if it is available, else the person's own install, else the bundled copy.
  */
-const agent = chooseAgent(hooks.agent);
+let nothingFound = false;
+const agent = chooseAgent(hooks.agent, () => {
+  const { settings, problem } = readSettings(settingsFile());
+  if (problem) settingsNotes.push(problem);
+  // No `--version` spawn. Inside a Flatpak this still asks the host, synchronously (up to 5 s per
+  // launcher), before the window exists — only the preferences dialog is asynchronous (see below).
+  const { agent: found, note } = resolveDefaultWithNote(
+    gatherResolveContext(process.env, false),
+    settings.agent,
+  );
+  if (note) settingsNotes.push(note);
+  if (!found || hooks.noAgent) {
+    nothingFound = true;
+    console.log(`kurier: ${NO_AGENT_MESSAGE}`);
+    return null;
+  }
+  return found;
+});
+// `KU_APP_NO_AGENT` beats `KU_APP_AGENT`: it forces the nothing-found resolution for the empty state.
+const noAgent = hooks.noAgent === true || nothingFound;
+const emptyView = noAgent ? emptyStateView({ agent: null }) : null;
+
+/**
+ * The bundled-agent notice, read once: nothing seen yet (or a file that could not be read, which shows it
+ * again) and the copy that runs. `KU_APP_NOTICE` forces the bundled condition — the copy does not exist
+ * outside a Flatpak.
+ */
+const noticesPath = noticesFile();
+const noticesRead = readNotices(noticesPath);
+if (noticesRead.problem) console.log(`kurier: ${noticesRead.problem}`);
+const notice = noAgent
+  ? null
+  : noticeView(hooks.notice === true ? 'bundled' : agent.source, noticesRead.notices.seen);
+for (const note of settingsNotes) console.log(`kurier: ${note}`);
 if (agent.note) console.log(`kurier: ${agent.note}`);
+
+const sandboxed = isSandboxed(currentSandboxFacts());
+
+/**
+ * Where a new chat runs. `KU_APP_CWD` is the dev hook that pins it (a screenshot must not show a real
+ * directory name), `KURIER_CWD` is the same override for a person; `resolveCwd` decides the rest.
+ */
+const facts = gatherCwdFacts(process.env);
+const cwd = resolveCwd({ ...process.env, ...(hooks.cwd ? { KURIER_CWD: hooks.cwd } : {}) }, facts);
 
 const status = await runAdwaitaApp({
   applicationId: APP_ID,
@@ -77,6 +136,74 @@ const status = await runAdwaitaApp({
     new MainWindow(app, {
       hooks,
       agent: agent.command,
+      agentSource: agent.source,
+      ...(emptyView?.kind === 'no-agent' ? { noAgent: emptyView } : {}),
+      ...(notice
+        ? {
+            notice,
+            rememberNotice: (id: typeof notice.id) => {
+              try {
+                writeNotices(noticesPath, markSeen(readNotices(noticesPath).notices, id));
+              } catch (error) {
+                console.log(
+                  `kurier: could not remember the notice — ${error instanceof Error ? error.message : String(error)}`,
+                );
+              }
+            },
+          }
+        : {}),
+      newChat: cwd ? { cwd, home: facts.home } : null,
+      // **Only when no agent is pinned.** `KU_APP_AGENT` means "this agent, for everything in this window"
+      // — a fixture record naming `opencode` must be answered by the stand-in, not start a real one.
+      ...(hooks.agent
+        ? {}
+        : {
+            resolveAgent: async (id, source) => {
+              try {
+                return resolveRecorded(
+                  id,
+                  source,
+                  sandboxed
+                    ? await gatherResolveContextAsync(process.env)
+                    : gatherResolveContext(process.env, false, false),
+                );
+              } catch (error) {
+                return { problem: error instanceof Error ? error.message : String(error) };
+              }
+            },
+          }),
+      preferences: {
+        // The file is read afresh on every open and after every choice, so the rows show the file, not a
+        // memory of it. Never a blocking child: with no host answer yet (`detected` null) the PATH walk
+        // is all that runs, and inside a Flatpak the host rows say "Checking…" until `detect` answers.
+        // Outside a Flatpak there is no host question, so `detect` is `null` and the cheap rows are final.
+        load: (detected) => {
+          const file = settingsFile();
+          const { settings, problem, problemKind } = readSettings(file);
+          const context = detected ?? gatherResolveContext(process.env, false, false);
+          return settingsChoicesView(context.detections, BUNDLED_AGENTS, settings, {
+            bundledAvailable: context.bundledAvailable,
+            problem,
+            problemKind,
+            backupPath: backupPath(file),
+            hostPending: detected === null && sandboxed,
+          });
+        },
+        detect: sandboxed
+          ? async () => {
+              try {
+                return await gatherResolveContextAsync(process.env);
+              } catch {
+                // A probe that threw means "no host answer": the cheap rows, now final.
+                return gatherResolveContext(process.env, false, false);
+              }
+            }
+          : null,
+        save: (choice) => saveSettings(settingsFile(), { version: 1, agent: choice }),
+      },
+      createSession: (record) => {
+        createSessionStore(sessionsFile()).create(record);
+      },
       loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
       // **One store for the window's lifetime, not one per call.** The window reads the file once at
       // startup and appends a batch per streamed chunk; a fresh store per append would re-read and
