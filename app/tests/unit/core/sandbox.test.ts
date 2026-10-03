@@ -35,6 +35,7 @@ import {
   type SandboxFacts,
 } from '../../../src/core/agents/sandbox.ts';
 import {
+  needsWindowsShell,
   probeAccepts,
   resolveSpawnCommand,
   StdioChannel,
@@ -482,6 +483,64 @@ export default async () => {
     await it('passes a program with a space as one argument', async () => {
       const argv = hostProbeArgv('two words', SANDBOXED);
       expect(argv?.[argv.length - 1]).toBe('two words');
+    });
+  });
+
+  await describe('needsWindowsShell — only a .bat/.cmd carrier gets shell:true', async () => {
+    await it('is true for a .cmd carrier on win32, which spawn cannot exec directly', async () => {
+      expect(needsWindowsShell('C:\\Users\\x\\opencode.cmd', 'win32')).toBe(true);
+    });
+
+    await it('is true for a .bat carrier on win32, case-insensitively', async () => {
+      expect(needsWindowsShell('C:\\Users\\x\\OPENCODE.BAT', 'win32')).toBe(true);
+    });
+
+    await it('is false for a plain .exe on win32 — a real binary needs no shell', async () => {
+      expect(needsWindowsShell('C:\\Users\\x\\opencode.exe', 'win32')).toBe(false);
+    });
+
+    await it('is false for a bare name with no extension on win32', async () => {
+      expect(needsWindowsShell('opencode', 'win32')).toBe(false);
+    });
+
+    await it('is false on macOS/Linux even for a .cmd name, since win32 never applies there', async () => {
+      expect(needsWindowsShell('/usr/local/bin/opencode.cmd', 'darwin')).toBe(false);
+      expect(needsWindowsShell('/usr/local/bin/opencode.cmd', 'linux')).toBe(false);
+    });
+  });
+
+  await describe('which — PATHEXT, the Windows npm-global-shim case', async () => {
+    await it('finds opencode.cmd on a bare "opencode" lookup when PATHEXT lists .CMD', async () => {
+      // A global `npm install -g` puts a `.cmd` shim next to the real script on Windows, and
+      // `where opencode` finds it through PATHEXT — a plain file-exists check on the bare name
+      // does not, which is the gap that made a working install report as "not found".
+      await withTempDir((dir) => {
+        writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        // Lower-cased on both sides, not `toBe`: the candidate is built from PATHEXT's own casing
+        // (conventionally uppercase, `.CMD`), and on NTFS and APFS alike that still finds the
+        // lower-case `opencode.cmd` npm actually writes — a case-insensitive filesystem opens the
+        // same file either way, so the exact casing in the returned string is not part of the
+        // contract `which` makes.
+        expect(which('opencode', env, NOT_SANDBOXED)?.toLowerCase()).toBe(join(dir, 'opencode.cmd').toLowerCase());
+      });
+    });
+
+    await it('prefers the bare name over an extension when both exist', async () => {
+      await withTempDir((dir) => {
+        writeFileSync(join(dir, 'opencode'), '');
+        writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        expect(which('opencode', env, NOT_SANDBOXED)).toBe(join(dir, 'opencode'));
+      });
+    });
+
+    await it('is unaffected when PATHEXT is unset, so macOS/Linux behaviour is unchanged', async () => {
+      await withTempDir((dir) => {
+        writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
+        const env = { PATH: dir, KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        expect(which('opencode', env, NOT_SANDBOXED)).toBe(null);
+      });
     });
   });
 

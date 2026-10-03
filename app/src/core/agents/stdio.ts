@@ -125,6 +125,8 @@ export class StdioChannel implements RawChannel {
       stdio: ['pipe', 'pipe', 'pipe'],
       ...(cwd ? { cwd } : {}),
       ...(env ? { env: { ...process.env, ...env } } : {}),
+      // Only a `.bat`/`.cmd` carrier gets a shell — never every program. See `needsWindowsShell`.
+      ...(needsWindowsShell(actual.program) ? { shell: true } : {}),
     });
     this.#child.stdout.setEncoding('utf8');
     this.#child.stdout.on('data', (chunk: string) => {
@@ -265,6 +267,27 @@ export function stdioTransport(options: StdioChannelOptions): Transport {
 }
 
 /**
+ * Whether `spawn` needs `shell: true` to run this program.
+ *
+ * **Only `.bat`/`.cmd`, and only on `win32`.** Windows cannot exec a batch file directly — it is
+ * text for `cmd.exe` to interpret, not a PE binary — so `spawn` fails with `ENOENT` even though
+ * `where`/`whichOnPath` found it (documented at
+ * https://nodejs.org/api/child_process.html#spawning-bat-and-cmd-files-on-windows). A global
+ * `shell: true` would fix that one case and weaken every other: `args` stays an ARRAY either way,
+ * so Node still does the quoting — the thing that must never happen is building `args` into a
+ * command-line STRING by interpolation, which is how `shell: true` turns into argument injection.
+ *
+ * A separate export so the decision is a unit test, not a win32 box: the predicate is pure and
+ * takes `platform` as an argument precisely so this runs on the CI the repo actually has.
+ */
+export function needsWindowsShell(
+  program: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform === 'win32' && /\.(cmd|bat)$/i.test(program);
+}
+
+/**
  * Whether a program is on PATH, and where.
  *
  * **Three answers, in order, and the order is the point.** A program named by path is the person's
@@ -292,18 +315,38 @@ export function which(
   return probe ? probeOnHost(probe) : null;
 }
 
-/** The pure PATH walk, exactly as it was. */
+/** The pure PATH walk, now PATHEXT-aware. */
 function whichOnPath(program: string, env: NodeJS.ProcessEnv): string | null {
   const path = env['PATH'] ?? '';
   // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `kurier agents`
   // honest on the platform the app is eventually meant to run on.
   const separator = path.includes(';') ? ';' : ':';
+  const extensions = pathextCandidates(env);
   for (const dir of path.split(separator)) {
     if (!dir) continue;
-    const candidate = dir.endsWith('/') || dir.endsWith('\\') ? `${dir}${program}` : `${dir}/${program}`;
-    if (isExecutable(candidate, env)) return candidate;
+    const base = dir.endsWith('/') || dir.endsWith('\\') ? `${dir}${program}` : `${dir}/${program}`;
+    for (const extension of extensions) {
+      const candidate = `${base}${extension}`;
+      if (isExecutable(candidate, env)) return candidate;
+    }
   }
   return null;
+}
+
+/**
+ * The suffixes a bare program name may need before `isExecutable` can find it.
+ *
+ * Windows resolves a bare `opencode` to `opencode.cmd` through `PATHEXT` — a step `cmd.exe` and
+ * `where` both apply and a plain file-exists check does not, which is why an npm-global shim
+ * (`opencode.cmd`) was invisible to this walk even though `where opencode` found it. The empty
+ * suffix is always first, so a file matching the bare name wins over a same-named `.exe` sitting
+ * next to it, and whenever `PATHEXT` is unset the list is exactly `['']` — today's behaviour on
+ * macOS and Linux, which never set it, unchanged.
+ */
+function pathextCandidates(env: NodeJS.ProcessEnv): string[] {
+  const pathext = env['PATHEXT'];
+  if (!pathext) return [''];
+  return ['', ...pathext.split(';').filter(Boolean)];
 }
 
 /**
