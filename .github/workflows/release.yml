@@ -1,0 +1,131 @@
+name: Release
+
+# A tag is a release: `git tag v0.1.0 && git push --tags` builds every target through CI and
+# hangs the packages off the tag on GitHub. The build itself is NOT repeated here — the `build`
+# job below calls ci.yml, so there is exactly one definition of how the toolchain is installed
+# and what "green" means. A release therefore cannot be cut from a commit whose tests, type
+# check or lint did not pass.
+#
+# ci.yml ships THREE artifacts: `ship-deb-rpm-appimage` (.deb, .rpm, .AppImage — all from
+# `gjsify.ship`, the GUI binary `kurier-app`), `ship-macos-windows` (both macos-app-zips,
+# windows-dir-zip, .msi), and `ship-flatpak` (eu.jumplink.Kurier.flatpak, built from the
+# hand-maintained manifest that stages both `kurier` and `kurier-app`). This job only downloads
+# and attaches them — repeating the build here would be a second copy of a toolchain this
+# repository has decided to define once.
+on:
+  push:
+    tags: ['v*']
+  # Re-cut assets for a tag that already exists, without moving the tag. The ref actually built
+  # is whichever branch/tag is picked when the run is dispatched (the "Use workflow from" selector
+  # in the Actions UI) — `tag` below names what the artifacts are asserted and attached against.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build from (e.g. v0.2.0). Empty = the selected branch."
+        required: false
+        default: ""
+        type: string
+      publish:
+        description: "Attach the artifacts to the GitHub release (needs a tag)"
+        required: false
+        default: false
+        type: boolean
+
+# Two tags pushed seconds apart would otherwise run twice against one release and upload in
+# whichever order finished last. Queued rather than cancelled: a half-uploaded release is worse
+# than a slow one.
+concurrency:
+  group: release-${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: build
+    # A dispatch without `publish` builds and stops: the name it would attach to is a branch, not
+    # necessarily a release, so `inputs.publish` alone is not enough.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (inputs.publish && inputs.tag != '') }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the packages CI built
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ship-*
+          path: ship
+          merge-multiple: true
+
+      # Names are the ones `utils/ship/formats.ts` in gjsify actually renders (ci.yml's own
+      # assert steps derive the same ones), from the TAG rather than a checkout — this job never
+      # checks the repo out. `kurier-app` is this repo's own public binary name, not a secret.
+      - name: Assert every artifact arrived
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          ls -la ship
+          version="${TAG#v}"
+          binary=kurier-app
+          missing=0
+          for f in \
+            "${binary}_${version}-1_all.deb" \
+            "${binary}-${version}-1.noarch.rpm" \
+            "${binary}-${version}-1.x86_64.AppImage" \
+            "${binary}-${version}-1.macos.arm64.zip" \
+            "${binary}-${version}-1.macos.x86_64.zip" \
+            "${binary}-${version}-1.windows.x64.zip" \
+            "${binary}-${version}-1.x64.msi" \
+            "eu.jumplink.Kurier.flatpak"; do
+            if [ ! -s "ship/$f" ]; then
+              echo "::error::missing or empty artifact: $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      # A tag push creates no release on its own, and `gh release upload` against a tag with none
+      # fails with "release not found" after every artifact has already been built. Create it
+      # first when missing — as a draft, so the notes can be written before anyone is notified —
+      # and leave an existing one alone, which is what makes re-running this on a tag safe.
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          ls -la ship/
+          [ -n "$(find ship -mindepth 1 -maxdepth 1 -print -quit)" ] || { echo "::error::no assets were downloaded"; exit 1; }
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "no release for $TAG yet — creating it as a draft"
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --draft \
+              --generate-notes
+          fi
+          gh release upload "$TAG" ship/* --clobber --repo "$GITHUB_REPOSITORY"
+          echo "Attached $(find ship -mindepth 1 -maxdepth 1 | wc -l) asset(s) to $TAG:"
+          ls ship/
+
+      # macOS (arm64 + x64, macos-app-zip) and Windows (x64, windows-dir-zip + .msi) ARE attached
+      # above — assembling them does not need a Mac or a Windows runner (ci.yml), only naming the
+      # target so `gjsify install` does not skip the `optionalDependencies` runtime it would
+      # otherwise stage with no interpreter in it. What this does NOT do is RUN the Mach-O or PE
+      # payload: that is verified on its own OS or not at all, so a `macos-latest` /
+      # `windows-latest` job staying absent is a gap in verification, not in the release's
+      # contents.
+      #
+      # UNSIGNED on both, by design (ADR 0024 § A13 in gjsify) — a legitimate deliverable, not a
+      # placeholder. Where signing would attach, on a runner that actually holds the identity:
+      #   macOS   — `gjsify ship darwin --arch <arch> --skip-build --target macos-app-zip --sign
+      #             <identity>` (Developer ID; `--notarize <keychain-profile>` on top of that)
+      #   Windows — same shape, `--sign <certificate thumbprint or PFX path>` reaching `signtool`
+      #             (UNVERIFIED upstream: no run in gjsify has ever invoked it)
+      #
+      # Flatpak IS attached, unlike beifahrer/troedler/buchhaltung: kurier is a `kind: "app"`
+      # GUI with a desktop entry and an App-ID, and `eu.jumplink.Kurier.json` is a real,
+      # hand-maintained manifest (data/README.md) — "App-ID + Manifest" is satisfied. It is
+      # unsigned and not submitted to Flathub by this workflow; that stays a manual step.
