@@ -16,6 +16,11 @@
       "path": "app/dist",
       "class": "derived",
       "recreate": "gjsify workspace kurier-cli build"
+    },
+    {
+      "path": "app/ship",
+      "class": "derived",
+      "recreate": "Output tree of `gjsify ship` (out/, overlay/, stage/): the built packages and their intermediate stages. Run `gjsify ship` in app/."
     }
   ]
 }

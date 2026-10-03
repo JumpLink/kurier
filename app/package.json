@@ -18,6 +18,7 @@
     "build": "gjsify run build:gjs",
     "build:gjs": "gjsify build src/index.ts --app gjs --outfile dist/kurier.gjs.mjs",
     "build:app": "gjsify build src/frontends/gui/main.ts --app gjs --outfile dist/kurier-app.gjs.mjs",
+    "build:app:node": "gjsify build src/frontends/gui/main.ts --app node --outfile dist/kurier-app.node.mjs",
     "start": "gjsify run dist/kurier.gjs.mjs",
     "start:app": "gjsify run dist/kurier-app.gjs.mjs",
     "dev": "gjsify run build:gjs && gjsify run start",
@@ -34,6 +35,58 @@
         "gjs",
         "node"
       ]
+    },
+    "ship": {
+      "appId": "eu.jumplink.Kurier",
+      "binaryName": "kurier-app",
+      "kind": "app",
+      "name": "Kurier",
+      "bundle": {
+        "linux": "dist/kurier-app.gjs.mjs",
+        "darwin": "dist/kurier-app.node.mjs",
+        "win32": "dist/kurier-app.node.mjs"
+      },
+      "app": {
+        "darwin": "node",
+        "win32": "node"
+      },
+      "icon": "../data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+      "categories": [
+        "Development",
+        "GTK"
+      ],
+      "keywords": [
+        "ACP",
+        "agent",
+        "coding assistant",
+        "AI",
+        "session",
+        "Adwaita",
+        "GNOME"
+      ],
+      "developer": {
+        "id": "eu.jumplink",
+        "name": "Pascal Garber",
+        "email": "pascal@jumplink.eu"
+      },
+      "summary": "Start coding agents as subprocesses and drive their sessions",
+      "license": {
+        "project": "AGPL-3.0-or-later"
+      },
+      "description": "Kurier is a client for the Agent Client Protocol (ACP). It starts an agent such as OpenCode as a subprocess, keeps the conversation, and shows what the agent says while it works. The agent and the model behind it are not part of Kurier.",
+      "homepageUrl": "https://github.com/JumpLink/kurier",
+      "bugtrackerUrl": "https://github.com/JumpLink/kurier/issues",
+      "vcsBrowserUrl": "https://github.com/JumpLink/kurier",
+      "flatpak": {
+        "finishArgs": [
+          "--device=dri",
+          "--share=ipc",
+          "--socket=fallback-x11",
+          "--socket=wayland",
+          "--talk-name=org.freedesktop.Flatpak",
+          "--filesystem=host"
+        ]
+      }
     }
   },
   "dependencies": {
