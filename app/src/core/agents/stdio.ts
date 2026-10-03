@@ -271,8 +271,14 @@ export class StdioChannel implements RawChannel {
    * (`lib/esm/index.js`). The stale claim is what made this look unfixable, so the fix went the
    * runtime-agnostic way instead of subscribing to an event that was only just made truthful.
    *
-   * A child that leaves a grandchild holding a pipe therefore never ends the channel — which is
-   * exactly what Node's `close` does, so the wait is the compatible answer and not a hang.
+   * A child that leaves a grandchild holding a pipe therefore never ends the channel, and Node's
+   * `close` behaves the same way — but that is compatibility, not a defence, and calling it "not a
+   * hang" here is how it stayed invisible. It is the defect filed as *terminate() cannot end the
+   * channel*: `SIGTERM` and `SIGKILL` reach the direct child, the grandchild keeps the pipe, and
+   * `onEnd` never fires. Waiting for stderr widens the set of children that can do it — one holding
+   * stderr alone used to get through — though the realistic case, a grandchild inheriting both
+   * pipes, already hung before this change. Measured `NEVER-ENDED` on gjs and on node either way.
+   * Fixed separately; see docs/reviews/2026-09-30-code-review-findings.md.
    */
   #maybeEnd(): void {
     if (!this.#hasExited || !this.#isStdoutDone || !this.#isStderrDone) return;
