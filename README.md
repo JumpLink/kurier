@@ -8,8 +8,9 @@ Kurier has no agent of its own and no model of its own. It runs on **GJS** (GNOM
 runtime) via [gjsify](https://github.com/gjsify/gjsify), like [postbote](../mail/README.md) and
 [beifahrer](../beifahrer/README.md).
 
-> **Status: early.** One adapter (opencode), one prompt turn per `start`/`resume` call, no
-> graphical surface yet.
+> **Status: early.** One adapter (opencode), one prompt turn per `start`/`resume` call. A GTK4 /
+> libadwaita surface exists and is being built slice by slice; it runs from source, not yet from a
+> package — see [Run the surface](#run-the-surface).
 
 ## Why ACP instead of one SDK per agent
 
@@ -64,6 +65,21 @@ kurier auth [--agent opencode]              # the interactive-login escape hatch
 kurier agents                               # the launchers that are registered, and whether the binary is on PATH
 ```
 
+## Run the surface
+
+The GTK4 / libadwaita window is a **separate bundle** from the CLI, because `gi://` may only be
+imported under `frontends/gui/`:
+
+```bash
+gjsify workspace kurier-cli build:app      # → app/dist/kurier-app.gjs.mjs
+gjsify run app/dist/kurier-app.gjs.mjs
+```
+
+It picks its agent the same way the CLI does — your own copy of `opencode` first, a bundled one
+otherwise, the choice in `settings.json` above both. An empty session file opens on a live composer:
+your first prompt starts the session. Every dev hook, the stand-in agent that needs no model, and the
+measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
+
 ## Where your data lives
 
 Kurier keeps one record per session — which agent, which directory, the transcript, whether it is
@@ -77,9 +93,9 @@ future call permission on its own — every request the agent makes is checked a
 
 ## What it does not do yet
 
-No graphical surface (a GTK4/libadwaita one is planned, not a browser page), no Telegram bot, no
-wiring to kurier's own MCP servers, no policy for more than one person in a session, and no adapter
-for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
+No packaged surface yet (the libadwaita window runs from source — never a browser page), no Telegram
+bot, no wiring to kurier's own MCP servers, no policy for more than one person in a session, and no
+adapter for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
 
 ## Development
 
