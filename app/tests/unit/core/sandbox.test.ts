@@ -805,6 +805,33 @@ export default async () => {
         });
       });
     });
+
+    await it('delivers every line of a burst written just before the child exits', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(
+          dir,
+          'burst',
+          '#!/bin/sh\ni=0\nwhile [ $i -lt 500 ]; do echo "line-$i"; i=$((i+1)); done\n',
+        );
+        const channel = new StdioChannel({
+          command: { id: 'burst', title: 'burst', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        let out = '';
+        channel.onData((chunk) => {
+          out += chunk;
+        });
+        return new Promise<string>((resolve, reject) => {
+          channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
+        }).then((all) => {
+          const lines = all.split('\n').filter(Boolean);
+          expect(lines.length).toBe(500);
+          expect(lines[499]).toBe('line-499');
+        });
+      });
+    });
   });
 };
 

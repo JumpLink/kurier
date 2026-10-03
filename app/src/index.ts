@@ -60,6 +60,7 @@ try {
 try {
   await parsed;
   // fixed upstream in gjsify: natural end of main ignores process.exitCode (PR pending)
+  // gjsify#2007 fixes it on main and awaits a release; remove this line when the pin carries it.
   if (process.exitCode) process.exit();
 } catch (err) {
   reportError(err);
