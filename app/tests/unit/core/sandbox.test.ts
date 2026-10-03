@@ -22,7 +22,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -652,7 +652,11 @@ export default async () => {
           channel.onEnd((reason) => (reason ? reject(reason) : resolve(out)));
         }).then((out) => {
           expect(out).toContain('ARGV:one|two');
-          expect(out).toContain(`CWD:${dir}`);
+          // `realpathSync`, not `dir`: macOS's `/tmp` is a symlink to `/private/tmp`, and the
+          // child's own `pwd` reports the resolved target — asserting the unresolved path is a
+          // test bug, not a product one, because kurier never promised the CWD comes back
+          // byte-identical to what it passed, only that the process actually started there.
+          expect(out).toContain(`CWD:${realpathSync(dir)}`);
           expect(out).toContain('ENV:present');
         });
       });
