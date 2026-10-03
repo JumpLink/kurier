@@ -325,6 +325,12 @@ entire point of the `packages/acp` ↔ `app` split.
 > green run, which is the one thing a test suite cannot report about itself**, so that measurement is
 > worth repeating whenever the toolchain moves; treat a suspiciously fast green as this, not as a win.
 >
+> **The same family, one level over: a regression test that passes on the code it was meant to fix.**
+> A test that cannot fail without its fix is decoration, not a guard — and the most expensive green,
+> because it reads as one. **Run a fix's new test against the unfixed code first**; the failure is the
+> only evidence it is testing. Worked example, and the test shape that exposed it:
+> [the 2026-09-30 review](docs/reviews/2026-09-30-code-review-findings.md).
+>
 > One trap survives, and it is the same family: **the `gjsify` on `PATH` is the one that decides.** A
 > global install in `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`,
 > so a run that looks like it used the pinned toolchain was a released CLI — and it happily reports a
