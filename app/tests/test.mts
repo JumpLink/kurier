@@ -44,6 +44,7 @@ import notices from './unit/core/notices.test.ts';
 import emptyState from './unit/core/empty-state.test.ts';
 import loginProviders from './unit/core/login-providers.test.ts';
 import loginFlow from './unit/core/login-flow.test.ts';
+import loginController from './unit/core/login-controller.test.ts';
 import loginApi from './unit/core/login-api.test.ts';
 import server from './unit/core/server.test.ts';
 
@@ -91,6 +92,7 @@ run({
   emptyState,
   loginProviders,
   loginFlow,
+  loginController,
   loginApi,
   server,
   hookValue,
