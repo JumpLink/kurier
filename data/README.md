@@ -124,7 +124,7 @@ the read-only build result — so the archive unpacks to `/app/extra/agents/open
 `@opencode/cli`, one binary package per platform in the wrapper's `optionalDependencies`
 (`@opencode/cli-linux-x64`, `-linux-arm64`; glibc, because the GNOME runtime is). The tarball
 holds `package/package.json` and `package/bin/opencode`, so the catalog's `binary` is
-`package/bin/opencode` and `apply_extra` stays unchanged. There is no GitHub release for v2 —
+`package/bin/opencode`: `apply_extra` keeps its four steps and only its `chmod` path follows. There is no GitHub release for v2 —
 the latest one there is v1.18.34. Resolve the version through the wrapper, never through a
 platform package's own `latest` tag: that one points at an unrelated 1.18.18 with a binary called
 `lildax`. v2 is about 90 MB to download and 204 MB unpacked, against 60 MB for v1.
