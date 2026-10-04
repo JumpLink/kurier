@@ -1,0 +1,122 @@
+#!/usr/bin/env node
+// Refresh the pinned bundled agent from its npm package.
+//
+//   ./scripts/refresh-bundled-agent                 # dry run: print what would change
+//   ./scripts/refresh-bundled-agent --write         # update app/data/bundled-agents.json and package.json
+//   ./scripts/refresh-bundled-agent --tag beta      # a dist-tag other than `latest`
+//   ./scripts/refresh-bundled-agent --version 2.0.22
+//
+// Why npm: opencode v2 ships there as `@opencode/cli`, with one binary package per platform in the
+// wrapper's `optionalDependencies` (the layout opencode.ai/v2/install downloads from). The version is
+// resolved THROUGH that wrapper, never through the platform package's own `latest` tag — that tag
+// points at an unrelated 1.18.18 with a binary called `lildax`.
+//
+// The registry's sha512 `integrity` is verified on every download, and the sha256 Flatpak's
+// `extra-data` needs is computed here from the same bytes. Nothing is trusted from the script's own
+// output: the catalog tests fail when the module in package.json disagrees with the data file.
+//
+// After --write, re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging so the
+// generated eu.jumplink.Kurier.json follows.
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+const HERE = new URL('.', import.meta.url).pathname;
+const DATA = join(HERE, '../app/data/bundled-agents.json');
+const PACKAGE_JSON = join(HERE, '../package.json');
+
+const AGENT_ID = 'opencode';
+const WRAPPER = '@opencode/cli';
+/** The binary's path inside the archive; `tar -xzf` puts it under the entry's `installPath`. */
+const BINARY = 'package/bin/opencode';
+/** Flatpak arch → platform package suffix. glibc builds: org.gnome.Platform is glibc. */
+const TARGETS = { x86_64: 'linux-x64', aarch64: 'linux-arm64' };
+const REGISTRY = 'https://registry.npmjs.org';
+
+const args = process.argv.slice(2);
+const flag = (name) => args.includes(`--${name}`);
+const option = (name) => {
+  const at = args.indexOf(`--${name}`);
+  return at >= 0 ? args[at + 1] : undefined;
+};
+const write = flag('write');
+const selector = option('version') ?? option('tag') ?? 'latest';
+
+async function manifest(name, selectorOrVersion) {
+  const url = `${REGISTRY}/${name.replace('/', '%2f')}/${selectorOrVersion}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return response.json();
+}
+
+function fail(message) {
+  console.error(`refresh-bundled-agent: ${message}`);
+  process.exit(1);
+}
+
+const wrapper = await manifest(WRAPPER, selector);
+const version = wrapper.version;
+console.log(`${WRAPPER}@${selector} = ${version}`);
+
+const dist = [];
+for (const [arch, suffix] of Object.entries(TARGETS)) {
+  const platform = `${WRAPPER}-${suffix}`;
+  const wanted = wrapper.optionalDependencies?.[platform];
+  if (wanted !== version) fail(`${WRAPPER}@${version} does not pin ${platform} to ${version} (has ${wanted})`);
+
+  const info = await manifest(platform, version);
+  const response = await fetch(info.dist.tarball);
+  if (!response.ok) fail(`${info.dist.tarball}: HTTP ${response.status}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+
+  const [algorithm, expected] = info.dist.integrity.split('-', 2);
+  const actual = createHash(algorithm).update(bytes).digest('base64');
+  if (actual !== expected) fail(`${platform}@${version}: ${algorithm} integrity mismatch`);
+
+  const scratch = mkdtempSync(join(tmpdir(), 'kurier-refresh-'));
+  const file = join(scratch, 'archive.tgz');
+  writeFileSync(file, bytes);
+  const listing = spawnSync('tar', ['-tzf', file], { encoding: 'utf8' });
+  rmSync(scratch, { recursive: true, force: true });
+  if (listing.status !== 0) fail(`${platform}@${version}: tar could not read the archive`);
+  const entries = listing.stdout.split('\n').filter(Boolean);
+  if (!entries.includes(BINARY)) fail(`${platform}@${version}: no ${BINARY} in the archive (has ${entries.join(', ')})`);
+
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  dist.push({ arch, url: info.dist.tarball, sha256, size: bytes.length });
+  console.log(`  ${arch}: ${bytes.length} bytes, sha256 ${sha256.slice(0, 16)}…, ${algorithm} ok`);
+}
+
+const today = new Date().toISOString().slice(0, 10);
+const catalog = JSON.parse(readFileSync(DATA, 'utf8'));
+const entry = catalog.agents.find((agent) => agent.id === AGENT_ID);
+if (!entry) fail(`no ${AGENT_ID} entry in ${DATA}`);
+
+console.log(`\nbundled-agents.json: ${entry.version} → ${version}, binary ${entry.binary} → ${BINARY}`);
+Object.assign(entry, { version, dist, binary: BINARY, refreshed: today });
+catalog.checked = today;
+
+const pkg = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8'));
+const module_ = pkg.gjsify?.flatpak?.modules?.find((m) => m.name === AGENT_ID);
+if (!module_) fail(`no module named ${AGENT_ID} in package.json#gjsify.flatpak.modules`);
+for (const source of module_.sources) {
+  if (source.type === 'extra-data') {
+    const next = dist.find((d) => d.arch === source['only-arches']?.[0]);
+    if (!next) fail(`package.json has an extra-data source for an arch this script does not know`);
+    Object.assign(source, { url: next.url, sha256: next.sha256, size: next.size });
+  } else if (source['dest-filename'] === 'apply_extra') {
+    const chmod = source.commands.findIndex((line) => line.startsWith('chmod '));
+    if (chmod < 0) fail('package.json: no chmod line in apply_extra');
+    source.commands[chmod] = `chmod 0755 ${entry.installPath}/${BINARY}`;
+  }
+}
+
+if (!write) {
+  console.log('\ndry run — nothing written; pass --write to update the data file and package.json');
+} else {
+  writeFileSync(DATA, JSON.stringify(catalog, null, 2) + '\n');
+  writeFileSync(PACKAGE_JSON, JSON.stringify(pkg, null, 2) + '\n');
+  console.log('\nwritten. Next: the `gjsify flatpak init --force …` line from AGENTS.md § Packaging, then the tests.');
+}
