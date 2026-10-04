@@ -604,15 +604,21 @@ export default async () => {
       // `where opencode` finds it through PATHEXT — a plain file-exists check on the bare name
       // does not, which is the gap that made a working install report as "not found".
       await withTempDir((dir) => {
-        writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
+        // The fixture is written in PATHEXT's OWN casing, because that is the name the walk
+        // probes: `accessSync('<dir>/opencode.CMD')`, a byte-exact check. npm's lower-case `.cmd`
+        // is found on Windows because NTFS is case-insensitive, and that is a property of the
+        // FILESYSTEM, not of `which` — which is why the fixture used to be written lower-case: it
+        // passed on macOS (APFS, case-insensitive) and failed on the Linux CI runner (ext4,
+        // case-sensitive) with `undefined`, a red run that said nothing about kurier. The shipped
+        // path is untouched either way: macOS and Linux never set PATHEXT, so these candidates
+        // are never walked there.
+        writeFileSync(join(dir, 'opencode.CMD'), '@echo off\n');
         const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
-        // Lower-cased on both sides, not `toBe`: the candidate is built from PATHEXT's own casing
-        // (conventionally uppercase, `.CMD`), and on NTFS and APFS alike that still finds the
-        // lower-case `opencode.cmd` npm actually writes — a case-insensitive filesystem opens the
-        // same file either way, so the exact casing in the returned string is not part of the
-        // contract `which` makes.
+        // Lower-cased on both sides, not `toBe`: the returned string is the candidate built from
+        // PATHEXT's own casing (conventionally uppercase, `.CMD`), so the exact casing is not part
+        // of the contract `which` makes.
         expect(which('opencode', env, NOT_SANDBOXED)?.toLowerCase()).toBe(
-          join(dir, 'opencode.cmd').toLowerCase(),
+          join(dir, 'opencode.CMD').toLowerCase(),
         );
       });
     });
