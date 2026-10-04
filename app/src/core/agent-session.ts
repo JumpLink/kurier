@@ -477,7 +477,7 @@ export class AgentSession {
       // Without this the dead handle would be reused and the composer's "Press New chat" would be a lie.
       this.#retiring = this.#retire();
       this.#attachment = { status: 'none' };
-    } else if (failed.status === 'failed' && failed.kind !== 'model') {
+    } else if (failed.status === 'failed' && failed.kind !== 'model' && failed.kind !== 'quota') {
       this.#attachment = this.#handle ? { status: 'attached', name: this.#agentName } : { status: 'none' };
     }
     this.#state = transition(this.#state, { kind: 'chat-reset' });
@@ -1313,7 +1313,7 @@ export class AgentSession {
     // on that path the desk is empty anyway, because the provider answers before it asks for anything.
     this.#failClosed('agent-gone');
     const kind = failureKind(error, { promptSent: this.#promptSent });
-    if (kind === 'model') {
+    if (kind === 'model' || kind === 'quota') {
       this.#reportModelRefusal(kind, message);
       return;
     }
@@ -1361,7 +1361,7 @@ export class AgentSession {
    * reachable because `cancelledBy` is `'none'` — nobody pressed Stop and the agent did not abandon
    * the turn; the provider refused it, and the window says so in words rather than in a state name.
    */
-  #reportModelRefusal(kind: 'model', message: string): void {
+  #reportModelRefusal(kind: 'model' | 'quota', message: string): void {
     this.#setAttachment({ status: 'failed', kind, message });
     this.#move({ kind: 'turn-ended', stopReason: null, cancelledBy: 'none' });
   }
