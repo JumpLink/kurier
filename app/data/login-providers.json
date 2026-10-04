@@ -1,0 +1,5 @@
+{
+  "checked": "2026-10-04",
+  "excluded": [{ "id": "xai", "reason": "Not supported, by decision of 2026-10-04." }],
+  "preferred": ["opencode", "openai", "github-copilot", "gitlab", "poe", "digitalocean", "snowflake-cortex"]
+}
