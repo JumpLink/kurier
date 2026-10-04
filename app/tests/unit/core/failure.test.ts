@@ -14,6 +14,7 @@ import {
   failureKind,
   failureNotice,
   failureToShow,
+  isQuotaExhausted,
   staleDialog,
 } from '../../../src/core/failure.ts';
 import type { AgentAttachment } from '../../../src/core/turn.ts';
@@ -26,7 +27,44 @@ function authRequired(): unknown {
   return new RpcError({ code: -32000, message: 'Authentication required' });
 }
 
+/** opencode 2.0.22 for a logged-in Zen account without balance: `-32603`, with the name in `data`. */
+function quotaExhausted(): unknown {
+  return new RpcError({
+    code: -32603,
+    message: 'Internal error: Upstream request failed: Insufficient account funds',
+    data: { service: 'session', errorName: 'provider.quota' },
+  });
+}
+
 export default async function failure(): Promise<void> {
+  await describe('failure — an account without credit', async () => {
+    await it('is its own kind, read from the error name and not from the sentence', async () => {
+      expect(failureKind(quotaExhausted(), { promptSent: true })).toBe('quota');
+      const reworded = new RpcError({
+        code: -32603,
+        message: 'something else entirely',
+        data: { errorName: 'provider.quota' },
+      });
+      expect(failureKind(reworded, { promptSent: true })).toBe('quota');
+    });
+
+    await it('is not guessed from the wording or from the code alone', async () => {
+      const sameWords = new RpcError({ code: -32603, message: 'Insufficient account funds' });
+      expect(isQuotaExhausted(sameWords)).toBe(false);
+      expect(failureKind(sameWords, { promptSent: true })).toBe('start');
+      expect(isQuotaExhausted(new Error('provider.quota'))).toBe(false);
+    });
+
+    await it('tells a logged-in person not to log in again, and offers the model button', async () => {
+      const notice = failureNotice('quota')!;
+      expect(notice.command).toBe(null);
+      expect(notice.action).toBe('choose-model');
+      expect(notice.body.includes('kurier auth')).toBe(false);
+      expect(failureAction(notice, { modelChoice: true })).toBe('choose-model');
+      expect(failureAction(notice, { modelChoice: false })).toBe(null);
+    });
+  });
+
   await describe('failure — which failure this is', async () => {
     await it('reads ACP’s own auth_required as the auth trap when no prompt has gone out', async () => {
       expect(failureKind(authRequired(), { promptSent: false })).toBe('auth');

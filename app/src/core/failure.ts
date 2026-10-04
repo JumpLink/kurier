@@ -64,12 +64,12 @@
  * therefore *shown* — a dialog, and the caption under the entry — and neither is recorded.
  */
 
-import { isAuthRequired, UnsupportedCapabilityError } from '@kurier/acp';
+import { isAuthRequired, RpcError, UnsupportedCapabilityError } from '@kurier/acp';
 
 import type { AgentAttachment } from './turn.ts';
 
 /** What sort of "this did not work" this is. The names are kurier's, not the protocol's. */
-export type FailureKind = 'auth' | 'model' | 'unsupported' | 'start';
+export type FailureKind = 'auth' | 'model' | 'quota' | 'unsupported' | 'start';
 
 /**
  * The one fact about the turn that decides between `auth` and `model`.
@@ -105,6 +105,23 @@ export class AuthRequiredError extends Error {
 }
 
 /**
+ * The provider says the account is out of credit: opencode answers `-32603` with
+ * `data.errorName: "provider.quota"` ("Upstream request failed: Insufficient account funds", measured on
+ * 2.0.22 with a logged-in Zen account that had no balance). The name is a field the agent set for exactly
+ * this, so it is matched like a code and never like a sentence. It is the one case where the login
+ * *worked*: the provider knew the account and refused it for money, so `kurier auth` would not help.
+ */
+export function isQuotaExhausted(error: unknown): boolean {
+  if (!(error instanceof RpcError)) return false;
+  const data = error.data;
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { errorName?: unknown }).errorName === 'provider.quota'
+  );
+}
+
+/**
  * The one classification, and the only place an error is asked which kind of failure it is.
  *
  * **Every branch matches on the error's own type or on the turn state, never on its text.** Matching a
@@ -125,6 +142,7 @@ export class AuthRequiredError extends Error {
  * same failure as the raw `RpcError` and must not be classified as `start`.
  */
 export function failureKind(error: unknown, context: FailureContext): FailureKind {
+  if (isQuotaExhausted(error)) return 'quota';
   if (error instanceof AuthRequiredError) return context.promptSent ? 'model' : 'auth';
   if (isAuthRequired(error)) return context.promptSent ? 'model' : 'auth';
   if (error instanceof UnsupportedCapabilityError) return 'unsupported';
@@ -280,6 +298,17 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
           'The provider turned this request down. It may be limited by region or rate, or it may need ' +
           'a login. Choose another model, or run kurier auth in a terminal.',
         // `null`, not `AUTH_COMMAND`: see `FailureNotice.command`. This dialog's remedy is a button.
+        command: null,
+        action: 'choose-model',
+      };
+    case 'quota':
+      return {
+        heading: 'The provider account has no credit',
+        // Fixed words, no agent text. The login worked, so no command is named: the remedies are a free
+        // model (the button) or topping up the account at the provider, which kurier cannot do.
+        body:
+          'You are logged in, but the provider refused this request because the account has no credit. ' +
+          'Choose a model that is free, or add credit at the provider.',
         command: null,
         action: 'choose-model',
       };
