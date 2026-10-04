@@ -101,7 +101,7 @@ jobs:
       - name: Install packaging prerequisites
         run: >
           dnf install -y --setopt=install_weak_deps=False
-          msitools squashfs-tools
+          msitools squashfs-tools file
 
       - name: Build the GUI app bundle (GJS, for Linux)
         run: gjsify workspace kurier-cli build:app
@@ -297,7 +297,7 @@ jobs:
           # 26.08 …), not on the GNOME one: `…Extension.node24//50` does not exist. Read the branch
           # from the SDK's own extension point, so a GNOME bump cannot silently break this.
           fdo=$(flatpak info --show-metadata org.gnome.Sdk//50 \
-            | sed -n '/^\[Extension org.freedesktop.Sdk.Extension\]/,/^\[/s/^version=//p')
+            | sed -n '/^\[Extension org.freedesktop.Sdk.Extension\]/,/^\[/s/^version *= *//p')
           test -n "$fdo" || { flatpak info --show-metadata org.gnome.Sdk//50 | grep -a -A4 Extension; exit 1; }
           echo "freedesktop branch for the SDK extensions: $fdo"
           flatpak install --system --noninteractive \
