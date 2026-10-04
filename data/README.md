@@ -145,6 +145,13 @@ the person's real home (measured). So the one switch left is `HOME` itself.
 `modules` nor `extraModules`, so a Flatpak built with `ship` has no bundled agent. Only the
 manifest above carries it.
 
+**`--share=network` is load-bearing for the bundled agent.** It runs *inside* the sandbox, and a
+sandbox with this app's other grants has no DNS and no route out — measured with `flatpak run
+--filesystem=host --command=sh org.freedesktop.Platform//25.08`: `curl https://registry.npmjs.org`
+fails, and with `--share=network` it answers 200. Without it the bundled agent could not reach one
+model provider, and no login could finish. A host agent is unaffected: it runs on the other side of
+`flatpak-spawn --host`.
+
 **`--filesystem=host` is load-bearing twice now.** Besides what `flatpak-spawn --host`
 needs, the bundled agent runs *inside* the sandbox, and that grant is what lets it read and
 edit the project it is pointed at.

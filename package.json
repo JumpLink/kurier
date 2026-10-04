@@ -37,6 +37,7 @@
       "finishArgs": [
         "--device=dri",
         "--share=ipc",
+        "--share=network",
         "--socket=fallback-x11",
         "--socket=wayland",
         "--talk-name=org.freedesktop.Flatpak",

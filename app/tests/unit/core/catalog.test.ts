@@ -161,6 +161,14 @@ export default async () => {
         expect(BUNDLED_AGENTS.length > 0).toBe(true);
       });
 
+      await it(`${file} shares the network, because a bundled agent runs inside the sandbox`, async () => {
+        // Measured: a sandbox with this app's other grants has no DNS and no route out, so a bundled
+        // agent could not reach one model provider. A host agent is unaffected (`flatpak-spawn --host`).
+        const finishArgs: string[] =
+          file === 'package.json' ? (pkg as any).gjsify.flatpak.finishArgs : (manifest as any)['finish-args'];
+        expect(finishArgs.includes('--share=network')).toBe(true);
+      });
+
       for (const agent of BUNDLED_AGENTS) {
         await it(`${file} carries ${agent.id}'s pins as extra-data, one per arch`, async () => {
           const module = modules.find((entry) => entry['name'] === agent.id);

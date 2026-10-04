@@ -365,10 +365,11 @@ a green run of it says nothing. The two real validators are `desktop-file-valida
 the same way. `packaging:install` installs metadata only: `bin/kurier-app` is produced by
 `gjsify ship`, not by this script.
 
-**Two finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
+**Three finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
 reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
 cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
 this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
+`--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).
 
 `app/src/core/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
 it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
