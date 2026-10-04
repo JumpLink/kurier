@@ -71,15 +71,24 @@ for (const [arch, suffix] of Object.entries(TARGETS)) {
   if (!response.ok) fail(`${info.dist.tarball}: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
 
-  const [algorithm, expected] = info.dist.integrity.split('-', 2);
+  const dash = info.dist.integrity.indexOf('-');
+  const algorithm = info.dist.integrity.slice(0, dash);
+  const expected = info.dist.integrity.slice(dash + 1);
+  if (dash < 1 || !['sha512', 'sha256', 'sha1'].includes(algorithm)) {
+    fail(`${platform}@${version}: unexpected integrity format ${info.dist.integrity.slice(0, 12)}…`);
+  }
   const actual = createHash(algorithm).update(bytes).digest('base64');
   if (actual !== expected) fail(`${platform}@${version}: ${algorithm} integrity mismatch`);
 
   const scratch = mkdtempSync(join(tmpdir(), 'kurier-refresh-'));
-  const file = join(scratch, 'archive.tgz');
-  writeFileSync(file, bytes);
-  const listing = spawnSync('tar', ['-tzf', file], { encoding: 'utf8' });
-  rmSync(scratch, { recursive: true, force: true });
+  let listing;
+  try {
+    const file = join(scratch, 'archive.tgz');
+    writeFileSync(file, bytes);
+    listing = spawnSync('tar', ['-tzf', file], { encoding: 'utf8' });
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
   if (listing.status !== 0) fail(`${platform}@${version}: tar could not read the archive`);
   const entries = listing.stdout.split('\n').filter(Boolean);
   if (!entries.includes(BINARY)) fail(`${platform}@${version}: no ${BINARY} in the archive (has ${entries.join(', ')})`);
@@ -116,7 +125,11 @@ for (const source of module_.sources) {
 if (!write) {
   console.log('\ndry run — nothing written; pass --write to update the data file and package.json');
 } else {
-  writeFileSync(DATA, JSON.stringify(catalog, null, 2) + '\n');
-  writeFileSync(PACKAGE_JSON, JSON.stringify(pkg, null, 2) + '\n');
+  // Serialise both first, so a failure in the second step cannot leave the data file pinned alone.
+  const files = [
+    [DATA, JSON.stringify(catalog, null, 2) + '\n'],
+    [PACKAGE_JSON, JSON.stringify(pkg, null, 2) + '\n'],
+  ];
+  for (const [path, text] of files) writeFileSync(path, text);
   console.log('\nwritten. Next: the `gjsify flatpak init --force …` line from AGENTS.md § Packaging, then the tests.');
 }

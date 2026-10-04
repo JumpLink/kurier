@@ -142,7 +142,7 @@ export default async () => {
   await describe('toHostCommand — a bundled command', async () => {
     const BUNDLED: AgentCommand = {
       ...OPENCODE,
-      program: '/app/extra/agents/opencode/opencode',
+      program: '/app/extra/agents/opencode/package/bin/opencode',
       env: { XDG_CONFIG_HOME: '/data/kurier/agents/opencode/config' },
       bundled: true,
     };
