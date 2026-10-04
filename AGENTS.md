@@ -61,7 +61,7 @@ The GUI writes it from Preferences (`<Ctrl>comma`; `core/settings-view.ts` decid
 An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
-`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under
+`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `HOME` and `XDG_*` under
 `<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real
 `~/.config/opencode` in reach and its login must not be shared; `kurier auth` logs in there too.
 The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
