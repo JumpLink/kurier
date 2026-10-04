@@ -262,12 +262,11 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-**The auth refusal is deliberately *not* fixable from the window; the model refusal is.** kurier stores no
-credential (§ Privacy), so for `auth` the only remedy it can name is the command a person runs in a
-terminal — the dialog says so and offers nothing else, because a button that could only copy a string would
-be a control pointing at nothing. The `'model'` dialog is the other half: **Choose another model** opens
-the row's model dropdown and picks nothing, and `failureAction` withholds the button when the agent
-reported no model option — a button that opens nothing is the same defect pointed the other way.
+**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `core/login/`, [docs/login.md](docs/login.md)): the
+agent's own OAuth flow through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
+stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
+a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it
+opens the row's dropdown and picks nothing, and `failureAction` withholds either button when the window cannot do it.
 
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with **all four option kinds on the

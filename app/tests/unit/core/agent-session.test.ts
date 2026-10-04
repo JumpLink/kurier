@@ -362,6 +362,18 @@ export default async () => {
       expect(refused.session.snapshot.attachment).toBe(before);
     });
 
+    await it('restartAgent forgives a login trap and retires the process, so the next prompt starts a new one', async () => {
+      const h = fresh({ requireAuth: true });
+      h.session.startConversation(NEW_CWD);
+      await h.session.prompt('hello');
+      const before = h.session.snapshot.attachment;
+      expect(before.status === 'failed' && before.kind).toBe('auth');
+      const closedBefore = h.closed();
+      await h.session.restartAgent();
+      expect(h.session.snapshot.attachment.status).toBe('none');
+      expect(h.closed()).toBe(closedBefore + 1);
+    });
+
     await it('leaves the pending conversation when a stored session is opened, and comes back to it', async () => {
       const h = fresh();
       h.session.bind(SESSION);

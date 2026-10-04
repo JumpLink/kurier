@@ -19,6 +19,8 @@ const CLOSE_LABEL = 'Close';
 /** The one remedy a failure can offer, and kurier's own words for it. See `core/failure.ts`. */
 const MODEL_RESPONSE = 'choose-model';
 const MODEL_LABEL = 'Choose another model';
+const LOGIN_RESPONSE = 'login';
+const LOGIN_LABEL = 'Log in…';
 
 /**
  * The callbacks this dialog may be given, one per `FailureAction`.
@@ -31,6 +33,8 @@ const MODEL_LABEL = 'Choose another model';
 export interface FailureDialogActions {
   /** The person chose another model: open the config row's model dropdown. */
   readonly onChooseModel?: () => void;
+  /** The person chose to log in: open the login dialog. */
+  readonly onLogin?: () => void;
 }
 
 /**
@@ -70,7 +74,10 @@ export class FailureDialog {
     // can take: `kurier auth` runs an interactive login in a terminal, and a button here that only
     // copied a string to the clipboard would be a control that points at nothing (`AGENTS.md`'s rule
     // for this window). The sentence already names it.
-    if (notice.command !== null) dialog.body = `${notice.body}\n\nRun \`${notice.command}\` in a terminal.`;
+    if (notice.command !== null) {
+      const alternative = notice.action === 'login' && typeof actions.onLogin === 'function';
+      dialog.body = `${notice.body}\n\n${alternative ? 'Or run' : 'Run'} \`${notice.command}\` in a terminal.`;
+    }
     // **Both halves of the availability test, and neither is the other's job.** `notice.action` is what
     // the failure offers (`core/failure.ts`'s `failureNotice`); the callback is whether *this* window
     // can do it. A notice whose action has no callback gets a Close-only dialog, because a button that
@@ -97,6 +104,17 @@ export class FailureDialog {
       dialog.connect('response', (_dialog: Adw.AlertDialog, response: string) => {
         if (response !== MODEL_RESPONSE) return;
         actions.onChooseModel?.();
+      });
+    }
+    // The login button follows the same two-halves rule as the model button above: the notice offers it,
+    // the callback says this window can do it. It is the remedy, so it is suggested and focused.
+    if (notice.action === 'login' && typeof actions.onLogin === 'function') {
+      dialog.add_response(LOGIN_RESPONSE, LOGIN_LABEL);
+      dialog.set_response_appearance(LOGIN_RESPONSE, Adw.ResponseAppearance.SUGGESTED);
+      dialog.set_default_response(LOGIN_RESPONSE);
+      dialog.connect('response', (_dialog: Adw.AlertDialog, response: string) => {
+        if (response !== LOGIN_RESPONSE) return;
+        actions.onLogin?.();
       });
     }
     dialog.connect('response', () => {

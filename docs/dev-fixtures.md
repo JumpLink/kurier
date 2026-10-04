@@ -257,6 +257,10 @@ GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-i
 
 Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version.
 
+## The login dialog
+
+`KU_APP_LOGIN=1` opens it the way the auth dialog's **Log in…** does, on the real path: a private `opencode serve` and its real provider list, so it needs opencode v2 on `PATH`. Rows are `Adw.ActionRow`s, which the devtools plane can activate. A window that is not visible renders nothing (`Screenshot` answers `empty-snapshot`); a headless `mutter --headless --wayland --virtual-monitor 1280x800` on its own session bus is a display that always draws.
+
 ## First run and New chat
 
 **First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `kurier start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate that one action.

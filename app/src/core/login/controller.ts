@@ -196,11 +196,12 @@ export class LoginController {
         return;
       case 'cancelled':
         // Cancelling goes back to the choice; a closed dialog stays closed (`#set` drops the update).
-        void this.#backToProviders();
+        void this.showProviders();
     }
   }
 
-  async #backToProviders(): Promise<void> {
+  /** Back to the list, on the server that is already up. */
+  async showProviders(): Promise<void> {
     const session = this.#session;
     if (!session) return;
     try {

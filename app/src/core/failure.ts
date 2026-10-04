@@ -185,7 +185,7 @@ export interface FailureNotice {
  * second remedy, and adding it will break the widget's exhaustive handling rather than silently leaving
  * a button that does nothing.
  */
-export type FailureAction = 'choose-model';
+export type FailureAction = 'choose-model' | 'login';
 
 /**
  * Whether the dialog's action is available at all.
@@ -197,6 +197,12 @@ export type FailureAction = 'choose-model';
  */
 export interface FailureActionContext {
   readonly modelChoice: boolean;
+  /**
+   * The window can log in itself: the agent is one whose own login API kurier drives (opencode), and its
+   * login server can be reached from here (`whyNoLoginServer`). Without it the `auth` dialog stays a
+   * sentence that names `kurier auth`, as before.
+   */
+  readonly login: boolean;
 }
 
 /**
@@ -209,8 +215,9 @@ export interface FailureActionContext {
  * would stop being answerable without a surface.
  */
 export function failureAction(notice: FailureNotice, context: FailureActionContext): FailureAction | null {
-  if (notice.action !== 'choose-model') return null;
-  return context.modelChoice ? 'choose-model' : null;
+  if (notice.action === 'choose-model') return context.modelChoice ? 'choose-model' : null;
+  if (notice.action === 'login') return context.login ? 'login' : null;
+  return null;
 }
 
 /** The command `AGENTS.md` § "Trap 1" already tells a person to run. Named here so it is named once. */
@@ -279,11 +286,12 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
       return {
         heading: 'The agent wants you to log in first',
         body:
-          'It cannot answer a prompt until somebody has logged in, and this window has no terminal ' +
-          'to hand that login to — so kurier cannot do it for you. Everything else keeps working; ' +
+          'It cannot answer a prompt until somebody has logged in. Everything else keeps working; ' +
           'the prompt on screen was not sent.',
+        // Stays: the dialog names it as the way in when the window cannot log in itself (an agent that
+        // has no login API kurier drives, or one outside the sandbox), and as the alternative otherwise.
         command: AUTH_COMMAND,
-        action: null,
+        action: 'login',
       };
     case 'model':
       return {
