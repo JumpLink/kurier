@@ -164,8 +164,10 @@ export default async () => {
       await it(`${file} shares the network, because a bundled agent runs inside the sandbox`, async () => {
         // Measured: a sandbox with this app's other grants has no DNS and no route out, so a bundled
         // agent could not reach one model provider. A host agent is unaffected (`flatpak-spawn --host`).
-        const finishArgs: string[] =
-          file === 'package.json' ? (pkg as any).gjsify.flatpak.finishArgs : (manifest as any)['finish-args'];
+        const finishArgs =
+          file === 'package.json'
+            ? (pkg as { gjsify: { flatpak: { finishArgs: string[] } } }).gjsify.flatpak.finishArgs
+            : (manifest as { 'finish-args': string[] })['finish-args'];
         expect(finishArgs.includes('--share=network')).toBe(true);
       });
 
