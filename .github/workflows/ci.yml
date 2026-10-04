@@ -292,9 +292,17 @@ jobs:
           flatpak remote-modify --enable flathub
           flatpak install --system --noninteractive \
             org.gnome.Platform//50 \
-            org.gnome.Sdk//50 \
-            org.freedesktop.Sdk.Extension.node24//50 \
-            org.freedesktop.Sdk.Extension.typescript//50
+            org.gnome.Sdk//50
+          # The SDK extensions live on the freedesktop branch the GNOME SDK is built on (25.08,
+          # 26.08 …), not on the GNOME one: `…Extension.node24//50` does not exist. Read the branch
+          # from the SDK's own extension point, so a GNOME bump cannot silently break this.
+          fdo=$(flatpak info --show-metadata org.gnome.Sdk//50 \
+            | sed -n '/^\[Extension org.freedesktop.Sdk.Extension\]/,/^\[/s/^version=//p')
+          test -n "$fdo" || { flatpak info --show-metadata org.gnome.Sdk//50 | grep -a -A4 Extension; exit 1; }
+          echo "freedesktop branch for the SDK extensions: $fdo"
+          flatpak install --system --noninteractive \
+            "org.freedesktop.Sdk.Extension.node24//$fdo" \
+            "org.freedesktop.Sdk.Extension.typescript//$fdo"
           flatpak list --runtime --columns=ref
 
       - name: Bootstrap the gjsify CLI
