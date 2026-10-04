@@ -27,8 +27,9 @@ function mode(path: string): number {
 
 export default async () => {
   await describe('isolationDirs', async () => {
-    await it('is <dataDir>/agents/<id>/{config,data,state,cache}', async () => {
+    await it('is <dataDir>/agents/<id>/{home,config,data,state,cache}', async () => {
       expect(isolationDirs('/synthetic/data/kurier', 'opencode')).toStrictEqual({
+        home: '/synthetic/data/kurier/agents/opencode/home',
         config: '/synthetic/data/kurier/agents/opencode/config',
         data: '/synthetic/data/kurier/agents/opencode/data',
         state: '/synthetic/data/kurier/agents/opencode/state',
@@ -52,9 +53,10 @@ export default async () => {
   });
 
   await describe('isolationEnv', async () => {
-    await it('names all four XDG directories and the npm cache, inside the isolation root', async () => {
+    await it('names HOME, all four XDG directories and the npm cache, inside the isolation root', async () => {
       const dirs = isolationDirs('/synthetic/data/kurier', 'opencode');
       expect(isolationEnv(dirs)).toStrictEqual({
+        HOME: dirs.home,
         XDG_CONFIG_HOME: dirs.config,
         XDG_DATA_HOME: dirs.data,
         XDG_STATE_HOME: dirs.state,
@@ -63,17 +65,18 @@ export default async () => {
       });
     });
 
-    await it('sets no HOME: the person keeps their own, only the XDG directories move', async () => {
-      expect('HOME' in isolationEnv(isolationDirs('/synthetic/d', 'x'))).toBe(false);
+    await it("moves HOME off the person's own: opencode v2 reads ~/.claude and has no switch to stop it", async () => {
+      const env = isolationEnv(isolationDirs('/synthetic/d', 'x'));
+      expect(env['HOME']).toBe('/synthetic/d/agents/x/home');
     });
   });
 
   await describe('prepareIsolation', async () => {
-    await it('creates the root and the four directories, all 0700', async () => {
+    await it('creates the root, HOME and the four directories, all 0700', async () => {
       await withTempDir((dir) => {
         const dirs = isolationDirs(join(dir, 'kurier'), 'opencode');
         prepareIsolation(isolationEnv(dirs));
-        for (const path of [dirs.config, dirs.data, dirs.state, dirs.cache]) {
+        for (const path of [dirs.home, dirs.config, dirs.data, dirs.state, dirs.cache]) {
           expect(existsSync(path)).toBe(true);
           expect(mode(path)).toBe(0o700);
         }
@@ -91,7 +94,7 @@ export default async () => {
       });
     });
 
-    await it('ignores an unset or relative value and an environment without XDG variables', async () => {
+    await it('ignores an unset or relative value and an environment without HOME or XDG variables', async () => {
       await withTempDir((dir) => {
         prepareIsolation(undefined);
         prepareIsolation({ XDG_CONFIG_HOME: 'relative/config', PATH: join(dir, 'nope') });
