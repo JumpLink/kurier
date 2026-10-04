@@ -41,6 +41,7 @@ kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
 kurier auth [--agent opencode]             # trap 1's escape hatch
+kurier login [provider] [--method id]       # OAuth login, no terminal (docs/login.md)
 kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
 ```
 
@@ -188,7 +189,7 @@ gjsify run app/dist/kurier.gjs.mjs <command>
 gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
 
-**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
+**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions.
 
 ### Watching a turn without a model
 

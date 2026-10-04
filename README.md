@@ -62,6 +62,7 @@ kurier sessions                             # list kurier's own records for the 
 kurier resume <id> [prompt…]                # reattach a stored session, then optionally one prompt turn
 kurier cancel <id>                          # send session/cancel
 kurier auth [--agent opencode]              # the interactive-login escape hatch
+kurier login [provider]                     # log in through the agent's OAuth flow, no terminal (opencode v2)
 kurier agents                               # the launchers that are registered, and whether the binary is on PATH
 ```
 

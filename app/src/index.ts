@@ -21,6 +21,7 @@ import {
   agentsCommand,
   authCommand,
   cancelCommand,
+  loginCommand,
   resumeCommand,
   sessionsCommand,
   startCommand,
@@ -38,6 +39,7 @@ const parseArgs = () =>
     .command(resumeCommand)
     .command(cancelCommand)
     .command(authCommand)
+    .command(loginCommand)
     .command(agentsCommand)
     .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
     .strictCommands()

@@ -136,7 +136,7 @@ export function startServer(
       resolve({ baseUrl, password, send: makeSend(baseUrl, password), close });
     });
     // Nothing is read off stderr: it is the agent's log, and kurier has no use for it here.
-    child.stderr.resume();
+    child.stderr.on('data', () => undefined);
     child.once('error', (error) => fail(error));
     child.once('exit', (code, signal) => {
       fail(
