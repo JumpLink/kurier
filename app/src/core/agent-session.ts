@@ -486,6 +486,22 @@ export class AgentSession {
   }
 
   /**
+   * Put the next prompt on a fresh agent process, for after a login.
+   *
+   * The agent reads its credentials at start, so a login made in the meantime is invisible to the process
+   * that is running — measured as the reason the window restarts it. Only between turns: a turn in flight
+   * is left alone and the call is a no-op, because ending the process under it would be the cancel nobody
+   * asked for. A failure (an `auth` trap, a refusal) is forgiven, since the cause is what the person just
+   * fixed; the conversation the window points at stays, and the next prompt binds it again.
+   */
+  async restartAgent(): Promise<void> {
+    if (this.#turn) return;
+    this.#setAttachment({ status: 'none' });
+    await this.#retire();
+    this.#emit();
+  }
+
+  /**
    * Empty the row and cancel the bookkeeping a set in flight is holding.
    *
    * **`#configBusy` goes too, and that is not a detail.** A set is a round trip, so the person can

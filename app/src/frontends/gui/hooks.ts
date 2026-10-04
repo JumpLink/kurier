@@ -202,6 +202,13 @@ export interface KurierHooks extends FrameworkHooks {
   preferencesAgent?: string;
 
   /**
+   * `KU_APP_LOGIN` — open the login dialog the way the auth dialog's "Log in…" button does. A flag. It
+   * runs the real path (a private `opencode serve`, the real provider list), so a screenshot shows what a
+   * person sees; the dialog's rows are `Adw.ActionRow`s, which the devtools plane can activate.
+   */
+  login?: boolean;
+
+  /**
    * `KU_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
    * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `KU_APP_NEW_CHAT=0` stays where it is.
    */
@@ -274,6 +281,7 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
     preferences: hookFlag(env, 'PREFERENCES'),
     preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),
+    login: hookFlag(env, 'LOGIN'),
     newChat: hookFlag(env, 'NEW_CHAT'),
     newChatMidTurn: hookFlag(env, 'NEW_CHAT_MIDTURN'),
     cwd: hookValue(env, 'CWD'),
