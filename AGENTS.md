@@ -430,7 +430,5 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 
 A web surface (the Adwaita one is in `app/src/frontends/gui/`, being built slice by slice; **not**
 adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot · MCP wiring against
-the real apps · principal policy · troedler integration · a Claude adapter (parked on a
-non-technical question: per `docs/concepts/ai-document-workflow.md` the Claude Agent SDK has drawn
-its own monthly quota since 2026-06-15, separate from the interactive subscription — verify before
-building against it, never assume).
+the real apps · principal policy · troedler integration · a Claude Code adapter (decided,
+not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).
