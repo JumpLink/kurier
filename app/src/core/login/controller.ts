@@ -25,6 +25,7 @@ import type { LoginField, LoginMethod, LoginProvider } from './providers.ts';
 /** What the controller needs from the private server. `createLoginApi` + `startServer` are the real one. */
 export interface LoginSession extends LoginApi {
   providers(): Promise<LoginProvider[]>;
+  connectKey(providerId: string, key: string, answer: Readonly<Record<string, string>>): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -42,6 +43,8 @@ export type LoginState =
       readonly method: LoginMethod;
       readonly missing: readonly LoginField[];
     }
+  /** An API key method with every question answered: the person pastes the key. */
+  | { readonly step: 'key'; readonly provider: LoginProvider; readonly method: LoginMethod }
   /** The provider is being asked to begin. */
   | { readonly step: 'beginning'; readonly provider: LoginProvider }
   /** `prompt.mode` says whether kurier polls (`auto`) or the person pastes a code (`code`). */
@@ -77,6 +80,8 @@ export class LoginController {
   #pendingCode: ((code: string | null) => void) | null = null;
   /** Answers collected so far for the method in `fields`. */
   #given: Record<string, string> = {};
+  /** The form answers of the key method in `key`, sent with the key. */
+  #keyAnswer: Record<string, string> = {};
 
   constructor(deps: LoginControllerDeps) {
     this.#deps = deps;
@@ -158,7 +163,44 @@ export class LoginController {
       this.#set({ step: 'fields', provider, method, missing });
       return;
     }
+    if (method.kind === 'key') {
+      this.#keyAnswer = answer;
+      this.#set({ step: 'key', provider, method });
+      return;
+    }
     await this.#begin(provider, method, answer);
+  }
+
+  /**
+   * Hand a pasted API key to opencode. The key is held in this call and nowhere else: not in `state`, not in
+   * a field, and not in a message — a failure says what the server answered, never what was sent.
+   */
+  async submitKey(provider: LoginProvider, key: string): Promise<void> {
+    const session = this.#session;
+    const trimmed = key.trim();
+    if (!session || trimmed === '') return;
+    this.#set({ step: 'beginning', provider });
+    try {
+      await session.connectKey(provider.id, trimmed, this.#keyAnswer);
+    } catch (error) {
+      this.#set({ step: 'failed', message: messageOf(error) });
+      return;
+    }
+    await this.#connected(provider);
+  }
+
+  async #connected(provider: LoginProvider): Promise<void> {
+    try {
+      await this.#deps.onConnected?.(provider);
+    } catch (error) {
+      // The login itself worked; only the follow-up did not. Say so instead of calling it a failure.
+      this.#set({
+        step: 'failed',
+        message: `logged in, but the agent could not be restarted: ${messageOf(error)}`,
+      });
+      return;
+    }
+    this.#set({ step: 'connected', provider });
   }
 
   async #begin(provider: LoginProvider, method: LoginMethod, answer: Record<string, string>): Promise<void> {
@@ -187,17 +229,7 @@ export class LoginController {
     }
     switch (result.kind) {
       case 'connected':
-        try {
-          await this.#deps.onConnected?.(provider);
-        } catch (error) {
-          // The login itself worked; only the follow-up did not. Say so instead of calling it a failure.
-          this.#set({
-            step: 'failed',
-            message: `logged in, but the agent could not be restarted: ${messageOf(error)}`,
-          });
-          return;
-        }
-        this.#set({ step: 'connected', provider });
+        await this.#connected(provider);
         return;
       case 'failed':
         this.#set({ step: 'failed', message: result.message });

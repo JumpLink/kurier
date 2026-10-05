@@ -129,22 +129,20 @@ export class LoginDialog {
         content.append(plainLabel(state.reason));
         content.append(button('Close', () => this.close()));
         return;
-      case 'providers': {
-        content.append(
-          plainLabel('Use your own subscription or account. kurier stores nothing: the agent keeps it.'),
-        );
-        const group = new Adw.PreferencesGroup();
-        for (const provider of state.providers) {
-          group.add(this.#providerRow(provider, controller));
-        }
-        content.append(group);
+      case 'providers':
+        this.#renderProviders(content, controller, state.providers);
         return;
-      }
       case 'methods': {
         content.append(plainLabel(`How do you want to log in to ${state.provider.name}?`));
         const group = new Adw.PreferencesGroup();
         for (const method of state.provider.methods) {
-          const row = new Adw.ActionRow({ title: method.label, activatable: true, useMarkup: false });
+          const row = new Adw.ActionRow({
+            title: method.label,
+            subtitle:
+              method.kind === 'key' ? 'Paste a key from the provider’s console' : 'Log in in the browser',
+            activatable: true,
+            useMarkup: false,
+          });
           row.add_suffix(new Gtk.Image({ iconName: 'go-next-symbolic' }));
           row.connect('activated', () => void controller.pickMethod(state.provider, method));
           group.add(row);
@@ -155,6 +153,9 @@ export class LoginDialog {
       }
       case 'fields':
         this.#renderFields(content, controller, state.provider, state.method, state.missing);
+        return;
+      case 'key':
+        this.#renderKey(content, controller, state.provider);
         return;
       case 'waiting': {
         content.append(plainLabel(`Log in to ${state.provider.name}`, ['title-3']));
@@ -218,15 +219,88 @@ export class LoginDialog {
   }
 
   #providerRow(provider: LoginProvider, controller: LoginController): Adw.ActionRow {
+    const ways = [
+      ...new Set(provider.methods.map((method) => (method.kind === 'key' ? 'API key' : 'Browser login'))),
+    ];
+    const notes = [
+      ...(provider.connected ? ['Logged in'] : []),
+      ...(provider.europe ? ['Europe'] : []),
+      ways.join(' · '),
+    ];
     const row = new Adw.ActionRow({
       title: provider.name,
-      subtitle: provider.connected ? 'Logged in' : '',
+      subtitle: notes.join(' · '),
       activatable: true,
       useMarkup: false,
     });
     row.add_suffix(new Gtk.Image({ iconName: 'go-next-symbolic' }));
     row.connect('activated', () => void controller.pickProvider(provider));
     return row;
+  }
+
+  /**
+   * opencode's popular providers and the European ones first, everything else after, and a search over
+   * both: the catalog is 200+ names long. The list scrolls inside the dialog so the search stays in view.
+   */
+  #renderProviders(content: Gtk.Box, controller: LoginController, providers: readonly LoginProvider[]): void {
+    content.append(
+      plainLabel('Use your own subscription, account or API key. kurier stores nothing: the agent keeps it.'),
+    );
+    const search = new Gtk.SearchEntry({ placeholderText: 'Search providers' });
+    content.append(search);
+    const list = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 18 });
+    const entries: Array<{ row: Adw.ActionRow; haystack: string; group: Adw.PreferencesGroup }> = [];
+    const groups: Array<{ group: Adw.PreferencesGroup; rows: Adw.ActionRow[] }> = [];
+    for (const [title, wanted] of [
+      ['Popular', true],
+      ['Other', false],
+    ] as const) {
+      const group = new Adw.PreferencesGroup({ title });
+      const rows: Adw.ActionRow[] = [];
+      for (const provider of providers.filter((candidate) => candidate.featured === wanted)) {
+        const row = this.#providerRow(provider, controller);
+        group.add(row);
+        rows.push(row);
+        entries.push({ row, group, haystack: `${provider.name} ${provider.id}`.toLowerCase() });
+      }
+      if (rows.length === 0) continue;
+      groups.push({ group, rows });
+      list.append(group);
+    }
+    search.connect('search-changed', () => {
+      const query = search.get_text().trim().toLowerCase();
+      for (const entry of entries) entry.row.set_visible(query === '' || entry.haystack.includes(query));
+      for (const { group, rows } of groups) group.set_visible(rows.some((row) => row.get_visible()));
+    });
+    content.append(
+      new Gtk.ScrolledWindow({
+        child: list,
+        hscrollbarPolicy: Gtk.PolicyType.NEVER,
+        propagateNaturalHeight: true,
+        // The floor matters in a small window: without it the dialog is squeezed to a one-row sliver.
+        minContentHeight: 240,
+        maxContentHeight: 380,
+      }),
+    );
+    search.grab_focus();
+  }
+
+  #renderKey(content: Gtk.Box, controller: LoginController, provider: LoginProvider): void {
+    content.append(plainLabel(`${provider.name}: API key`, ['title-3']));
+    content.append(
+      plainLabel(
+        'Paste the key from the provider’s console. It goes to the agent, which stores it; kurier keeps nothing.',
+      ),
+    );
+    const entry = new Adw.PasswordEntryRow({ title: 'API key' });
+    const group = new Adw.PreferencesGroup();
+    group.add(entry);
+    content.append(group);
+    const go = (): void => void controller.submitKey(provider, entry.get_text());
+    entry.connect('entry-activated', go);
+    content.append(button('Continue', go, true));
+    content.append(button('Back', () => void controller.showProviders()));
+    entry.grab_focus();
   }
 
   #renderFields(

@@ -41,7 +41,7 @@ kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
 kurier auth [--agent opencode]             # trap 1's escape hatch
-kurier login [provider] [--method id]       # OAuth login, no terminal (docs/login.md)
+kurier login [provider] [--method id]       # login, no terminal (docs/login.md)
 kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
 ```
 
@@ -263,7 +263,7 @@ ever shown one" flag, because `AgentSession` builds a **new** attachment per fai
 second failure has to be shown.
 
 **Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `core/login/`, [docs/login.md](docs/login.md)): the
-agent's own OAuth flow through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
+agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
 stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
 a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it
 opens the row's dropdown and picks nothing, and `failureAction` withholds either button when the window cannot do it.

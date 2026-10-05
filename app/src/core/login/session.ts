@@ -27,6 +27,7 @@ export async function openLoginSession(agent: AgentCommand): Promise<LoginSessio
   const api = createLoginApi(server.send);
   return {
     providers: () => api.providers(),
+    connectKey: (providerId, key, answer) => api.connectKey(providerId, key, answer),
     begin: (providerId, methodId, answer) => api.begin(providerId, methodId, answer),
     status: (providerId, attemptId) => api.status(providerId, attemptId),
     complete: (providerId, attemptId, code) => api.complete(providerId, attemptId, code),

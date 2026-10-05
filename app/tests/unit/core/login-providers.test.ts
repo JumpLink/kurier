@@ -99,13 +99,27 @@ export default async () => {
     const providers = parseIntegrations(CATALOG);
     const ids = providers.map((p) => p.id);
 
-    await it('offers only providers with an OAuth method', async () => {
-      expect(ids.includes('anthropic')).toBe(false);
+    await it('offers a provider that has only an API key method', async () => {
+      const anthropic = providers.find((p) => p.id === 'anthropic')!;
+      expect(anthropic.methods.map((m) => `${m.kind}:${m.id}`).join(',')).toBe('key:key');
     });
 
-    await it('keeps the OAuth methods and drops the key and env ones', async () => {
+    await it('lists the browser logins before the key, and drops the env method', async () => {
       const openai = providers.find((p) => p.id === 'openai')!;
-      expect(openai.methods.map((m) => m.id).join(',')).toBe('chatgpt-token-sharing,chatgpt-headless');
+      expect(openai.methods.map((m) => m.id).join(',')).toBe('chatgpt-token-sharing,chatgpt-headless,key');
+    });
+
+    await it('marks the featured and the European providers from the policy', async () => {
+      const policy = parseLoginPolicy({ excluded: [], preferred: ['scaleway'], europe: ['scaleway'] });
+      const catalog = {
+        data: [
+          { id: 'scaleway', name: 'Scaleway', methods: [{ type: 'key' }], connections: [] },
+          { id: 'other', name: 'Other', methods: [{ type: 'key' }], connections: [] },
+        ],
+      };
+      const [first, second] = parseIntegrations(catalog, policy);
+      expect([first!.id, first!.featured, first!.europe].join()).toBe('scaleway,true,true');
+      expect([second!.featured, second!.europe].join()).toBe('false,false');
     });
 
     await it('drops a provider the policy excludes, however it is spelled in the catalog', async () => {
@@ -113,7 +127,7 @@ export default async () => {
     });
 
     await it('puts the preferred providers first, in their order, and the rest by name', async () => {
-      expect(ids.join(',')).toBe('opencode,openai,github-copilot,poe');
+      expect(ids.join(',')).toBe('opencode,openai,github-copilot,anthropic,poe');
     });
 
     await it('says which provider already holds a connection', async () => {
@@ -151,6 +165,12 @@ export default async () => {
   await describe('the shipped policy', async () => {
     await it('does not offer xAI, and says why', async () => {
       expect(LOGIN_POLICY.excluded.get('xai')!.length > 0).toBe(true);
+    });
+
+    await it('lists opencode’s own popular providers first and Scaleway among the European ones', async () => {
+      expect(LOGIN_POLICY.preferred.slice(0, 2).join()).toBe('opencode,opencode-go');
+      expect(LOGIN_POLICY.europe.has('scaleway')).toBe(true);
+      expect(LOGIN_POLICY.preferred.includes('scaleway')).toBe(true);
     });
 
     await it('rejects an entry without a reason', async () => {

@@ -11,6 +11,7 @@
  * kurier login poe                   # one method: starts the login
  * kurier login openai --method chatgpt-headless
  * kurier login github-copilot --method device --answer deploymentType=github.com
+ * echo "$KEY" | kurier login scaleway   # an API key: read from stdin, never from an argument
  * ```
  *
  * It needs opencode v2. v1 has no such API and answers a 404 on the catalog, which this reports as
@@ -18,6 +19,7 @@
  */
 
 import { createInterface } from 'node:readline';
+import { Writable } from 'node:stream';
 
 import type { CommandModule } from 'yargs';
 
@@ -46,7 +48,11 @@ function parseAnswers(raw: unknown): Record<string, string> | string {
 function listProviders(providers: readonly LoginProvider[]): void {
   for (const provider of providers) {
     out(`${provider.id} — ${provider.name}${provider.connected ? '  (connected)' : ''}`);
-    for (const method of provider.methods) out(`    --method ${method.id}   ${method.label}`);
+    for (const method of provider.methods) {
+      out(
+        `    --method ${method.id}   ${method.label}${method.kind === 'key' ? '  (key read from stdin)' : ''}`,
+      );
+    }
   }
 }
 
@@ -70,9 +76,36 @@ function readLine(prompt: string): Promise<string | null> {
   });
 }
 
+/**
+ * A key from stdin, never from an argument: an argument is in the process list and the shell history.
+ * On a terminal the typed characters are not echoed; a pipe is read to its end.
+ */
+async function readSecret(prompt: string): Promise<string | null> {
+  if (!process.stdin.isTTY) {
+    // Events, not `for await`: GJS's stdin is not async-iterable (measured: "process.stdin is not iterable").
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      process.stdin.on('data', (chunk) => chunks.push(Buffer.from(chunk as Uint8Array)));
+      process.stdin.once('end', () => resolve(Buffer.concat(chunks).toString('utf8').trim() || null));
+      process.stdin.once('error', () => resolve(null));
+    });
+  }
+  const muted = new Writable({ write: (_chunk, _encoding, done) => done() });
+  process.stderr.write(prompt);
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: muted, terminal: true });
+    rl.question('', (answer) => {
+      rl.close();
+      process.stderr.write('\n');
+      resolve(answer.trim() || null);
+    });
+    rl.once('close', () => resolve(null));
+  });
+}
+
 const command: CommandModule = {
   command: 'login [provider]',
-  describe: "log in to a provider through the agent's own OAuth flow, with no terminal login",
+  describe: 'log in to a provider (browser login or API key) through the agent, with no terminal login',
   builder: (yargs) =>
     yargs
       .positional('provider', { type: 'string', describe: 'which provider; none lists them' })
@@ -180,6 +213,25 @@ const command: CommandModule = {
         err(`${method.label} needs more before it can start:`);
         for (const field of missing) err(`    --answer ${describeField(method, field.key)}`);
         process.exitCode = 1;
+        return;
+      }
+
+      if (method.kind === 'key') {
+        const key = await readSecret(`${provider.name} API key: `);
+        if (!key) {
+          err('no key given — pipe it in (`… | kurier login <provider>`) or run this in a terminal.');
+          process.exitCode = 1;
+          return;
+        }
+        try {
+          await api.connectKey(provider.id, key, answer);
+        } catch (error) {
+          err(`the key was not accepted: ${error instanceof Error ? error.message : String(error)}`);
+          process.exitCode = 1;
+          return;
+        }
+        out(`logged in to ${provider.name}.`);
+        err('  an agent that is already running may need a restart to see it.');
         return;
       }
 
