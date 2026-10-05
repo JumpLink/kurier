@@ -476,6 +476,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     if (options.notice) this.#showNotice(options.notice, options.rememberNotice);
     if (options.preferences) this.#installPreferences(app, options.preferences);
     this.#installNewChat(app);
+    this.#installLogin();
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
@@ -532,6 +533,20 @@ export class MainWindow extends Adw.ApplicationWindow {
     action.connect('activate', () => dialog.show(this));
     app.add_action(action);
     app.set_accels_for_action('app.preferences', ['<Ctrl>comma']);
+  }
+
+  /**
+   * `win.login`: the menu's "Log in to a provider…", reachable with or without a working login — a person
+   * may want a second provider. Disabled where the dialog could only say no (another agent than opencode,
+   * a host opencode outside the sandbox), so the entry is insensitive rather than pointing at nothing.
+   */
+  #installLogin(): void {
+    const action = new Gio.SimpleAction({
+      name: 'login',
+      enabled: loginUnavailableReason(this.#loginAgent) === null,
+    });
+    action.connect('activate', () => this.#openLogin());
+    this.add_action(action);
   }
 
   /**
