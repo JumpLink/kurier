@@ -494,11 +494,12 @@ export class AgentSession {
    * asked for. A failure (an `auth` trap, a refusal) is forgiven, since the cause is what the person just
    * fixed; the conversation the window points at stays, and the next prompt binds it again.
    */
-  async restartAgent(): Promise<void> {
-    if (this.#turn) return;
+  async restartAgent(): Promise<boolean> {
+    if (this.#turn) return false;
     this.#setAttachment({ status: 'none' });
     await this.#retire();
     this.#emit();
+    return true;
   }
 
   /**

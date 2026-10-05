@@ -80,6 +80,12 @@ export default async () => {
       expect(h.calls.includes('open')).toBe(false);
     });
 
+    await it('a second open does not start a second server', async () => {
+      const h = harness();
+      await Promise.all([h.controller.open(), h.controller.open()]);
+      expect(h.calls.filter((c) => c === 'open').length).toBe(1);
+    });
+
     await it('lists the providers after the server is up', async () => {
       const h = harness();
       await h.controller.open();
@@ -92,7 +98,7 @@ export default async () => {
       await h.controller.pickProvider(POE);
       expect(h.controller.state.step).toBe('connected');
       expect(h.calls.includes('begin poe/device {}')).toBe(true);
-      expect(h.calls.indexOf('connected poe') < h.calls.length).toBe(true);
+      expect(h.calls.includes('connected poe')).toBe(true);
       expect(h.steps.join()).toBe('starting,providers,beginning,waiting,connected');
     });
 

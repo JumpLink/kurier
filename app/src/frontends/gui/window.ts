@@ -657,6 +657,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    * clicks through a list.
    */
   #open(listed: SessionRecord): void {
+    // A login dialog is about the agent as it was; leaving for another session closes it.
+    this.#login.close();
     const record = this.#fresh(listed);
     const label = labelOf(record);
     this.#openRecord = record;
@@ -820,7 +822,11 @@ export class MainWindow extends Adw.ApplicationWindow {
       unavailableReason: () => loginUnavailableReason(agent),
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       now: () => Date.now(),
-      onConnected: () => this.#agent.restartAgent(),
+      onConnected: async () => {
+        // A turn in flight is left alone, so say so instead of claiming a restart that did not happen.
+        if (!(await this.#agent.restartAgent()))
+          throw new Error('a turn is still running — send again once it ends');
+      },
     });
     this.#login.show(this, controller);
   }

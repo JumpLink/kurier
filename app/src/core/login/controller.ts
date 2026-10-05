@@ -72,6 +72,7 @@ export class LoginController {
   #state: LoginState = { step: 'starting' };
   #session: LoginSession | null = null;
   #closed = false;
+  #opening = false;
   #cancelled = false;
   #pendingCode: ((code: string | null) => void) | null = null;
   /** Answers collected so far for the method in `fields`. */
@@ -98,6 +99,16 @@ export class LoginController {
 
   /** Start the server and show the providers. */
   async open(): Promise<void> {
+    if (this.#session || this.#opening) return;
+    this.#opening = true;
+    try {
+      await this.#open();
+    } finally {
+      this.#opening = false;
+    }
+  }
+
+  async #open(): Promise<void> {
     const reason = this.#deps.unavailableReason();
     if (reason) {
       this.#set({ step: 'unavailable', reason });
