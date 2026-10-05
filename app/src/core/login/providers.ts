@@ -3,14 +3,14 @@
  *
  * **The catalog is the agent's, the policy is kurier's.** opencode v2 lists every integration it knows
  * (`GET /api/integration`, 229 on 2.0.22) with the ways to connect each: an API key, an environment
- * variable, or an OAuth flow. kurier offers only the OAuth ones — a key typed into a kurier window is a
- * credential in kurier's hands, and `AGENTS.md` § Privacy keeps that tier empty. An OAuth flow never
- * passes through here: opencode runs it, shows kurier a URL and a code, and keeps the result in its own
- * store.
+ * variable, or an OAuth flow. kurier offers the browser logins and the API key; the environment method is
+ * left out. An OAuth flow never passes through here: opencode runs it, shows kurier a URL and a code, and
+ * keeps the result in its own store. A pasted key is handed to opencode in one call and held nowhere else
+ * (`AGENTS.md` § Privacy: memory only, never persisted).
  *
  * `app/data/login-providers.json` is the one list kurier owns: providers it deliberately does not offer
- * (`excluded`, each with its reason) and the order the rest are shown in (`preferred`). A provider that is
- * in neither is still shown, after the preferred ones — a new provider upstream is a row, not a code
+ * (`excluded`, each with its reason), the featured order (`preferred`) and the European ones (`europe`). A
+ * provider that is in none is still shown, after the featured ones — a new provider upstream is a row, not a code
  * change, and the file is only touched to *remove* or *reorder*.
  *
  * Pure: no process, no network. The shape parsed here was measured against opencode 2.0.22.
@@ -96,7 +96,7 @@ export function parseLoginPolicy(value: unknown): LoginPolicy {
   if (!Array.isArray(value['preferred']) || !value['preferred'].every((id) => typeof id === 'string')) {
     fail('`preferred` is not a list of ids');
   }
-  const europe = value['europe'] ?? [];
+  const europe = value['europe'] === undefined ? [] : value['europe'];
   if (!Array.isArray(europe) || !europe.every((id) => typeof id === 'string')) {
     fail('`europe` is not a list of ids');
   }

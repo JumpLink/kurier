@@ -249,7 +249,7 @@ export class LoginDialog {
     const search = new Gtk.SearchEntry({ placeholderText: 'Search providers' });
     content.append(search);
     const list = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 18 });
-    const entries: Array<{ row: Adw.ActionRow; haystack: string; group: Adw.PreferencesGroup }> = [];
+    const entries: Array<{ row: Adw.ActionRow; haystack: string }> = [];
     const groups: Array<{ group: Adw.PreferencesGroup; rows: Adw.ActionRow[] }> = [];
     for (const [title, wanted] of [
       ['Popular', true],
@@ -261,7 +261,7 @@ export class LoginDialog {
         const row = this.#providerRow(provider, controller);
         group.add(row);
         rows.push(row);
-        entries.push({ row, group, haystack: `${provider.name} ${provider.id}`.toLowerCase() });
+        entries.push({ row, haystack: `${provider.name} ${provider.id}`.toLowerCase() });
       }
       if (rows.length === 0) continue;
       groups.push({ group, rows });
@@ -298,7 +298,11 @@ export class LoginDialog {
     content.append(group);
     const go = (): void => void controller.submitKey(provider, entry.get_text());
     entry.connect('entry-activated', go);
-    content.append(button('Continue', go, true));
+    const next = button('Continue', go, true);
+    // Nothing to send until something is typed: a dead button would say nothing.
+    next.set_sensitive(false);
+    entry.connect('changed', () => next.set_sensitive(entry.get_text().trim() !== ''));
+    content.append(next);
     content.append(button('Back', () => void controller.showProviders()));
     entry.grab_focus();
   }

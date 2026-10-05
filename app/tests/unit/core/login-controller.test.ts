@@ -131,8 +131,30 @@ export default async () => {
       expect(JSON.stringify(h.controller.state).includes('sk-secret-synthetic')).toBe(false);
     });
 
+    await it('a second submit while the first is in flight stores and restarts once', async () => {
+      const h = harness();
+      await h.controller.open();
+      await h.controller.pickProvider(SCALEWAY);
+      await Promise.all([
+        h.controller.submitKey(SCALEWAY, 'sk-synthetic'),
+        h.controller.submitKey(SCALEWAY, 'sk-synthetic'),
+      ]);
+      expect(h.calls.filter((c) => c.startsWith('key ')).length).toBe(1);
+      expect(h.calls.filter((c) => c.startsWith('connected')).length).toBe(1);
+    });
+
+    await it('keeps one provider’s form answers out of another provider’s key call', async () => {
+      const h = harness();
+      await h.controller.open();
+      await h.controller.pickMethod(SCALEWAY, { ...KEY, fields: [] });
+      await h.controller.submitKey(SCALEWAY, 'sk-a');
+      await h.controller.pickProvider(SCALEWAY);
+      await h.controller.submitKey(SCALEWAY, 'sk-b');
+      expect(h.calls.filter((c) => c.startsWith('key ')).every((c) => c.endsWith('{}'))).toBe(true);
+    });
+
     await it('reports a rejected key as a failure and does not restart the agent', async () => {
-      const h = harness({ keyError: 'invalid key' });
+      const h = harness({ keyError: 'invalid key sk-secret-synthetic' });
       await h.controller.open();
       await h.controller.pickProvider(SCALEWAY);
       await h.controller.submitKey(SCALEWAY, 'sk-secret-synthetic');

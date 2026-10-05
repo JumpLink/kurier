@@ -148,6 +148,7 @@ export class LoginController {
   /** Pick a method: ask for what it needs, or begin. */
   pickMethod(provider: LoginProvider, method: LoginMethod): Promise<void> | void {
     this.#given = {};
+    this.#keyAnswer = {};
     return this.submitFields(provider, method, {});
   }
 
@@ -178,14 +179,17 @@ export class LoginController {
   async submitKey(provider: LoginProvider, key: string): Promise<void> {
     const session = this.#session;
     const trimmed = key.trim();
-    if (!session || trimmed === '') return;
+    // Only from the key step: a second submit while the first is in flight would store and restart twice.
+    if (!session || this.#state.step !== 'key' || trimmed === '') return;
     this.#set({ step: 'beginning', provider });
     try {
       await session.connectKey(provider.id, trimmed, this.#keyAnswer);
     } catch (error) {
-      this.#set({ step: 'failed', message: messageOf(error) });
+      // A server may echo what it was sent; the key is never in a message.
+      this.#set({ step: 'failed', message: messageOf(error).split(trimmed).join('[key]') });
       return;
     }
+    this.#keyAnswer = {};
     await this.#connected(provider);
   }
 
