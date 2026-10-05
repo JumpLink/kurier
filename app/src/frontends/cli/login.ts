@@ -88,6 +88,8 @@ async function readSecret(prompt: string): Promise<string | null> {
       process.stdin.on('data', (chunk) => chunks.push(Buffer.from(chunk as Uint8Array)));
       process.stdin.once('end', () => resolve(Buffer.concat(chunks).toString('utf8').trim() || null));
       process.stdin.once('error', () => resolve(null));
+      // The command's own SIGINT handler replaced the default one, so a never-ending stdin would hang.
+      process.once('SIGINT', () => resolve(null));
     });
   }
   const muted = new Writable({ write: (_chunk, _encoding, done) => done() });
@@ -226,7 +228,8 @@ const command: CommandModule = {
         try {
           await api.connectKey(provider.id, key, answer);
         } catch (error) {
-          err(`the key was not accepted: ${error instanceof Error ? error.message : String(error)}`);
+          const reason = error instanceof Error ? error.message : String(error);
+          err(`the key was not accepted: ${reason.split(key).join('[key]')}`);
           process.exitCode = 1;
           return;
         }

@@ -40,9 +40,9 @@ kurier start [prompt..] --agent opencode   # new session, one prompt turn
 kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
-kurier auth [--agent opencode]             # trap 1's escape hatch
+kurier auth [--agent opencode]             # trap 1's way out
 kurier login [provider] [--method id]       # login, no terminal (docs/login.md)
-kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
+kurier agents                              # launchers, SOURCE, what kurier would use
 ```
 
 **Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
@@ -94,8 +94,8 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
   repository. `.gitignore` is the second line of defence; not writing there is the first, and it
   lives in `app/src/core/paths.ts`. Backup tier: `state` — declared in `.werkstatt-state.json`.
 - There is **no `secret` tier, and adding one needs a reason.** kurier stores no credential:
-  `kurier auth` runs the agent's own login with inherited stdio and keeps nothing. The agent's
-  credentials live wherever the agent keeps them and kurier neither reads nor copies them. Do not
+  `kurier auth` runs the agent's own login. The agent keeps its credentials and kurier never reads them
+  back; a pasted API key (`kurier login`, login dialog) is held in memory for one call, never written. Do not
   put a token in a session record, in a launcher `env`, or in any file here — there is no file here
   with a safe place for it.
 - Test fixtures are **synthetic only**. A real session id, a real prompt or a real model reply from
