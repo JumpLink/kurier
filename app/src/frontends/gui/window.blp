@@ -274,6 +274,13 @@ template $KurierMainWindow: Adw.ApplicationWindow {
 menu primary_menu {
   section {
     item {
+      label: "Log in to a provider…";
+      action: "win.login";
+    }
+  }
+
+  section {
+    item {
       label: "Preferences";
       action: "app.preferences";
     }
