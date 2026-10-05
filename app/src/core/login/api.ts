@@ -11,6 +11,7 @@
  * - `GET  /api/integration/{id}/connect/oauth/{attempt}` — `pending` | `complete` | `failed{message}` | `expired`.
  * - `POST …/complete` `{code}` — for `code` mode.
  * - `DELETE …/{attempt}` — cancel.
+ * - `POST /api/integration/{id}/connect/key` `{key, answer?}` — an API key; answers 204 with no body.
  *
  * v1 has none of this (it has `/provider/auth`), which is why a 404 on the catalog is its own error: it
  * means "this opencode cannot be logged in to from here", not "something broke".
@@ -100,6 +101,8 @@ function parseStatus(response: HttpResponse): OAuthStatus {
 }
 
 export interface OpencodeLogin extends LoginApi {
+  /** Hand opencode an API key, which it stores. kurier keeps it only for the length of this call. */
+  connectKey(providerId: string, key: string, answer: Readonly<Record<string, string>>): Promise<void>;
   /** The providers to offer. Rejects with a 404 `LoginApiError` for an opencode that has no such API. */
   providers(policy?: LoginPolicy): Promise<LoginProvider[]>;
 }
@@ -112,6 +115,10 @@ export function createLoginApi(send: Send): OpencodeLogin {
       const response = await send('GET', '/api/integration');
       if (response.status === 404) throw new LoginApiError(404, 'this opencode has no integration API');
       return parseIntegrations(ok(response).json, policy);
+    },
+    async connectKey(providerId, key, answer) {
+      const body = Object.keys(answer).length > 0 ? { key, answer } : { key };
+      ok(await send('POST', `/api/integration/${encodeURIComponent(providerId)}/connect/key`, body));
     },
     async begin(providerId, methodId, answer) {
       const body = Object.keys(answer).length > 0 ? { methodID: methodId, answer } : { methodID: methodId };

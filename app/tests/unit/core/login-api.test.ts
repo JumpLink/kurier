@@ -144,5 +144,25 @@ export default async () => {
       const providers = await createLoginApi(recorder(catalog).send).providers();
       expect(providers.map((p) => p.id).join(',')).toBe('poe');
     });
+
+    await it('sends an API key to connect/key and accepts the empty 204', async () => {
+      const r = recorder({ status: 204, json: null });
+      await createLoginApi(r.send).connectKey('scaleway', 'sk-synthetic', {});
+      expect(r.requests.join('\n')).toBe('POST /api/integration/scaleway/connect/key {"key":"sk-synthetic"}');
+    });
+
+    await it('sends the form answers with the key, and rejects a 400 without echoing the key', async () => {
+      const r = recorder({ status: 400, json: { message: 'bad request' } });
+      let message = '';
+      try {
+        await createLoginApi(r.send).connectKey('azure', 'sk-synthetic', { resource: 'r' });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(r.requests[0]).toBe(
+        'POST /api/integration/azure/connect/key {"key":"sk-synthetic","answer":{"resource":"r"}}',
+      );
+      expect(message).toBe('bad request');
+    });
   });
 };

@@ -45,6 +45,8 @@ export interface LoginField {
 
 export interface LoginMethod {
   readonly id: string;
+  /** `oauth`: a browser login opencode runs. `key`: an API key the person pastes, which opencode stores. */
+  readonly kind: 'oauth' | 'key';
   readonly label: string;
   readonly fields: readonly LoginField[];
 }
@@ -54,6 +56,10 @@ export interface LoginProvider {
   readonly name: string;
   /** opencode already holds a connection for it. */
   readonly connected: boolean;
+  /** Listed first: opencode's own popular providers and the European ones (`login-providers.json`). */
+  readonly featured: boolean;
+  /** A provider based in Europe, said on its row. */
+  readonly europe: boolean;
   readonly methods: readonly LoginMethod[];
 }
 
@@ -61,6 +67,7 @@ export interface LoginPolicy {
   /** Provider id → why kurier does not offer it. */
   readonly excluded: ReadonlyMap<string, string>;
   readonly preferred: readonly string[];
+  readonly europe: ReadonlySet<string>;
 }
 
 function fail(message: string): never {
@@ -89,7 +96,11 @@ export function parseLoginPolicy(value: unknown): LoginPolicy {
   if (!Array.isArray(value['preferred']) || !value['preferred'].every((id) => typeof id === 'string')) {
     fail('`preferred` is not a list of ids');
   }
-  return { excluded, preferred: value['preferred'] as string[] };
+  const europe = value['europe'] ?? [];
+  if (!Array.isArray(europe) || !europe.every((id) => typeof id === 'string')) {
+    fail('`europe` is not a list of ids');
+  }
+  return { excluded, preferred: value['preferred'] as string[], europe: new Set(europe as string[]) };
 }
 
 export const LOGIN_POLICY: LoginPolicy = parseLoginPolicy(raw);
@@ -141,10 +152,15 @@ function parseField(value: unknown): LoginField | null {
   };
 }
 
+/** The key method carries no id or label on the wire; kurier gives it the same ones everywhere. */
+export const KEY_METHOD_ID = 'key';
+
 function parseMethod(value: unknown): LoginMethod | null {
-  if (!isRecord(value) || value['type'] !== 'oauth') return null;
-  const id = text(value['id']);
-  const label = text(value['label']);
+  if (!isRecord(value)) return null;
+  const kind = value['type'];
+  if (kind !== 'oauth' && kind !== 'key') return null;
+  const id = kind === 'key' ? KEY_METHOD_ID : text(value['id']);
+  const label = kind === 'key' ? 'API key' : text(value['label']);
   if (!id || !label) return null;
   const fields: LoginField[] = [];
   for (const entry of Array.isArray(value['form']) ? value['form'] : []) {
@@ -152,7 +168,7 @@ function parseMethod(value: unknown): LoginMethod | null {
     if (!field) return null;
     fields.push(field);
   }
-  return { id, label, fields };
+  return { id, kind, label, fields };
 }
 
 /**
@@ -181,7 +197,10 @@ export function parseIntegrations(body: unknown, policy: LoginPolicy = LOGIN_POL
       id,
       name,
       connected: Array.isArray(entry['connections']) && entry['connections'].length > 0,
-      methods,
+      featured: policy.preferred.includes(id),
+      europe: policy.europe.has(id),
+      // A browser login before a pasted key: it is the one that needs nothing from a console.
+      methods: [...methods].sort((a, b) => Number(a.kind === 'key') - Number(b.kind === 'key')),
     });
   }
   const rank = (id: string): number => {

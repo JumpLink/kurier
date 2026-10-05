@@ -34,11 +34,24 @@ client. Everything is tested on both runtimes against a scripted API.
 
 ## What is on offer
 
-OAuth methods only. `app/data/login-providers.json` holds the two things kurier owns: the providers it does
-not offer (`xai`, by decision of 2026-10-04, each with a reason) and the order of the rest. A provider in
-neither list is still shown, after the preferred ones. Methods that ask a question (a GitHub Enterprise host,
-a Snowflake account) work through `--answer key=value`; a field type kurier has no widget for leaves the
-method out.
+Every provider opencode's catalog lists, minus the ones kurier does not offer, with two kinds of way in:
+a **browser login** (`oauth`: opencode runs the flow, kurier shows a URL and a code) and an **API key**
+(`key`: the person pastes it, kurier hands it to `POST /api/integration/{id}/connect/key` and opencode
+stores it; measured 204 on 2.0.22, and the key was found in opencode's own store only). 228 of 229 providers
+have a key method, 10 an OAuth one. The `env` method (read a variable) is not offered.
+
+The key is held for the length of that one call: not in the controller's `state`, not in a message, not in a
+file. The CLI reads it from stdin (`echo "$KEY" | kurier login scaleway`), never from an argument, which would
+sit in the process list and the shell history.
+
+`app/data/login-providers.json` holds what kurier owns: the providers it does not offer (`xai`, by decision of
+2026-10-04, each with a reason), the **featured** order and the **European** providers. The featured list is
+opencode's own "popular" set (`opencode`, `opencode-go`, `openai`, `github-copilot`, `anthropic`, `google`,
+`openrouter`, `vercel`, from its TUI and app pickers) followed by the European ones (Mistral, Scaleway,
+OVHcloud, STACKIT, Berget, Infomaniak, Hetzner, Cortecs); the window shows them under **Popular**, everything
+else under **Other**, with a search box over both. A provider in neither list is still shown. Methods that ask a
+question (a GitHub Enterprise host, an Azure resource) work through `--answer key=value`; a field type kurier
+has no widget for leaves the method out.
 
 ## No login wall
 
