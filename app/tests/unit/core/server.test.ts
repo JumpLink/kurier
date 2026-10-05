@@ -73,6 +73,18 @@ export default async () => {
       );
     });
 
+    await it('kills a server that ignores SIGTERM instead of hanging on close', async () => {
+      await withProgram(
+        'trap "" TERM\necho "server listening on http://127.0.0.1:2"\nwhile :; do sleep 1; done',
+        async (program) => {
+          const server = await startServer(agent(program));
+          const began = Date.now();
+          await server.close();
+          expect(Date.now() - began < 10_000).toBe(true);
+        },
+      );
+    });
+
     await it('gives every start its own password', async () => {
       await withProgram('echo "server listening on http://127.0.0.1:1"\nexec sleep 30', async (program) => {
         const [a, b] = [await startServer(agent(program)), await startServer(agent(program))];

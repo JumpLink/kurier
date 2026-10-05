@@ -28,6 +28,9 @@ import type { AgentCommand } from './stdio.ts';
 
 export const SERVER_START_TIMEOUT_MS = 20_000;
 
+/** How long a stopping server gets before SIGKILL. */
+export const SERVER_KILL_GRACE_MS = 2_000;
+
 /** The line `opencode serve` prints once it listens (measured: `server listening on http://127.0.0.1:38775`). */
 const LISTENING = /server listening on (http:\/\/\S+)/;
 
@@ -114,7 +117,15 @@ export function startServer(
 
     const close = async (): Promise<void> => {
       if (!exited) child.kill('SIGTERM');
-      await exit;
+      // A server that ignores SIGTERM must not hang the dialog's close or outlive it.
+      const grace = setTimeout(() => {
+        if (!exited) child.kill('SIGKILL');
+      }, SERVER_KILL_GRACE_MS);
+      try {
+        await exit;
+      } finally {
+        clearTimeout(grace);
+      }
     };
     const fail = (error: Error): void => {
       if (settled) return;

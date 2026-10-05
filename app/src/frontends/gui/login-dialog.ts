@@ -255,7 +255,7 @@ export class LoginDialog {
         group.add(row);
         read.push(() => [field.key, options[row.get_selected()]?.value ?? '']);
       } else {
-        const row = new Adw.EntryRow({ title: field.title });
+        const row = new Adw.EntryRow({ title: field.title, useMarkup: false });
         if (field.default) row.set_text(field.default);
         group.add(row);
         read.push(() => [field.key, row.get_text().trim()]);

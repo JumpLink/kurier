@@ -369,7 +369,7 @@ export default async () => {
       const before = h.session.snapshot.attachment;
       expect(before.status === 'failed' && before.kind).toBe('auth');
       const closedBefore = h.closed();
-      await h.session.restartAgent();
+      expect(await h.session.restartAgent()).toBe(true);
       expect(h.session.snapshot.attachment.status).toBe('none');
       expect(h.closed()).toBe(closedBefore + 1);
     });
