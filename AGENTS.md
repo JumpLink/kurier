@@ -87,6 +87,12 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
   as `denyAll` or `deny-all` depending on version, and a gate that silently stopped firing is the
   worst failure a flag whose whole job is stopping things can have.
 
+## Licence
+
+Apps (`app/`, the repo root) are AGPL-3.0-or-later; the reusable packages under `packages/*` are
+LGPL-3.0-or-later (own `LICENSE` + `COPYING`). A LGPL package never depends on an AGPL one; new
+packages under `packages/*` follow the same split. No SPDX headers in sources.
+
 ## Privacy — this repo is PUBLIC
 
 - The session file holds **the text of a person's conversations with an agent**. It lives at
