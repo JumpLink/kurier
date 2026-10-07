@@ -104,4 +104,6 @@ See [AGENTS.md](AGENTS.md).
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE) © Pascal Garber.
+The apps are [AGPL-3.0-or-later](LICENSE); the reusable packages under `packages/*`
+(`@kurier/acp`, `@kurier/session`) are LGPL-3.0-or-later, each with its own `LICENSE` and
+`COPYING`. © Pascal Garber.
