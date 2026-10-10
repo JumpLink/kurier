@@ -29,7 +29,7 @@
  * same rule the CLI's Ctrl-C obeys (`AGENTS.md`).
  */
 
-import type { AcpClient, RequestPermissionRequest } from '@kurier/acp';
+import type { AcpClient, McpServer, RequestPermissionRequest } from '@kurier/acp';
 import type { ClientGate } from '@kurier/acp/gate';
 import type {
   RequestPermissionResponse,
@@ -215,6 +215,12 @@ export interface AgentSessionOptions {
   readonly open?: (options: OpenAgentOptions) => Promise<AgentHandle>;
   /** How long a close waits for a cancelled turn. Default `CLOSE_GRACE_MS`. */
   readonly closeGraceMs?: number;
+  /**
+   * The host's own MCP servers (ACP `McpServer`), sent unchanged in `session/new` and in the reattach
+   * of a stored session. Absent means `session/new` carries `[]` and a reattach adds nothing — what the
+   * app and the CLI send. kurier never edits the agent's global config for this.
+   */
+  readonly mcpServers?: readonly McpServer[];
 }
 
 /** What the controller needs of an `AgentHandle`: the connection, and a way to end it. */
@@ -233,6 +239,7 @@ export class AgentSession {
   readonly #now: () => string;
   readonly #open: (options: OpenAgentOptions) => Promise<AgentHandle>;
   readonly #closeGraceMs: number;
+  readonly #mcpServers: McpServer[] | undefined;
   /**
    * One open question, a queue behind it, no memory. Owned here rather than by the surface because the
    * fail-closed paths are *this* file's: a Stop, a closing window and a dying agent are decided here,
@@ -354,6 +361,7 @@ export class AgentSession {
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#open = options.open ?? ((openOptions) => openAgent(openOptions));
     this.#closeGraceMs = options.closeGraceMs ?? CLOSE_GRACE_MS;
+    this.#mcpServers = options.mcpServers ? [...options.mcpServers] : undefined;
     // **Bound in the constructor, not at the first ask.** The desk owns "this question is on screen",
     // and the surface is what is on screen — wiring it lazily would mean the first request of the very
     // first turn took a different path from every one after it.
@@ -679,7 +687,7 @@ export class AgentSession {
         return;
       }
       const answer = await withAuthHint('session/new', () =>
-        handle.client.newSession({ cwd: pending.cwd, mcpServers: [] }),
+        handle.client.newSession({ cwd: pending.cwd, mcpServers: this.#mcpServers ?? [] }),
       );
       const at = this.#now();
       const record = conversationRecord({
@@ -1099,7 +1107,10 @@ export class AgentSession {
     this.#clearConfigRow();
     this.#emitConfig();
     const answer = await withAuthHint('attaching to the session', () =>
-      handle.client.reattach(session.id, { cwd: session.cwd }),
+      handle.client.reattach(session.id, {
+        cwd: session.cwd,
+        ...(this.#mcpServers ? { mcpServers: this.#mcpServers } : {}),
+      }),
     );
     this.#agentSession = session.id;
     this.#takeConfigOptions(answer.configOptions, session.id);
