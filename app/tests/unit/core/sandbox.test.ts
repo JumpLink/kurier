@@ -933,6 +933,62 @@ export default async () => {
         });
       });
     });
+
+    /**
+     * An agent that stops reading its stdin. The write fails asynchronously — on Node as an `EPIPE`
+     * `error` event on the stream — and an unhandled one took the whole process down, the CLI and
+     * every test in the run with it. Measured before the fix: node crashed, gjs logged and went on.
+     */
+    await it('survives an agent that closed its stdin, and ends instead of crashing', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(dir, 'deaf', '#!/bin/sh\nexec 0<&-\nsleep 0.5\nexit 0\n');
+        const channel = new StdioChannel({
+          command: { id: 'deaf', title: 'deaf', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const ended = new Promise<Error | undefined>((resolve) => channel.onEnd(resolve));
+        setTimeout(() => {
+          if (!channel.isClosed) channel.send('x'.repeat(256 * 1024));
+        }, 150);
+        return ended.then((reason) => {
+          expect(channel.isClosed).toBe(true);
+          if (reason) expect(reason.message).toContain(program);
+          expect(() => channel.send('late')).toThrow();
+        });
+      });
+    });
+
+    await it('delivers a large send complete and in order', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        // `exec cat` echoes stdin back, so what arrives on stdout is exactly what got through. `exec`,
+        // not a plain `cat`: a shell left waiting on it is a grandchild that `terminate` cannot reach.
+        const program = writeProgram(dir, 'echo', '#!/bin/sh\nexec cat\n');
+        const channel = new StdioChannel({
+          command: { id: 'echo', title: 'echo', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const lines = Array.from({ length: 64 }, (_, i) => `${i}:${'y'.repeat(32 * 1024)}`);
+        const expected = lines.map((line) => `${line}\n`).join('');
+        let received = '';
+        const echoed = new Promise<void>((resolve) => {
+          channel.onData((chunk) => {
+            received += chunk;
+            if (received.length >= expected.length) resolve();
+          });
+        });
+        for (const line of lines) channel.send(line);
+        return echoed.then(() => {
+          const ended = new Promise<Error | undefined>((resolve) => channel.onEnd(resolve));
+          channel.terminate();
+          expect(received).toBe(expected);
+          return ended.then(() => undefined);
+        });
+      });
+    });
   });
 };
 

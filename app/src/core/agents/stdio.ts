@@ -77,6 +77,19 @@ export interface StdioChannelOptions {
 const DEFAULT_KILL_GRACE_MS = 2000;
 
 /**
+ * The largest piece handed to stdin in one `write`, and it is one pipe page on purpose.
+ *
+ * `stdin.write` already queues: what the pipe cannot take yet waits in the stream's buffer, in
+ * order, so nothing is dropped and the review's "await `drain`" would only move that queue here.
+ * The real failure was on GJS, where the stream's async write is a poll-then-`write()` on a
+ * *blocking* fd: poll says "writable" when one page is free, and a larger write then blocks the
+ * main loop until the agent reads it all. An agent that answers while it reads (every ACP agent)
+ * fills our stdout pipe meanwhile, which nobody can drain from a blocked loop — measured as a frozen
+ * gjs at 256 KB through `cat`. A write of at most a page always fits once poll said yes.
+ */
+const STDIN_CHUNK_BYTES = 4096;
+
+/**
  * How long the "is it installed" host probe may take. Short, because the probe sits on the path of
  * `kurier agents` and of any window that reports launcher state: a slow answer reads as a broken
  * app, and nothing about resolving one program's location is worth more than this.
@@ -120,6 +133,8 @@ export class StdioChannel implements RawChannel {
   #isStdoutDone = false;
   /** stderr has reached EOF (or been torn down), so no further log line can arrive. */
   #isStderrDone = false;
+  /** Why stdin can no longer carry a line — set once, and every later `send` throws it. */
+  #stdinError: Error | undefined = undefined;
 
   constructor(options: StdioChannelOptions) {
     const { program } = options.command;
@@ -170,6 +185,9 @@ export class StdioChannel implements RawChannel {
     };
     this.#child.stderr.on('end', onStderrDone);
     this.#child.stderr.on('close', onStderrDone);
+    this.#child.stdin.on('error', (error: Error) => {
+      this.#stdinError = new Error(`${program} stopped reading its stdin: ${error.message}`);
+    });
     this.#child.on('error', (error: Error) => this.#end(error));
     this.#child.on('exit', (code, signal) => {
       // An agent killed mid-write leaves a partial line in the stderr buffer, and that line is
@@ -200,7 +218,11 @@ export class StdioChannel implements RawChannel {
 
   send(data: string): void {
     if (this.#closed) throw new Error(`${this.command.program} is gone — cannot send`);
-    this.#child.stdin.write(`${data}\n`);
+    if (this.#stdinError) throw this.#stdinError;
+    const bytes = Buffer.from(`${data}\n`, 'utf8');
+    for (let offset = 0; offset < bytes.length; offset += STDIN_CHUNK_BYTES) {
+      this.#child.stdin.write(bytes.subarray(offset, offset + STDIN_CHUNK_BYTES));
+    }
   }
 
   onData(listener: (data: string) => void): void {
