@@ -49,11 +49,21 @@ the server and listed its tools. A server whose command does not exist is **not 
 returns a normal result (`sessionId`, `configOptions`), no error. A host that needs to know its server is up must
 check for itself (the probe's second `session/new` shows this).
 
+## Probe result (step 1, second half, done)
+
+opencode **2.0.25** reports connection state. `scripts/probes/provider-connections.mjs` starts `opencode serve
+--port 0` with a scratch `HOME` and `XDG_*` tree and reads `GET /api/integration`: every provider has a
+`connections` array, empty in a fresh home. After `POST /api/integration/scaleway/connect/key` with a made-up key
+(204) the array holds one entry (`{type: credential, id, label, method}`, no secret) for that provider and the
+rest stay empty. No model call, no real credential. ACP carries no equivalent: `authMethods` is the single terminal
+method and `session/new` succeeds with no login. Free Zen models need no connection, so "nothing connected" is a
+reason to offer a login, not to block the chat.
+
 ## Order of work
 
-Planned; steps 1 to 5 are done.
+Planned; steps 1 to 6 are done.
 
-1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers.
+1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers (done, below).
 2. Make paths and settings injectable. **Done:** `KurierPaths` (`packages/core/src/paths.ts` since step 3: data and config dir plus the
    sessions, settings and notices files; a bundled agent's `HOME`/`XDG_*` follow `dataDir`) is built once at the
    app and CLI entry (`kurierPaths()`, defaults and `KURIER_*` knobs unchanged) and passed down; a host builds
@@ -97,7 +107,17 @@ Planned; steps 1 to 5 are done.
 
    The CSS is split the same way: the widget installs its own sheet (`installWidgetCss`, once per display),
    and the app's `APP_CSS` holds its three sidebar rules, so one owner per rule and a host needs no CSS.
-6. Inline provider onboarding.
+6. Inline provider onboarding. **Done:** `KurierChatOptions.providerOnboarding` (off by default). With it, a new chat
+   shows an `Adw.StatusPage` — "Connect a provider", the two ways in the login already offers (browser login, API
+   key, with the provider counts of the catalog), **Connect a provider…** (the existing login dialog, unchanged) and
+   **Use free hosted models**, labelled as time-limited and sent to the hosting provider. The decision is
+   `onboardingView` in core (pure, tested on both runtimes): it shows only with the option on, an agent found, a login
+   that can run, the catalog reporting **no** connection, and no earlier "free models" choice. Anything unreadable is
+   `unknown` and shows the ordinary chat, so the page fails closed into the behaviour that existed before; a turn that
+   then fails on a login still gets the auth dialog with **Log in…**. After a successful login the agent restarts and
+   the page gives way to the chat. Nothing reads or keeps a credential; the page only counts providers. The kurier
+   app itself does not opt in. Dev hook: `KU_APP_ONBOARDING=1` (`docs/dev-fixtures.md`). No connected-state signal was
+   added; `probeConnections` is exported for a host that wants one.
 7. API docs.
 8. Flatpak module generator from `bundled-agents.json`.
 9. Host integration in Steuererklärung.

@@ -749,6 +749,10 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#applyNewChatMidTurnHook(hooks);
     this.#applyFailureHooks(hooks);
     this.#applyPreferencesHooks(hooks);
+    if (hooks.onboarding === true) {
+      console.log('kurier: KU_APP_ONBOARDING — staging the provider onboarding page');
+      this.#chat.stageOnboarding();
+    }
     if (hooks.login === true) {
       console.log('kurier: KU_APP_LOGIN — opening the login dialog');
       this.#chat.openLogin();

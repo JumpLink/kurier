@@ -68,6 +68,13 @@ template $KurierChat: Adw.Bin {
       }
 
       StackPage {
+        name: "checking";
+        // Blank for the moment `providerOnboarding` reads the connection state, so "New chat" is not drawn
+        // and then replaced. Only ever shown while that probe runs; nothing else switches here.
+        child: Adw.Bin {};
+      }
+
+      StackPage {
         name: "no-agent";
         // The host's nothing-found page. A slot rather than markup: what to do about a missing agent
         // is "install this, or pick another in Preferences", and both halves of that sentence are the

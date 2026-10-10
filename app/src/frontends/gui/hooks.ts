@@ -209,6 +209,13 @@ export interface KurierHooks extends FrameworkHooks {
   login?: boolean;
 
   /**
+   * `KU_APP_ONBOARDING` — show the provider onboarding page as if no provider were connected and a
+   * login could run (`KurierChat.stageOnboarding`). A flag. The stand-in agent has no login API, so the
+   * real probe could never reach this state against it.
+   */
+  onboarding?: boolean;
+
+  /**
    * `KU_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
    * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `KU_APP_NEW_CHAT=0` stays where it is.
    */
@@ -282,6 +289,7 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     preferences: hookFlag(env, 'PREFERENCES'),
     preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),
     login: hookFlag(env, 'LOGIN'),
+    onboarding: hookFlag(env, 'ONBOARDING'),
     newChat: hookFlag(env, 'NEW_CHAT'),
     newChatMidTurn: hookFlag(env, 'NEW_CHAT_MIDTURN'),
     cwd: hookValue(env, 'CWD'),

@@ -189,7 +189,15 @@ export {
   type LoginPolicy,
   type LoginProvider,
 } from './login/providers.ts';
-export { loginUnavailableReason, openLoginSession } from './login/session.ts';
+export { loginUnavailableReason, openLoginSession, probeConnections } from './login/session.ts';
+export {
+  connectionFacts,
+  onboardingView,
+  type ConnectionFacts,
+  type OnboardingInput,
+  type OnboardingPath,
+  type OnboardingView,
+} from './onboarding.ts';
 
 // ── What a turn is doing, and what went wrong ────────────────────────────────────────────────────
 export {

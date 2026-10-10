@@ -44,6 +44,7 @@ import cwd from './unit/core/cwd.test.ts';
 import conversation from './unit/core/conversation.test.ts';
 import notices from './unit/core/notices.test.ts';
 import emptyState from './unit/core/empty-state.test.ts';
+import onboarding from './unit/core/onboarding.test.ts';
 import loginProviders from './unit/core/login-providers.test.ts';
 import loginFlow from './unit/core/login-flow.test.ts';
 import loginController from './unit/core/login-controller.test.ts';
@@ -95,6 +96,7 @@ run({
   conversation,
   notices,
   emptyState,
+  onboarding,
   loginProviders,
   loginFlow,
   loginController,
