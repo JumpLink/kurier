@@ -51,7 +51,7 @@ check for itself (the probe's second `session/new` shows this).
 
 ## Order of work
 
-Planned; steps 1 to 4 are done.
+Planned; steps 1 to 5 are done.
 
 1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers.
 2. Make paths and settings injectable. **Done:** `KurierPaths` (`packages/core/src/paths.ts` since step 3: data and config dir plus the
@@ -74,8 +74,29 @@ Planned; steps 1 to 4 are done.
    `session-groups.ts` and `private-file.ts`. `frontends/*` is surface code and was never a candidate.
    The unit tests stayed under `app/tests/unit/core/` with their imports repointed, because one runner
    there is what keeps the dual GJS + Node run working.
-4. Plumb `mcpServers` through `AgentSession` (new and reattach).
-5. Create `@kurier/widget`; split `KurierChat` out of `window.ts`.
+5. Create `@kurier/widget`; split `KurierChat` out of `window.ts`. **Done:** `packages/widget` (LGPL) holds
+   `KurierChat`, an `Adw.Bin` a host parents anywhere. It owns the whole chat surface — the transcript,
+   the composer with its model/effort/mode rows, the tool and thought cards, the permission dialog, the
+   failure and login dialogs, and the stack that switches between them. A host passes a resolved
+   `AgentCommand`, the cwd a new chat runs in, optional `mcpServers`, three storage callbacks
+   (`createSession`, `appendTurns`, `resolveAgent`) and an optional `gate` wrapper — no `KurierPaths`
+   and no store, because both are already behind those. The gate is fail-closed by
+   construction: it may answer `'ask'` or `'decline'`, and anything that is not literally `'ask'`
+   resolves the question as `cancelled` — a host can only narrow what kurier would have asked, never
+   widen it.
+
+   **What stayed in the app**, and why: `window.ts` (the shell — the header bar, the notice banner and
+   the `Adw.Bin` the widget sits in), `window.blp`, `session-list.ts` (one app's sidebar and its date
+   grouping; a host embeds one chat, or brings its own list), `preferences.ts` (this app's settings
+   file), `hooks.ts` and `hook-value.ts` (the `KU_APP_*` dev fixtures, an app's own test surface — the
+   widget exposes the methods they drive, such as `stagePermissionRequest()` and `openModelDropdown()`,
+   and the GLib timers that call them stay here). Two idle pages are app copy, so they are built in
+   `window.blp` as top-level `Adw.StatusPage` objects and handed to the widget as `closedPage` and
+   `noAgentPage`; the widget decides *when* to show them, the app decides what they say. `win.login`
+   stays an app menu action over the widget's `hasLogin`/`openLogin()`.
+
+   The CSS is split the same way: the widget exports `WIDGET_CSS`, the app's `APP_CSS` interpolates it
+   and adds its three sidebar rules, so there is one stylesheet at runtime and one owner per rule.
 6. Inline provider onboarding.
 7. API docs.
 8. Flatpak module generator from `bundled-agents.json`.
@@ -87,7 +108,10 @@ Planned; steps 1 to 4 are done.
   before moving files.
 - The host's data directory holds conversation text, here tax data: mode 0700, declared in the
   host's state manifest.
-- Splitting `window.ts` is the main cost and regression risk.
+- Splitting `window.ts` is the main cost and regression risk. Measured after step 5: `window.ts`
+  1366 → 1048 lines plus a 748-line `chat.ts`, so the seam itself costs around 430 lines of options,
+  getters and forwarding. That is the price of a surface a stranger can embed, and the same
+  screenshots prove the app did not change (`docs/design/screenshots/`).
 - The GUI up to v0.1.1 was a proof of concept. Its look was redone before the split
   ([docs/design/](../design/README.md)), so the widget starts from the new design rather than
   carrying the old one along. The redesign changed visuals only, no behaviour.

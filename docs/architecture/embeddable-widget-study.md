@@ -47,6 +47,35 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
   `@kurier/acp` and `@kurier/session` tests already do: one runner in `app/tests/test.mts` is what makes
   the dual GJS + Node run possible at all.
 
+### What step 5 actually did (2026-10-10)
+
+`packages/widget` followed the table's `frontends/gui` row exactly — `composer.ts`, `config-row.ts`,
+`transcript-view.ts`, `tool-line.ts`, `permission-dialog.ts` (+ `permission-body.blp`),
+`failure-dialog.ts` and `login-dialog.ts` moved with no edits at all, in their own commit — and the
+split of `window.ts` came out with five deltas worth recording.
+
+- **`css.ts` and `constants.ts` were split rather than moved**, which is what made the move commit
+  edit-free. The widget owns `WIDGET_CSS` and `CONTENT_MAX_WIDTH_PX`; the app's `APP_CSS`
+  interpolates `${WIDGET_CSS}` and adds its three sidebar rules, so there is still **one**
+  `Gtk.CssProvider` on the display and `main.ts` did not change. The app's `constants.ts` kept what
+  only an app has: the app id, name and version, the window geometry, `COLLAPSE_WIDTH_PX` and the
+  dev-hook prefix.
+- **The two idle pages are the host's widgets, not the widget's copy.** `closed` and `no-agent` are
+  `Adw.Bin` slots in `chat.blp`; kurier's `window.blp` builds two top-level `Adw.StatusPage` objects
+  and passes them as `closedPage` / `noAgentPage`. The widget decides *when* they show (it owns
+  `noAgent.sendReason` and the `'no-agent'`-vs-`'new'` choice), the host decides what they say.
+- **The dev hooks stayed in the app and the widget grew the methods they drive.** `hooks.ts`,
+  `hook-value.ts` and every GLib timer are app-only, and they reach the chat through
+  `stagePermissionRequest()`, `stageConfigOption()`, `openModelDropdown()`, `dismissPermission()`,
+  `closeFailure()` and friends — the same calls a pointer makes, which is the rule
+  `AGENTS.md#the-states-only-a-hook-can-reach` already set. `KU_APP_PERMISSION`'s polling loop and
+  its `KU_APP_*` log lines did not move.
+- **`win.login` stayed an app action.** It is a menu entry, and a menu is the host's; the widget
+  exposes `hasLogin` and `openLogin()` and holds the dialog.
+- **Two deliberate reach-ins beside the barrel, both for measurements**: `@kurier/widget/tool-line`
+  (no imports at all, so the unit test keeps its Node half) and `@kurier/widget/permission-dialog`
+  (the focus probe has to measure *this* widget). A host uses neither.
+
 ## 2. Embedding API sketch
 
 ```ts
@@ -79,12 +108,28 @@ everything else asks". It must never grant by session (guardrail 1: scope is not
 `<dataDir>/agents/<id>/` (`isolation.ts`, 0700), so a host passing its own `dataDir` gets its own login; nothing is
 shared with the user's `~/.config/opencode` or with the kurier app.
 
+### What the options became (step 5, 2026-10-10)
+
+The sketch above is what was asked for; `KurierChatOptions` in `packages/widget/src/chat.ts` is what
+shipped, and the differences are all in the same direction — fewer things the widget decides.
+
+| Sketch | Shipped | Why |
+|---|---|---|
+| `agent: {source, id?}` | `agent: AgentCommand` + `agentSource?` | Resolution is the host's: it already ran `resolveAgent`/`gatherResolveContext` for its own preferences and status, and a second resolver inside the widget would be a second answer. |
+| `storage: {dataDir, sessionsFile?}` | `createSession?`, `appendTurns?`, `resolveAgent?` callbacks | A host that lists sessions keeps its own handle on the file; the widget's two writes (one record, one line per chunk) have nothing to do with each other, and a `SessionStore` would drag `all`/`update`/`remove` in beside them. |
+| `isolation?`, `catalog?` | — (gone) | Both are decided before an `AgentCommand` exists. The command the host passes already carries its own `HOME`/`XDG_*`. |
+| `permissions: PermissionPolicy` | `gate?: (q) => HostGateAnswer \| Promise<HostGateAnswer>`, `HostGateAnswer = 'ask' \| 'decline'` | A policy object invites an allow rule. Two words cannot express one: anything that is not literally `'ask'` — including a throw, a rejection or an unexpected value — resolves the question `cancelled`. |
+| `features?: {sessionList, modelPicker, loginInline}` | — (gone) | No session list to switch off (it never entered the widget), and the other two are facts rather than preferences: `hasModelControl` is whether the agent offered one, `hasLogin` whether this agent can log in. |
+| `start()`, `send(text)` | `open(record)`, `newChat()`, `prompt(text)`, `stop()`, `shutdown()` | There is no "start" without a conversation; a host either opens a stored record or starts a new chat. |
+| Signals (`state-changed`, `turn-started`, …) + properties | `onConversation`, `onNotice` callbacks; getters (`turnRunning`, `agentRunning`, `openSessionId`, `snapshot`, …) | GObject signals were not needed by the first consumer, so they were not invented for it. The getters are what kurier's window actually reads; a signal can be added when a second host wants one. |
+| — | `closedPage?`, `noAgentPage?`, `noAgent?`, `mcpServers?`, `now?` | The two host slots (above), the pass-through MCP list, and an injected clock so a screenshot run is the only place a real one is used. |
+
 ## 3. Host MCP server via `session/new`
 
 - **Schema:** yes. `refs/acp/schema.v1.json` `NewSessionRequest` has required `mcpServers: McpServer[]`
   (also on `LoadSessionRequest`, line ~3324, and the third request at ~4562). `McpServer` is `anyOf` Http / Sse / Stdio.
   `McpServerStdio` = `{name, command (absolute path), args[], env[{name,value}]}`. Http/Sse are gated by the agent's
-  `mcpCapabilities`; opencode 2.0.19 advertises `{"http":true,"sse":false}` (AGENTS.md handshake), stdio is the baseline.
+  `mcpCapabilities`; opencode 2.0.19 advertises `{"http":true,"sse":false}` ([the measured handshake](../../refs/acp/SOURCE.md#what-one-real-agent-answers)), stdio is the baseline.
 - **kurier today:** `AcpClient.newSession` / `reattach` already accept `mcpServers` (`packages/acp/src/client.ts:227-242`)
   and forward them opaquely. Every call site passes `[]`: `packages/core/src/agent-session.ts:682`, `app/src/frontends/cli/start.ts:97`,
   `resume.ts:104`, `cancel.ts:67`. The plumbing is `AgentSessionOptions.mcpServers` (step 4, done).
@@ -146,15 +191,21 @@ Widget needs:
 | 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
 | 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | **Done** (`AgentSessionOptions.mcpServers`). Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
-| 5 | Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
+| 5 | **Done** (`packages/widget`, see above for the deltas). Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
 | 6 | Inline provider onboarding page + connected-state signal | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |
 | 8 | Flatpak module generator from `bundled-agents.json`; make `BUNDLED_PREFIX` configurable | M |
 | 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `KurierChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless kurier API is added. | M |
 
 **Risks**
-- `window.ts` is a 1356-line god-class; splitting it is the real cost and the likeliest source of regressions
-  (GTK construction-order comments in the file warn about exactly this).
+- ~~`window.ts` is a 1356-line god-class; splitting it is the real cost and the likeliest source of regressions
+  (GTK construction-order comments in the file warn about exactly this).~~ **Done in step 5**: 1366 → 1048 lines
+  plus a 748-line `chat.ts`. The construction order was the real hazard and it is now written down twice — the
+  widget's `#config` before its `AgentSession` before its `Composer`, and the window's `#applyBreakpoint()` only
+  after its content is set. Blueprint from a package needed no new tooling, but **no file in this repo may use
+  named imports from a `.blp`**: `tsc` has no `allowArbitraryExtensions` here, so `declare module '*.blp'` answers
+  first with a default-only module (TS2614). `window.ts` and `chat.ts` both use a literal `InternalChildren` array
+  with hand-declared fields and import only the default.
 - The AGPL -> LGPL move relicenses nothing as long as it is Pascal's own code (single copyright holder; check for outside
   contributions before moving). Third-party deps (`@gjsify/adwaita-app` is used in `main.ts`/`hooks.ts`) must be LGPL-compatible.
 - A server that fails to start may be dropped silently; the host needs a way to notice a missing tool.

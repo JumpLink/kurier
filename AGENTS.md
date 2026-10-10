@@ -24,7 +24,8 @@ layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `se
 | `@kurier/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
 | `@kurier/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@kurier/acp`, `node:fs` — no `gi://`, no agent adapter |
 | `@kurier/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@kurier/acp`, `@kurier/session`, `node:*` — no `gi://`, no yargs, no widget |
-| `kurier-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita surface in `src/frontends/gui/` (its own bundle) | all of the above; `gi://` only under `frontends/gui/` |
+| `@kurier/widget` | **The chat surface, as a widget.** `KurierChat` (`chat.ts` + `chat.blp`) — one conversation: transcript (`transcript-view.ts`, `tool-line.ts`), composer (`composer.ts`, `config-row.ts`), the approval dialog (`permission-dialog.ts` + `permission-body.blp`), the failure and login dialogs, `WIDGET_CSS` | `@kurier/core`, `@kurier/session`, `gi://` (GTK 4, Adw 1) — no app, no decisions of its own |
+| `kurier-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita shell in `src/frontends/gui/` (its own bundle) around one `KurierChat` | all of the above; `gi://` only under `frontends/gui/` |
 
 **`packages/acp` does not know that subprocesses exist.** No `spawn`, no `node:child_process`, no
 `gi://`, no dependencies at all — the transport is an injected interface (`Transport` in
@@ -40,10 +41,18 @@ the package, while reading and writing one app's file stays here. Before adding 
 whether a host would want it; if yes it belongs one level down. [ADR
 0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) records what stayed and why.
 
-**The app imports `@kurier/core`, never a file inside it.** `packages/core/src/index.ts` is a deliberate
-barrel, so what is public is a decision somebody made rather than whatever a consumer reached for; a new
-export is one line there. The unit tests live in `app/tests/unit/core/` and import the barrel like any
-other consumer — one runner (`app/tests/test.mts`) is what keeps the dual GJS + Node run working.
+**The app imports `@kurier/core`, never a file inside it** — and the same for `@kurier/widget`. Each
+package's `src/index.ts` is a deliberate barrel, so what is public is a decision somebody made rather than
+whatever a consumer reached for; a new export is one line there. The widget also exports `./tool-line` and
+`./permission-dialog`, both **for measurements, not for hosts** (a Node-capable unit test, the focus probe).
+The unit tests live in `app/tests/unit/` and import the barrels like any other consumer — one runner
+(`app/tests/test.mts`) is what keeps the dual GJS + Node run working.
+
+**`app/src/frontends/gui/` is the shell around one `KurierChat`.** Window, sidebar, menu, Preferences and
+the `KU_APP_*` hooks are this app's; the transcript, composer, dialogs and chat states are the widget's,
+reached only through its getters and methods. The two idle pages are built in `window.blp` and handed in as
+`closedPage`/`noAgentPage` — their copy belongs to whatever surrounds a chat. **No named imports from a
+`.blp`, anywhere**: [docs/toolchain-traps.md](docs/toolchain-traps.md#named-imports-from-a-blp).
 
 `@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
 `KurierPaths` (`app/src/core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)`
@@ -74,7 +83,7 @@ The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is
 precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
 `kurier agents --use <id>[:bundled|host]|none` writes it.
-The GUI writes it from Preferences (`<Ctrl>comma`; `app/src/core/settings-view.ts` decides the rows, unavailable ones stay listed) and a change applies the next time kurier starts (the window resolves its agent once and keeps it); a settings file kurier could not read is never destroyed by a save (`saveDecision`: a newer `version` refuses, anything else is first moved to `settings.json.bak`); inside a Flatpak the dialog opens before the host answers (`Checking…`, then async). Hooks `KU_APP_PREFERENCES[_AGENT]` are in docs/dev-fixtures.md.
+The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time kurier starts, and a settings file kurier could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `KU_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
 An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
@@ -170,13 +179,9 @@ free).
 
 ## The two traps
 
-**Trap 1 — `authMethods` is real and interactive.** Measured against `opencode acp` 2.0.19:
-
-```json
-"authMethods":[{"description":"Run `opencode auth login` in the terminal","name":"Login with opencode","id":"opencode-login"}]
-```
-
-No `type` tag, and a `description` the schema does not define. Without `kurier auth` the first
+**Trap 1 — `authMethods` is real and interactive.** Measured against `opencode acp` 2.0.19 (the
+`authMethods` entry is in the handshake below): no `type` tag, and a `description` the schema does not
+define. Without `kurier auth` the first
 session dies on an error message instead of on code. `classifyAuthMethods` (`gate.ts`) reads this
 as the protocol's *agent* auth method: it means the client has to arrange the login itself, which
 is what `kurier auth` runs outside the ACP channel.
@@ -195,21 +200,9 @@ it.** `AcpClient.reattach` tries `session/load` first (the default), falls back 
 and rejects with `UnsupportedCapabilityError` rather than a silent empty session if the agent
 offers neither. Asking for a capability the agent never advertised is a hard error, always.
 
-## The measured handshake
-
-A real `initialize` against `opencode acp` runs completely inside one GJS process, with no Node
-process anywhere in the chain:
-
-```json
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,
-  "agentCapabilities":{"loadSession":true,
-    "mcpCapabilities":{"http":true,"sse":false},
-    "promptCapabilities":{"embeddedContext":true,"image":true},
-    "sessionCapabilities":{"close":{},"delete":{},"fork":{},"list":{},"resume":{}}},
-  "authMethods":[{"description":"Run `opencode auth login` in the terminal",
-                  "name":"Login with opencode","id":"opencode-login"}],
-  "agentInfo":{"name":"OpenCode","version":"2.0.19"}}}
-```
+**What a real agent answers** — the verbatim `initialize` result of `opencode acp` 2.0.19, measured
+inside one GJS process with no Node in the chain — is in
+[refs/acp/SOURCE.md](refs/acp/SOURCE.md#what-one-real-agent-answers), beside the schema.
 
 ## Run / build / test
 
@@ -362,14 +355,12 @@ AppStream metainfo, the manifest and `flathub.json` are all generated from it, s
 `data/*` is lost on the next run:
 
 ```bash
-./node_modules/.bin/gjsify flatpak init --force --no-format \
-  --manifest eu.jumplink.Kurier.json \
-  --metainfo data/eu.jumplink.Kurier.metainfo.xml \
-  --desktop data/eu.jumplink.Kurier.desktop \
-  --flathub-json flathub.json
 npm run packaging:validate   # THE gate: desktop-file-validate + appstreamcli validate --no-net
 npm run packaging:install    # the four files into $XDG_DATA_HOME (or DESTDIR/PREFIX)
 ```
+
+The `gjsify flatpak init` invocation that regenerates them:
+[data/README.md](data/README.md#regenerating-the-four-files).
 
 `flatpak-builder --show-manifest` only *prints* the manifest — it parses, it does not validate, so
 a green run of it says nothing. The two real validators are `desktop-file-validate` and
@@ -385,26 +376,14 @@ this manifest as *an installer*, not as isolation, and say so to any Flathub rev
 
 `packages/core/src/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
 it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
-same object. Four things about it are measured rather than assumed, and each has a test:
-
-- **Detection is `/.flatpak-info` alone, not `FLATPAK_ID`.** A terminal, editor or IDE installed *as a
-  Flatpak* sets `FLATPAK_ID` in an otherwise host environment; treating that as sandboxed would route
-  its agents through `flatpak-spawn --host` and lose the PATH it already had.
-- **The agent's PATH comes from the host's own shell config.** `flatpak-spawn --host` passes the
-  *session bus* PATH, which on this machine does not contain `~/.opencode/bin` at all, so the agent is
-  run through the host's login shell with `~/.zshrc`/`~/.bashrc` read first. A login shell ALONE is not
-  enough — `-l` does not read `~/.zshrc` — and neither is sourcing it from `/bin/sh`, because `~/.zshrc`
-  is zsh syntax that dash cannot parse. The bash limit is real and named: a `[ -t 0 ]` guard in
-  `.bashrc` returns early with no terminal, and the answer stays "not installed" rather than a guess.
-- **The protocol pipes are fenced off.** A login shell reads several files before the agent starts and
-  any of them may print (a banner lands in the JSON-RPC stream) or `read` from stdin (an `ssh-add`
-  prompt swallows `initialize` and the handshake hangs with no error). The wrapper parks the pipes on
-  fds 3/4 and points the inherited ones at `/dev/null`/stderr, and the inner script hands them back
-  before the agent starts.
-- **Ending the agent is not a signal to the agent.** The pid kurier holds is the sandbox-side
-  `flatpak-spawn`; the agent is under `flatpak-session-helper` on the other side of the bus. SIGTERM
-  *is* forwarded (measured: Stop and `flatpak kill` leave no `opencode acp`), SIGKILL cannot be and
-  would orphan the host process — which is what `killGraceMs` is for.
+same object. **Four things about it are measured rather than assumed, each with a test, and each one
+bites a different way** — `/.flatpak-info` and not `FLATPAK_ID` decides whether to rewrite at all; the
+agent's PATH comes from the person's own `~/.zshrc`/`~/.bashrc` because the session bus PATH does not
+have it; the protocol pipes are parked on fds 3/4 so a shell banner cannot land in the JSON-RPC stream;
+and ending the agent is SIGTERM to a `flatpak-spawn` that forwards it, never SIGKILL, which is what
+`killGraceMs` is for. The measurements and the known limits are in
+[data/README.md](data/README.md#what-it-does-to-start-the-agent-and-what-it-cannot-do) — read them
+before changing `sandbox.ts`.
 
 Full details, including the placeholder icons and the build inputs: [data/README.md](data/README.md).
 
@@ -433,8 +412,7 @@ looked like two bugs: [docs/toolchain-traps.md](docs/toolchain-traps.md#nodechil
 
 ## What is deliberately not here yet
 
-A web surface (the Adwaita one is in `app/src/frontends/gui/`, being built slice by slice; **not**
-adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot (becomes a Curlew
+A web surface (**not** adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot (becomes a Curlew
 backend) · `kurier serve`, MCP wiring against the real apps and the principal policy (decided in
 [ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md), not built) · troedler integration ·
 a Claude Code adapter (decided, not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).
