@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+// Print the Flatpak module that bundles a catalog agent as extra-data.
+//
+//   ./scripts/flatpak-agent-module opencode                  # JSON on stdout, every pinned arch
+//   ./scripts/flatpak-agent-module opencode --arch x86_64    # one arch (repeatable)
+//   ./scripts/flatpak-agent-module opencode --out agent.json # write a file instead
+//
+// Reads packages/core/data/bundled-agents.json through the same validator the app uses, so an entry
+// without a sha256 or size fails here rather than shipping. Nothing is downloaded. A host drops the
+// output into its manifest's `modules` ahead of its own module; docs/embedding.md has the steps.
+import { writeFileSync } from 'node:fs';
+import { BUNDLED_AGENTS } from '../packages/core/src/agents/catalog.ts';
+import { flatpakAgentModule } from '../packages/core/src/agents/flatpak-module.ts';
+
+const args = process.argv.slice(2);
+const fail = (message) => {
+  console.error(`flatpak-agent-module: ${message}`);
+  process.exit(1);
+};
+
+let id;
+let out;
+const arches = [];
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--arch') arches.push(args[++i] ?? fail('--arch needs a value'));
+  else if (args[i] === '--out') out = args[++i] ?? fail('--out needs a path');
+  else if (args[i].startsWith('--')) fail(`unknown option ${args[i]}`);
+  else if (id === undefined) id = args[i];
+  else fail(`unexpected argument ${args[i]}`);
+}
+if (id === undefined) fail(`usage: flatpak-agent-module <agent-id> [--arch <arch>]… [--out <file>] (ids: ${BUNDLED_AGENTS.map((a) => a.id).join(', ')})`);
+
+const agent = BUNDLED_AGENTS.find((entry) => entry.id === id);
+if (agent === undefined) fail(`no bundled agent "${id}" (ids: ${BUNDLED_AGENTS.map((a) => a.id).join(', ')})`);
+
+let json;
+try {
+  json = `${JSON.stringify(flatpakAgentModule(agent, arches.length > 0 ? arches : undefined), null, 2)}\n`;
+} catch (error) {
+  fail(error.message);
+}
+if (out) writeFileSync(out, json);
+else process.stdout.write(json);

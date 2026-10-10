@@ -61,7 +61,7 @@ reason to offer a login, not to block the chat.
 
 ## Order of work
 
-Planned; steps 1 to 7 are done.
+Planned; steps 1 to 8 are done.
 
 1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers (done, below).
 2. Make paths and settings injectable. **Done:** `KurierPaths` (`packages/core/src/paths.ts` since step 3: data and config dir plus the
@@ -121,7 +121,8 @@ Planned; steps 1 to 7 are done.
 7. API docs. **Done:** a README for each package ([core](../../packages/core/README.md),
    [widget](../../packages/widget/README.md)) and the host guide [docs/embedding.md](../embedding.md). The examples are
    type-checked files under `app/tests/examples/`, so the docs follow the signatures.
-8. Flatpak module generator from `bundled-agents.json`.
+8. Flatpak module generator from `bundled-agents.json`. **Done:** `flatpakAgentModule` in `@kurier/core` and
+   `scripts/flatpak-agent-module`; a test pins the output byte for byte to the module in kurier's own manifest.
 9. Host integration in Steuererklärung.
 
 ## Consequences

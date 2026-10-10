@@ -59,14 +59,28 @@ const empty = emptyStateView({ agent: found });
 - `found.command` is what you pass as `agent`; `found.source` (`'host'` or `'bundled'`) is `agentSource`.
 - To honour a saved preference, pass an `AgentChoice` as the second argument. The settings file is yours.
 - To **bundle** an agent, ship the program the catalog names (`packages/core/data/bundled-agents.json`,
-  `bundledProgram`). Kurier's own Flatpak does this; the generator for other hosts is still planned
-  ([ADR order of work](adr/0001-kurier-as-an-embeddable-widget.md#order-of-work), step 8).
+  `bundledProgram`). Kurier's own Flatpak does this; for yours, see [Bundle the agent](#bundle-the-agent-flatpak).
 - Inside a Flatpak, probing the person's own agent goes through the host; use the async
   `gatherResolveContextAsync(paths)` there so the window is not blocked.
 - When nothing is found, `agent` must still be a command (`requireLauncher(DEFAULT_AGENT)`) and you pass
   `noAgent: empty` so Send is switched off with an explanation. Optionally pass `noAgentPage`, your own
   page, and call `chat.showNoAgent()`.
 - For development without a model, use the stand-in agent in [dev-fixtures](dev-fixtures.md).
+
+### Bundle the agent (Flatpak)
+
+Generate the module from the catalog instead of copying kurier's manifest:
+
+```bash
+./scripts/flatpak-agent-module opencode --out opencode-module.json   # --arch x86_64 to restrict
+```
+
+Put the module in your manifest's `modules`, **before** your own module, and keep `--share=network` in
+`finish-args` (the agent runs inside the sandbox). It is `extra-data`: url, sha256 and size come from the
+catalog, nothing is downloaded when you generate, and an entry without a checksum fails loudly. In code,
+`flatpakAgentModule(agent, arches?)` from `@kurier/core` returns the same object. Kurier's own manifest
+carries the identical module (a test compares them byte for byte), so a refresh of the pin reaches you by
+regenerating. Then point `agentSource` at `'bundled'`, as above.
 
 ## 4. Create the widget
 

@@ -27,6 +27,7 @@ import composerState from './unit/core/composer-state.test.ts';
 import agents from './unit/core/agents.test.ts';
 import sandbox from './unit/core/sandbox.test.ts';
 import catalog from './unit/core/catalog.test.ts';
+import flatpakModule from './unit/core/flatpak-module.test.ts';
 import detect from './unit/core/detect.test.ts';
 import isolation from './unit/core/isolation.test.ts';
 import resolve from './unit/core/resolve.test.ts';
@@ -79,6 +80,7 @@ run({
   agents,
   sandbox,
   catalog,
+  flatpakModule,
   detect,
   isolation,
   resolve,
