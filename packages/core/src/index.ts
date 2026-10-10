@@ -108,6 +108,7 @@ export {
   type OpenAgentOptions,
   type TurnOptions,
 } from './run.ts';
+export type { McpServer } from '@kurier/acp';
 export {
   AgentSession,
   type AgentSessionEvents,

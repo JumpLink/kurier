@@ -87,9 +87,9 @@ shared with the user's `~/.config/opencode` or with the kurier app.
   `mcpCapabilities`; opencode 2.0.19 advertises `{"http":true,"sse":false}` (AGENTS.md handshake), stdio is the baseline.
 - **kurier today:** `AcpClient.newSession` / `reattach` already accept `mcpServers` (`packages/acp/src/client.ts:227-242`)
   and forward them opaquely. Every call site passes `[]`: `packages/core/src/agent-session.ts:682`, `app/src/frontends/cli/start.ts:97`,
-  `resume.ts:104`, `cancel.ts:67`. So the widget work is plumbing an option through `AgentSession`, nothing in the protocol layer.
+  `resume.ts:104`, `cancel.ts:67`. The plumbing is `AgentSessionOptions.mcpServers` (step 4, done).
   Note `reattach` must receive the same list, otherwise a resumed session loses the tools.
-- **Does opencode honour it? Yes, measured** with opencode 2.0.25 by `scripts/probes/acp-mcp-servers.mjs` (scratch HOME and XDG dirs, no model call, no login): after `session/new` the stdio server was spawned and received `initialize`, `notifications/initialized` and `tools/list`. Remaining risk: if opencode drops an entry it cannot start, the session may still open without an error.
+- **Does opencode honour it? Yes, measured** with opencode 2.0.25 by `scripts/probes/acp-mcp-servers.mjs` (scratch HOME and XDG dirs, no model call, no login): after `session/new` the stdio server was spawned and received `initialize`, `notifications/initialized` and `tools/list`. Measured too: an entry whose command does not exist gets no error in the `session/new` response, which still succeeds (whether it is logged elsewhere was not measured).
 - **Steuererklärung:** `steuer mcp` is a yargs command (`app/src/frontends/cli/mcp.ts`), default `--transport stdio`.
   The host passes `{type:'stdio', name:'steuer', command:<abs path of the steuer binary>, args:['mcp'], env:[…]}`. The
   `command` must be absolute and executable *inside the sandbox*. If steuer runs in the same Flatpak, that is its own
@@ -145,7 +145,7 @@ Widget needs:
 | 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? | S |
 | 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
 | 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
-| 4 | Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
+| 4 | **Done** (`AgentSessionOptions.mcpServers`). Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
 | 5 | Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
 | 6 | Inline provider onboarding page + connected-state signal | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |

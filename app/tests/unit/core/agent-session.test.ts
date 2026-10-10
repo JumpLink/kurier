@@ -12,6 +12,7 @@ import {
   type AgentCommand,
   type AgentSnapshot,
   type ConfigRowView,
+  type McpServer,
   type PermissionQuestion,
   type RecordedResolution,
 } from '@kurier/core';
@@ -76,6 +77,7 @@ interface HarnessOptions extends FixtureAgentOptions {
   slowClose?: boolean;
   /** Refuse every `open` after the first: the fixture has one transport, so a second process cannot be real. */
   failAfterFirstOpen?: boolean;
+  mcpServers?: McpServer[];
 }
 
 /**
@@ -130,6 +132,7 @@ function harness(options: HarnessOptions = {}): Harness {
       created.push(record);
     },
     ...(options.source ? { source: options.source } : {}),
+    ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
     ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
     // The gate kurier passes is the gate the client answers with, so the refusal assertions are about
     // the wire and not about a local array — that is what makes guardrail 2 a measurement.
@@ -574,6 +577,41 @@ export default async () => {
       expect(h.agent.calls('session/load').length).toBe(1);
       const occurrences = h.entries.filter((entry) => entry.text === 'replayed');
       expect(occurrences.length).toBe(1);
+    });
+  });
+
+  await describe('agent-session — the host’s MCP servers', async () => {
+    const SERVERS: McpServer[] = [
+      { name: 'steuer', command: '/app/bin/steuer', args: ['mcp'], env: [{ name: 'A', value: 'b' }] },
+      { type: 'http', name: 'remote', url: 'https://example.invalid/mcp', headers: [] },
+    ];
+
+    await it('sends [] in session/new and nothing extra in session/load by default', async () => {
+      const fresh = harness({ bind: false });
+      fresh.session.startConversation('/synthetic/project');
+      await fresh.session.prompt('hello');
+      const created = fresh.agent.calls('session/new')[0]?.params as { mcpServers: unknown };
+      expect(created.mcpServers).toStrictEqual([]);
+
+      const stored = harness();
+      await stored.session.prompt('hello');
+      const loaded = stored.agent.calls('session/load')[0]?.params as { mcpServers: unknown };
+      expect(loaded.mcpServers).toStrictEqual([]);
+    });
+
+    await it('passes the list unchanged to session/new', async () => {
+      const h = harness({ bind: false, mcpServers: SERVERS });
+      h.session.startConversation('/synthetic/project');
+      await h.session.prompt('hello');
+      const params = h.agent.calls('session/new')[0]?.params as { mcpServers: unknown };
+      expect(params.mcpServers).toStrictEqual(SERVERS);
+    });
+
+    await it('passes the list unchanged to the reattach of a stored session', async () => {
+      const h = harness({ mcpServers: SERVERS });
+      await h.session.prompt('hello');
+      const params = h.agent.calls('session/load')[0]?.params as { mcpServers: unknown };
+      expect(params.mcpServers).toStrictEqual(SERVERS);
     });
   });
 

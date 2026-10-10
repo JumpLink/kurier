@@ -7,6 +7,8 @@
  * server exposing one tool, `probe_echo`, and reads the server's own request log afterwards:
  * `initialize` + `tools/list` arriving there means opencode spawned the server and asked for its tools.
  *
+ * A second `session/new` names a server whose command does not exist and prints what comes back.
+ *
  * Usage: node scripts/probes/acp-mcp-servers.mjs [opencode-binary]
  * Exit code 0 = honoured, 1 = not honoured.
  */
@@ -115,6 +117,17 @@ async function probe(binary) {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const seen = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
     console.log('mcp server saw:', seen.length ? seen.join(' | ') : '(nothing)');
+    // A server that cannot start: reported, or dropped silently? Only what the agent says is recorded.
+    const broken = await call('session/new', {
+      cwd: root,
+      mcpServers: [{ name: 'broken', command: join(root, 'no-such-binary'), args: [], env: [] }],
+    });
+    console.log(
+      'session/new with a server that cannot start:',
+      broken.error
+        ? `error ${JSON.stringify(broken.error)}`
+        : `ok (no error; result keys: ${Object.keys(broken.result ?? {})})`,
+    );
     return seen.includes('recv tools/list');
   } finally {
     agent.kill();
