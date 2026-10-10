@@ -531,9 +531,13 @@ export class TranscriptView {
   }
 }
 
-/** The kind icon in front of a tool or thought row; the status-only caption's is a step smaller. */
+/**
+ * The kind icon in front of a tool or thought row — one size for all of them, including the
+ * status-only row, which used to be a step smaller. The three row shapes share an icon column
+ * (`.kurier-tool-status` pads to the card's own inset), and a column only reads as one if the things
+ * in it are the same width.
+ */
 const ROW_ICON_PX = 16;
-const CAPTION_ICON_PX = 14;
 
 function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
   switch (item.kind) {
@@ -612,7 +616,10 @@ function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Wid
 }
 
 /**
- * A tool call as a card: icon, bold title, status capsule.
+ * A tool call as a card: icon, title, status capsule.
+ *
+ * The title is `.kurier-tool-title`, not Adwaita's `heading`, and `css.ts` says why: a tool's name
+ * at full size and full weight outranked the answer it belongs to.
  *
  * A line with no recognisable status gets no capsule rather than an invented one.
  */
@@ -623,7 +630,7 @@ function buildToolCard(line: ToolLine): Gtk.Widget {
     cssClasses: ['card', CSS.toolCard],
   });
   card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: ROW_ICON_PX }));
-  const title = buildLabel({ text: line.title, xalign: 0, cssClasses: ['heading'] });
+  const title = buildLabel({ text: line.title, xalign: 0, cssClasses: [CSS.toolTitle] });
   title.set_hexpand(true);
   card.append(title);
   if (line.status !== null) card.append(buildTonePill(line.status));
@@ -637,8 +644,15 @@ function buildToolCard(line: ToolLine): Gtk.Widget {
  * heading the agent never sent, and the line belongs to the call above it anyway.
  */
 function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
-  const row = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
-  row.append(new Gtk.Image({ iconName: TOOL_FALLBACK_ICON, pixelSize: CAPTION_ICON_PX, cssClasses: [CSS.dim] }));
+  // No card, but the card's geometry: `.kurier-tool-status` carries the same horizontal inset and
+  // the spacing matches `buildToolCard`'s, so the icon and the pill sit in the columns the calls
+  // above and below put theirs in.
+  const row = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 8,
+    cssClasses: [CSS.toolStatus],
+  });
+  row.append(new Gtk.Image({ iconName: TOOL_FALLBACK_ICON, pixelSize: ROW_ICON_PX, cssClasses: [CSS.dim] }));
   row.append(
     status === null
       ? buildLabel({ text: 'Tool call', xalign: 0, cssClasses: [CSS.dim, 'caption'] })
