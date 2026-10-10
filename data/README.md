@@ -156,9 +156,9 @@ model provider, and no login could finish. A host agent is unaffected: it runs o
 needs, the bundled agent runs *inside* the sandbox, and that grant is what lets it read and
 edit the project it is pointed at.
 
-What is still open: `kurier` has no `v0.1.0` tag, so the `sources` `tag` in the manifest
-does not resolve until one is pushed; and both icons are placeholders (see the table
-above) until the real mark lands.
+What is still open: both icons are placeholders (see the table above) until the real mark
+lands. The `sources` `tag` in the manifest names the release being cut (`v0.1.1`) and only
+resolves once that tag is pushed; the release workflow swaps it for the checkout.
 
 ## Validate
 
