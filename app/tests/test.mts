@@ -9,6 +9,7 @@ import permissionQueue from './unit/acp/permission-queue.test.ts';
 import gate from './unit/acp/gate.test.ts';
 import opencodeShape from './unit/acp/opencode-shape.test.ts';
 import configOptions from './unit/acp/config-options.test.ts';
+import transport from './unit/acp/transport.test.ts';
 
 import sessionModel from './unit/session/model.test.ts';
 import sessionStore from './unit/session/store.test.ts';
@@ -59,6 +60,7 @@ run({
   gate,
   opencodeShape,
   configOptions,
+  transport,
   sessionModel,
   sessionStore,
   config,

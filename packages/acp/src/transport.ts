@@ -45,8 +45,13 @@ export class ClosedTransport implements Transport {
 
   onMessage(_listener: TransportListener): void {}
 
+  /**
+   * Called at once, not in a microtask. The peer is already gone when the listener subscribes, so
+   * a deferred call would leave a window in which `write` throws at a caller whose close listener
+   * has not run yet — an `AcpClient` built on this would report `closed === false` and then throw.
+   */
   onClose(listener: CloseListener): void {
-    queueMicrotask(() => listener(this.reason));
+    listener(this.reason);
   }
 
   close(): void {}
