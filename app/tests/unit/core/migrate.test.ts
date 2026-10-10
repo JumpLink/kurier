@@ -85,18 +85,14 @@ export default async () => {
         const parent = join(root, 'locked');
         const legacy = join(root, 'data', 'kurier');
         seedLegacy(legacy, '{"sessions":["one"]}');
-        mkdirSync(parent, { recursive: true });
-        chmodSync(parent, 0o500);
-        try {
-          const move = adoptLegacyDir(join(parent, 'lotse'), legacy);
+        // A regular file as the parent fails the rename (ENOTDIR) for root and non-root alike.
+        writeFileSync(parent, '');
+        const move = adoptLegacyDir(join(parent, 'lotse'), legacy);
 
-          expect(move.moved).toBe(false);
-          expect(move.dir).toBe(legacy);
-          expect(move.note).toContain(legacy);
-          expect(readFileSync(join(legacy, 'sessions.json'), 'utf8')).toBe('{"sessions":["one"]}');
-        } finally {
-          chmodSync(parent, 0o700);
-        }
+        expect(move.moved).toBe(false);
+        expect(move.dir).toBe(legacy);
+        expect(move.note).toContain(legacy);
+        expect(readFileSync(join(legacy, 'sessions.json'), 'utf8')).toBe('{"sessions":["one"]}');
       });
     });
   });
