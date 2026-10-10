@@ -1,8 +1,11 @@
 export { agentsCommand } from './agents.ts';
+export { answerCommand } from './answer.ts';
 export { authCommand } from './auth.ts';
 export { cancelCommand } from './cancel.ts';
 export { loginCommand } from './login.ts';
+export { questionsCommand } from './questions.ts';
 export { resumeCommand } from './resume.ts';
+export { serveCommand } from './serve.ts';
 export { sessionsCommand } from './sessions.ts';
 export { startCommand } from './start.ts';
 export { processTerminal, scriptedTerminal } from './terminal.ts';

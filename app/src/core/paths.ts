@@ -67,6 +67,27 @@ export function noticesFile(env: NodeJS.ProcessEnv = process.env): string {
   return envKnob(env, 'NOTICES_FILE') || join(dataDir(env), 'notices.json');
 }
 
+/** `$XDG_STATE_HOME`, or the XDG default. An explicit value must be absolute, per the spec. */
+export function xdgStateHome(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env['XDG_STATE_HOME']?.trim();
+  return explicit && explicit.startsWith('/') ? explicit : join(homedir(), '.local', 'state');
+}
+
+/** Where `lotse serve` keeps its question store, run state, action log and locks (ADR 0003 §7). */
+export interface ServePaths {
+  readonly stateDir: string;
+  /** The task configuration: private, outside the repository, read once at start. */
+  readonly tasksFile: string;
+}
+
+/** `LOTSE_STATE_DIR` and `LOTSE_TASKS_FILE` override the XDG defaults. */
+export function servePaths(env: NodeJS.ProcessEnv = process.env): ServePaths {
+  return {
+    stateDir: envKnob(env, 'STATE_DIR') || join(xdgStateHome(env), 'lotse'),
+    tasksFile: envKnob(env, 'TASKS_FILE') || join(configDir(env), 'tasks.json'),
+  };
+}
+
 /** The app's defaults: XDG, with the `LOTSE_*` overrides, exactly as the functions above resolve them. */
 export function lotsePaths(env: NodeJS.ProcessEnv = process.env): LotsePaths {
   return {

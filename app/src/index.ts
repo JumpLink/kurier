@@ -19,20 +19,25 @@ import { hideBin } from 'yargs/helpers';
 
 import {
   agentsCommand,
+  answerCommand,
   authCommand,
   cancelCommand,
   loginCommand,
+  questionsCommand,
   resumeCommand,
+  serveCommand,
   sessionsCommand,
   startCommand,
 } from './frontends/cli/index.ts';
 import { migratedPaths } from './core/migrate.ts';
+import { servePaths } from './core/paths.ts';
 
 // The one place the process environment becomes paths; everything below is handed them. The
 // one-time move from the directories lotse wrote happens here too (`core/migrate.ts`), and its
 // notes go to stderr: a directory that moved — or could not be moved — is something *about* the
 // answer, never the answer a pipe is reading.
 const { paths, notes } = migratedPaths();
+const serve = servePaths();
 for (const note of notes) console.error(`lotse: ${note}`);
 
 function reportError(err: unknown): void {
@@ -49,6 +54,9 @@ const parseArgs = () =>
     .command(authCommand(paths))
     .command(loginCommand(paths))
     .command(agentsCommand(paths))
+    .command(serveCommand(paths, serve))
+    .command(questionsCommand(paths, serve))
+    .command(answerCommand(paths, serve))
     .demandCommand(1, 'Please provide a command — `lotse --help` lists them all.')
     .strictCommands()
     .scriptName('lotse')

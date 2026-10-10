@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "users": [{ "id": "me", "addresses": [] }],
+  "profiles": [
+    { "id": "private", "user": "me", "data": "private", "model": "<provider>/<paid-model-id>" },
+    { "id": "public", "user": "me", "agent": "opencode", "data": "public" }
+  ],
+  "tasks": [
+    {
+      "id": "morning-summary",
+      "profile": "private",
+      "schedule": { "at": "07:30", "days": ["mon", "tue", "wed", "thu", "fri"] },
+      "promptFile": "prompts/morning-summary.md",
+      "cwd": "/path/to/a/working/directory",
+      "mcpServers": [
+        {
+          "name": "<server-name>",
+          "command": "/path/to/an/mcp/server",
+          "args": ["mcp"],
+          "env": [{ "name": "<VARIABLE>", "value": "<value>" }]
+        }
+      ],
+      "rights": "confirm",
+      "questions": { "expiresIn": "12h", "maxOpen": 3, "maxPerHour": 6 },
+      "notify": "always"
+    },
+    {
+      "id": "watch-something-public",
+      "profile": "public",
+      "schedule": { "every": "6h" },
+      "prompt": "Check <a public source> and ask me if anything needs a decision.",
+      "cwd": "/path/to/a/working/directory",
+      "mcpServers": [],
+      "rights": "read"
+    }
+  ]
+}
