@@ -255,12 +255,20 @@ export class Composer {
       cssClasses: [CSS.composerStatus, 'caption'],
     });
 
-    // **The card's bottom line: the agent's settings on the left, Send on the right.** The config row
-    // hexpands and the button does not, so the disc is pinned to the card's inside corner at every
-    // width — and with no agent attached the row is invisible and the line is the button alone, which
-    // is what a composer with nothing to configure should look like.
+    // **The card's bottom line: the agent's settings on the left, Send on the right.** The settings
+    // side hexpands and the button does not, so the disc is pinned to the card's inside corner at
+    // every width.
+    //
+    // The wrapper is what makes that true in *both* windows, and it is not decoration: `hexpand` on a
+    // hidden widget buys nothing, and the config row hides itself whenever the agent offers no
+    // settings (`config-row.ts`). Packed directly, it then handed the whole line to the button and the
+    // disc moved from the card's right corner to its left — between two windows that are otherwise
+    // the same composer. The wrapper is always visible, so it holds the space either way.
+    const settings = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, hexpand: true });
+    settings.append(options.config);
+
     const controls = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
-    controls.append(options.config);
+    controls.append(settings);
     controls.append(this.#button);
 
     // **One inset for the whole card, and the two lines inside it.** Even on all four sides: the card
