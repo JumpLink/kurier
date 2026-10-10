@@ -1,17 +1,17 @@
 name: Release
 
-# A tag is a release: `git tag v0.1.0 && git push --tags` builds every target through CI and
-# hangs the packages off the tag on GitHub. The build itself is NOT repeated here — the `build`
-# job below calls ci.yml, so there is exactly one definition of how the toolchain is installed
-# and what "green" means. A release therefore cannot be cut from a commit whose tests, type
-# check or lint did not pass.
+# A tag is a release: `git tag v0.1.0 && git push --tags` builds every target and hangs the
+# packages off the tag on GitHub. Packaging lives ONLY here, never in ci.yml: it costs minutes and
+# several hundred MB per run, and nothing about a push or a PR needs it.
 #
-# ci.yml ships THREE artifacts: `ship-deb-rpm-appimage` (.deb, .rpm, .AppImage — all from
-# `gjsify.ship`, the GUI binary `kurier-app`), `ship-macos-windows` (both macos-app-zips,
-# windows-dir-zip, .msi), and `ship-flatpak` (eu.jumplink.Kurier.flatpak, built from the
-# hand-maintained manifest that stages both `kurier` and `kurier-app`). This job only downloads
-# and attaches them — repeating the build here would be a second copy of a toolchain this
-# repository has decided to define once.
+# The `check` job calls ci.yml, so there is exactly one definition of how the toolchain is
+# installed and what "green" means. A release cannot be cut from a commit whose tests, type check
+# or lint did not pass.
+#
+# Three artifacts: `ship-deb-rpm-appimage` (.deb, .rpm, .AppImage — all from `gjsify.ship`, the GUI
+# binary `kurier-app`), `ship-macos-windows` (both macos-app-zips, windows-dir-zip, .msi), and
+# `ship-flatpak` (eu.jumplink.Kurier.flatpak, from the hand-maintained manifest that stages both
+# `kurier` and `kurier-app` and bundles opencode as extra-data).
 on:
   push:
     tags: ['v*']
@@ -31,6 +31,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 # Two tags pushed seconds apart would otherwise run twice against one release and upload in
 # whichever order finished last. Queued rather than cancelled: a half-uploaded release is worse
 # than a slow one.
@@ -39,28 +42,339 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  check:
     uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  # ── Packaging (ADR 0024 in gjsify: assembly is not host-bound, only running the payload is).
+  # `gjsify.ship` packages the GUI (`kurier-app`), the one binary with a desktop entry and an
+  # App-ID. msitools adds `wixl`, the Linux-side MSI compiler `gjsify ship windows --target msi`
+  # needs; appimagetool is downloaded below because no distro packages it.
+  ship:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: fedora:44
+    steps:
+      - name: Install system prerequisites
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git tar xz findutils gjs msitools squashfs-tools file
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Node 24: gjsify's native install-backend prebuilds target node 24; Fedora's default node
+      # 22 loads a mismatched ABI and segfaults `gjsify install`.
+      - name: Set up Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Cache gjsify tarball store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/gjsify/tarballs
+          key: gjsify-tarballs-${{ hashFiles('gjsify-lock.json') }}
+          restore-keys: gjsify-tarballs-
+
+      # The version in app/package.json is what the artifact names carry, so a tag that disagrees
+      # with it would ship packages the assert steps (and the release) cannot match.
+      - name: Check the tag against app/package.json
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.tag != '' }}
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          version=$(node -p "require('./app/package.json').version")
+          [ "$TAG" = "v$version" ] || { echo "::error::tag $TAG does not match app/package.json version $version"; exit 1; }
+
+      # Bootstrap the SAME gjsify version the app pins — read from app/package.json, never
+      # repeated here, so the two cannot drift apart.
+      - name: Bootstrap the gjsify CLI
+        run: |
+          VERSION=$(node -p "require('./app/package.json').devDependencies['@gjsify/cli']")
+          echo "Bootstrapping @gjsify/cli@$VERSION (from app/package.json)"
+          npm install -g "@gjsify/cli@$VERSION"
+
+      - name: Install dependencies (gjsify install --immutable)
+        run: gjsify install --immutable
+
+      - name: Build the GUI app bundle (GJS, for Linux)
+        run: gjsify workspace kurier-cli build:app
+
+      - name: Build the GUI app bundle (Node, for macOS + Windows)
+        run: gjsify workspace kurier-cli build:app:node
+
+      # Pinned by version AND digest, the same shape gjsify's own CI image uses. The RUNTIME pin
+      # is the load-bearing half: appimagetool otherwise fetches it per-arch from type2-runtime's
+      # rolling `continuous` tag on every pack, so two packs of one build would not be
+      # byte-identical.
+      - name: Install appimagetool and pin its runtime
+        env:
+          APPIMAGETOOL_VERSION: "1.9.1"
+          APPIMAGETOOL_SHA256: "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+          APPIMAGE_RUNTIME_VERSION: "20251108"
+          APPIMAGE_RUNTIME_X86_64_SHA256: "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+        run: |
+          set -eu
+          curl -fsSL -o /usr/local/bin/appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+          echo "${APPIMAGETOOL_SHA256}  /usr/local/bin/appimagetool" | sha256sum -c -
+          chmod +x /usr/local/bin/appimagetool
+          mkdir -p /usr/local/share/gjsify/appimage-runtime
+          curl -fsSL -o /usr/local/share/gjsify/appimage-runtime/runtime-x86_64 \
+            "https://github.com/AppImage/type2-runtime/releases/download/${APPIMAGE_RUNTIME_VERSION}/runtime-x86_64"
+          echo "${APPIMAGE_RUNTIME_X86_64_SHA256}  /usr/local/share/gjsify/appimage-runtime/runtime-x86_64" | sha256sum -c -
+
+      # `appimage` is opt-in through `--target` (ADR 0024): the default set stays deb + rpm,
+      # naming it explicitly means a missing `appimagetool` fails loudly instead of quietly
+      # shipping one format fewer.
+      - name: Package for Linux (deb, rpm, AppImage)
+        working-directory: app
+        run: gjsify ship linux --skip-build --target deb,rpm,appimage
+
+      # Names are the ones `utils/ship/formats.ts` in gjsify actually renders, not guesses —
+      # `ship` exits 0 after writing nothing when every target is filtered away, so each
+      # artifact is asserted by name.
+      - name: Assert the Linux packages arrived
+        working-directory: app/ship/out
+        run: |
+          set -eu
+          ls -la
+          version=$(node -p "require('$GITHUB_WORKSPACE/app/package.json').version")
+          binary=$(node -p "require('$GITHUB_WORKSPACE/app/package.json').gjsify.ship.binaryName")
+          missing=0
+          for f in \
+            "${binary}_${version}-1_all.deb" \
+            "${binary}-${version}-1.noarch.rpm" \
+            "${binary}-${version}-1.x86_64.AppImage"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::missing or empty artifact: $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      # macOS and Windows runtimes are `optionalDependencies` gated by os/cpu
+      # (`@gjsify/node-runtime-{darwin-arm64,darwin-x64,win32-x64}`), which a plain install on
+      # this Linux host SKIPS — naming the target installs it instead, and `ship` picks up both
+      # that runtime and the matching `@gjsify/node-gi` native addon from node_modules at pack
+      # time. Assembly is not host-bound (ADR 0024 § A1): the Mach-O and PE payloads are only
+      # VERIFIED on their own OS, never assembled on one.
+      - name: Package macOS (arm64)
+        run: gjsify install --os darwin --cpu arm64 --immutable
+
+      - name: Ship macOS (arm64)
+        working-directory: app
+        run: gjsify ship darwin --arch arm64 --skip-build --target macos-app-zip
+
+      - name: Package macOS (x64)
+        run: gjsify install --os darwin --cpu x64 --immutable
+
+      - name: Ship macOS (x64)
+        working-directory: app
+        run: gjsify ship darwin --arch x64 --skip-build --target macos-app-zip
+
+      # `msi` needs `wixl` (msitools, installed above); `windows-dir-zip` needs nothing `ship`
+      # does not write itself.
+      - name: Package Windows (x64)
+        run: gjsify install --os win32 --cpu x64 --immutable
+
+      - name: Ship Windows (x64)
+        working-directory: app
+        run: gjsify ship windows --arch x64 --skip-build --target windows-dir-zip,msi
+
+      # UNSIGNED on all three, by design (ADR 0024 § A13) — a legitimate deliverable, not a
+      # placeholder. Where signing would attach, on a runner that actually holds the identity:
+      #   macOS   — `gjsify ship darwin --arch <arch> --skip-build --target macos-app-zip
+      #             --sign <identity>` (Developer ID; `--notarize <keychain-profile>` on top)
+      #   Windows — same shape, `--sign <certificate thumbprint or PFX path>` reaching
+      #             `signtool` (UNVERIFIED upstream: no run in gjsify has ever invoked it)
+      - name: Assert the macOS and Windows artifacts arrived
+        working-directory: app/ship/out
+        run: |
+          set -eu
+          ls -la
+          version=$(node -p "require('$GITHUB_WORKSPACE/app/package.json').version")
+          binary=$(node -p "require('$GITHUB_WORKSPACE/app/package.json').gjsify.ship.binaryName")
+          missing=0
+          for f in \
+            "${binary}-${version}-1.macos.arm64.zip" \
+            "${binary}-${version}-1.macos.x86_64.zip" \
+            "${binary}-${version}-1.windows.x64.zip" \
+            "${binary}-${version}-1.x64.msi"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::missing or empty artifact: $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ship-deb-rpm-appimage
+          path: |
+            app/ship/out/*.deb
+            app/ship/out/*.rpm
+            app/ship/out/*.AppImage
+          # Already-compressed packages; the default level 6 would spend minutes
+          # re-compressing them on the way up and again on the way down for no gain.
+          compression-level: 0
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ship-macos-windows
+          path: |
+            app/ship/out/*.zip
+            app/ship/out/*.msi
+          compression-level: 0
+
+  # The Flatpak is its own job: flatpak-builder runs every module's `build-commands` under
+  # `bwrap`, which a `fedora:44` container without `options: --privileged` refuses ("Can't mount
+  # proc on /proc: Permission denied").
+  #
+  # Builds from the hand-maintained root `eu.jumplink.Kurier.json` — it stages BOTH `kurier` and
+  # `kurier-app` and carries the bundled opencode (`extra-data` + `apply_extra`), which is not
+  # what `gjsify ship --target flatpak` would produce. That manifest's `kurier` module fetches a
+  # `git` source at a pinned tag (what Flathub builds); for a release the source is the checkout
+  # instead, otherwise v0.2.0's CI would package whatever the manifest's tag says.
+  ship-flatpak:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: fedora:44
+      options: --privileged
+    steps:
+      - name: Install system prerequisites
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git tar xz findutils gjs flatpak flatpak-builder jq
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Cache gjsify tarball store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/gjsify/tarballs
+          key: gjsify-tarballs-${{ hashFiles('gjsify-lock.json') }}
+          restore-keys: gjsify-tarballs-
+
+      # Keyed on everything that decides which runtimes are needed or what the build fetches: the
+      # manifest (runtime version, sdk-extensions) and both lock files. A static key would keep
+      # serving a stale runtime after a GNOME bump.
+      - name: Cache the flatpak runtimes
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/lib/flatpak
+          key: flatpak-${{ hashFiles('eu.jumplink.Kurier.json', 'gjsify-lock.json', 'gjsify-sources.json') }}
+          restore-keys: flatpak-
+
+      # What the bundle must contain, asserted against the manifest the build reads: the network
+      # (the bundled agent talks to its model provider), the opencode extra-data module, and that
+      # its archive URLs are the ones app/data/bundled-agents.json pins — so the manifest cannot
+      # fall behind a refreshed pin unnoticed.
+      - name: Check the manifest carries the bundled opencode
+        run: |
+          set -eu
+          m=eu.jumplink.Kurier.json
+          jq -e '.["finish-args"] | index("--share=network")' "$m" >/dev/null \
+            || { echo "::error::$m lacks --share=network"; exit 1; }
+          jq -e '[.modules[].sources[]? | select(type == "object" and .type == "extra-data")] | length > 0' "$m" >/dev/null \
+            || { echo "::error::$m has no extra-data source"; exit 1; }
+          jq -e '[.modules[].sources[]? | select(type == "object" and .type == "script" and .["dest-filename"] == "apply_extra")] | length == 1' "$m" >/dev/null \
+            || { echo "::error::$m has no apply_extra script"; exit 1; }
+          want=$(jq -r '.agents[] | select(.id == "opencode") | .dist[].url' app/data/bundled-agents.json | sort)
+          have=$(jq -r '.modules[].sources[]? | select(type == "object" and .type == "extra-data") | .url' "$m" | sort)
+          [ "$want" = "$have" ] || { echo "::error::extra-data URLs differ from app/data/bundled-agents.json"; echo "$want"; echo "$have"; exit 1; }
+
+      # `--system`, because that is the installation `flatpak-builder` reads when gjsify's
+      # `flatpak build` wrapper invokes it (no `--user`). The two SDK extensions are the
+      # manifest's own `sdk-extensions`: node24 and typescript, read by `build-options.append-path`.
+      - name: Install the GNOME runtime, SDK and its extensions
+        run: |
+          set -eu
+          flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-modify --enable flathub
+          flatpak install --system --noninteractive \
+            org.gnome.Platform//50 \
+            org.gnome.Sdk//50
+          # The SDK extensions live on the freedesktop branch the GNOME SDK is built on (25.08,
+          # 26.08 …), not on the GNOME one: `…Extension.node24//50` does not exist. Read the branch
+          # from the SDK's own extension point, so a GNOME bump cannot silently break this.
+          fdo=$(flatpak info --show-metadata org.gnome.Sdk//50 \
+            | sed -n '/^\[Extension org.freedesktop.Sdk.Extension\]/,/^\[/s/^version *= *//p')
+          test -n "$fdo" || { flatpak info --show-metadata org.gnome.Sdk//50 | grep -a -A4 Extension; exit 1; }
+          echo "freedesktop branch for the SDK extensions: $fdo"
+          flatpak install --system --noninteractive \
+            "org.freedesktop.Sdk.Extension.node24//$fdo" \
+            "org.freedesktop.Sdk.Extension.typescript//$fdo"
+          flatpak list --runtime --columns=ref
+
+      - name: Bootstrap the gjsify CLI
+        run: |
+          VERSION=$(node -p "require('./app/package.json').devDependencies['@gjsify/cli']")
+          echo "Bootstrapping @gjsify/cli@$VERSION (from app/package.json)"
+          npm install -g "@gjsify/cli@$VERSION"
+
+      # Same manifest, one change: the `git` source becomes this checkout. The builder's own
+      # output directories are skipped so a re-run does not copy them into the source tree.
+      - name: Point the manifest at this checkout
+        run: |
+          set -eu
+          jq '(.modules[] | select(.name == "kurier") | .sources) |=
+                map(if type == "object" and .type == "git"
+                    then {type: "dir", path: ".", skip: [".git", ".flatpak-builder", "flatpak-build", "repo"]}
+                    else . end)' \
+            eu.jumplink.Kurier.json > eu.jumplink.Kurier.ci.json
+          jq -e '[.modules[].sources[]? | select(type == "object" and .type == "git")] | length == 0' eu.jumplink.Kurier.ci.json >/dev/null
+
+      # The manifest's build-commands run `gjsify install`/`build`/`build:app` INSIDE the sandbox —
+      # no host-side install or build step belongs here.
+      - name: Build the Flatpak
+        run: |
+          set -eu
+          gjsify flatpak build eu.jumplink.Kurier.ci.json \
+            --repo repo --bundle eu.jumplink.Kurier.flatpak
+
+      - name: Assert the bundle arrived
+        run: |
+          set -eu
+          ls -la eu.jumplink.Kurier.flatpak
+          [ -s eu.jumplink.Kurier.flatpak ] || { echo "::error::missing or empty eu.jumplink.Kurier.flatpak"; exit 1; }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ship-flatpak
+          path: eu.jumplink.Kurier.flatpak
+          compression-level: 0
 
   release:
-    needs: build
+    needs: [check, ship, ship-flatpak]
     # A dispatch without `publish` builds and stops: the name it would attach to is a branch, not
     # necessarily a release, so `inputs.publish` alone is not enough.
     if: ${{ startsWith(github.ref, 'refs/tags/v') || (inputs.publish && inputs.tag != '') }}
+    # The only job that writes to the repository.
     permissions:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch the packages CI built
-        uses: actions/download-artifact@v4
+      - name: Fetch the packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ship-*
           path: ship
           merge-multiple: true
 
-      # Names are the ones `utils/ship/formats.ts` in gjsify actually renders (ci.yml's own
-      # assert steps derive the same ones), from the TAG rather than a checkout — this job never
-      # checks the repo out. `kurier-app` is this repo's own public binary name, not a secret.
+      # From the TAG rather than a checkout — this job never checks the repo out. `kurier-app` is
+      # this repo's own public binary name, not a secret.
       - name: Assert every artifact arrived
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
@@ -88,7 +402,7 @@ jobs:
 
       # A tag push creates no release on its own, and `gh release upload` against a tag with none
       # fails with "release not found" after every artifact has already been built. Create it
-      # first when missing — as a draft, so the notes can be written before anyone is notified —
+      # first when missing — as a draft, so the notes can be read before anyone is notified —
       # and leave an existing one alone, which is what makes re-running this on a tag safe.
       - name: Attach them to the release
         env:
@@ -96,7 +410,6 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -eu
-          ls -la ship/
           [ -n "$(find ship -mindepth 1 -maxdepth 1 -print -quit)" ] || { echo "::error::no assets were downloaded"; exit 1; }
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "no release for $TAG yet — creating it as a draft"
@@ -104,28 +417,12 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --title "$TAG" \
               --draft \
-              --generate-notes
+              --generate-notes \
+              --verify-tag
           fi
           gh release upload "$TAG" ship/* --clobber --repo "$GITHUB_REPOSITORY"
           echo "Attached $(find ship -mindepth 1 -maxdepth 1 | wc -l) asset(s) to $TAG:"
           ls ship/
 
-      # macOS (arm64 + x64, macos-app-zip) and Windows (x64, windows-dir-zip + .msi) ARE attached
-      # above — assembling them does not need a Mac or a Windows runner (ci.yml), only naming the
-      # target so `gjsify install` does not skip the `optionalDependencies` runtime it would
-      # otherwise stage with no interpreter in it. What this does NOT do is RUN the Mach-O or PE
-      # payload: that is verified on its own OS or not at all, so a `macos-latest` /
-      # `windows-latest` job staying absent is a gap in verification, not in the release's
-      # contents.
-      #
-      # UNSIGNED on both, by design (ADR 0024 § A13 in gjsify) — a legitimate deliverable, not a
-      # placeholder. Where signing would attach, on a runner that actually holds the identity:
-      #   macOS   — `gjsify ship darwin --arch <arch> --skip-build --target macos-app-zip --sign
-      #             <identity>` (Developer ID; `--notarize <keychain-profile>` on top of that)
-      #   Windows — same shape, `--sign <certificate thumbprint or PFX path>` reaching `signtool`
-      #             (UNVERIFIED upstream: no run in gjsify has ever invoked it)
-      #
-      # Flatpak IS attached, unlike beifahrer/troedler/buchhaltung: kurier is a `kind: "app"`
-      # GUI with a desktop entry and an App-ID, and `eu.jumplink.Kurier.json` is a real,
-      # hand-maintained manifest (data/README.md) — "App-ID + Manifest" is satisfied. It is
-      # unsigned and not submitted to Flathub by this workflow; that stays a manual step.
+      # Everything is UNSIGNED, by design (ADR 0024 § A13 in gjsify) — a legitimate deliverable.
+      # The Flatpak is unsigned and not submitted to Flathub by this workflow; that stays manual.
