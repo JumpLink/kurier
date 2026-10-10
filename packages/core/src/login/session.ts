@@ -23,6 +23,7 @@ export function loginUnavailableReason(agent: AgentCommand): string | null {
   return null;
 }
 
+/** Start a private login server for `agent`; `close()` stops it. What `LoginController` drives. */
 export async function openLoginSession(agent: AgentCommand): Promise<LoginSession> {
   const server = await startServer(agent);
   const api = createLoginApi(server.send);
