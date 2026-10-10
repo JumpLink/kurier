@@ -38,12 +38,16 @@
  * parses on assignment: `css.ts` and `transcript-view.ts` both record that a later
  * `set_use_markup(false)` is too late.
  *
- * **The placeholder is a visible line, with `placeholder-text` only as a hint on top.** That property exists on
- * the GTK 4.22.5 this runs against (measured: `scripts/probes/composer-props.mjs`) and does **not**
- * exist in the `@girs/gtk-4.0` 4.6.0 typings this repo compiles against — so writing it would be a
- * type error here and a silently absent placeholder on any older GTK. `#status` carries the same
- * sentences under the entry, which is better anyway: they are on screen in a screenshot taken with no
- * pointer anywhere near the button.
+ * **The placeholder is a label in a `Gtk.Overlay`, because `Gtk.TextView:placeholder-text` does not
+ * exist.** This file used to claim it did on GTK 4.22.5 and set it through a cast past the
+ * `@girs/gtk-4.0` typings — and both halves of that were wrong in the same way. In GJS an assignment
+ * to a name that is not a GObject property silently creates a plain JS field, so the line did nothing
+ * and nothing said so; `scripts/probes/composer-props.mjs` "measured" it by doing exactly that and
+ * reading the field back, which is a probe that cannot fail. `GObject.Object.find_property` is the
+ * question that has an answer: `placeholder-text` is `null` on `Gtk.TextView` and a real `ParamSpec`
+ * on `Gtk.Entry`, on this GTK. So the hint is drawn: one dim label over the entry, `canTarget: false`
+ * so a click still lands in the text, hidden by the buffer's own `changed` signal the moment there is
+ * anything to read.
  *
  * **The button is one widget whose content is swapped, never two widgets shown and hidden.** Two
  * buttons in one spot means two tab stops, two tooltips and a `Gtk.Stack` to keep in step with the
@@ -106,6 +110,8 @@ const STOP_LABEL = 'Stop';
 const SEND_TOOLTIP = 'Send this message to the agent.';
 const STOP_TOOLTIP = 'Stop the running turn.';
 
+/** What the empty entry says. Fixed English — see `core/session-groups.ts` §2 on why not `Intl`. */
+const PLACEHOLDER = 'Ask the agent…';
 /** The entry's resting height in logical pixels: two lines, so "write a prompt" is visibly possible. */
 const ENTRY_MIN_HEIGHT = 56;
 /** Where the entry stops growing and starts scrolling. A window's bottom bar has a budget. */
@@ -145,6 +151,8 @@ export class Composer {
   readonly widget: Gtk.Widget;
 
   readonly #entry: Gtk.TextView;
+  /** The hint drawn over an empty entry. See the file header on why it is not a property. */
+  readonly #placeholder: Gtk.Label;
   readonly #button: Gtk.Button;
   /** The one line under the entry: the reason, or the status, never both. See the file header. */
   readonly #status: Gtk.Label;
@@ -170,10 +178,6 @@ export class Composer {
       // navigation inside the composer, which at the 360 px phone floor has nowhere else to go.
       cssClasses: [CSS.composerEntry],
     });
-    // The typings (4.6.0) do not know `placeholder-text`; the GTK this runs on does (see the header and
-    // `scripts/probes/composer-props.mjs`). Set after construction through a cast, so an older GTK gets a
-    // plain JS property and no placeholder instead of a thrown constructor.
-    (this.#entry as Gtk.TextView & { placeholderText?: string }).placeholderText = 'Ask the agent…';
     // Enter sends, Shift+Enter does not — the convention in every chat surface this window is drawn
     // from, and without it a multi-line entry is a trap: the person types what looks like a message
     // and gets a newline instead. It goes through the SAME `#activate()` as the button, so there is
@@ -192,6 +196,30 @@ export class Composer {
       // message ever pasted into it.
       propagateNaturalHeight: true,
     });
+
+    // The placeholder, over the entry rather than in it — see the file header on the property that
+    // does not exist. The margins are the `Gtk.TextView`'s own text margins, so the hint starts
+    // exactly where the first typed character will.
+    this.#placeholder = new Gtk.Label({
+      // Our own word, but in the constructor like every other label in this window: one rule for
+      // "when is markup decided" beats a rule with an exception for the strings we wrote.
+      useMarkup: false,
+      label: PLACEHOLDER,
+      xalign: 0,
+      halign: Gtk.Align.START,
+      valign: Gtk.Align.START,
+      marginStart: 8,
+      marginTop: 8,
+      // Or the hint eats the click that was meant to put the cursor in the entry under it.
+      canTarget: false,
+      cssClasses: [CSS.dim],
+    });
+    const entryArea = new Gtk.Overlay({ child: scroller });
+    entryArea.add_overlay(this.#placeholder);
+    // The buffer's signal and not `#render`: whether there is text is the buffer's fact, and it
+    // changes on every keystroke while `#render` runs on turn-state moves. `clearDraft` goes through
+    // the same buffer, so the hint comes back on its own when the window empties the entry.
+    this.#entry.get_buffer()?.connect('changed', () => this.#syncPlaceholder());
 
     this.#button = new Gtk.Button({
       // **Icon only, in a circle, and the label is gone from the button rather than hidden.** It is
@@ -247,7 +275,7 @@ export class Composer {
       marginStart: 6,
       marginEnd: 6,
     });
-    inner.append(scroller);
+    inner.append(entryArea);
     inner.append(controls);
 
     const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
@@ -302,6 +330,17 @@ export class Composer {
   stop(): void {
     if (composerView(this.#input).action !== 'stop') return;
     this.#button.emit('clicked');
+  }
+
+  /**
+   * Show the hint exactly while the entry is empty. Driven by the buffer, not by `#render`.
+   *
+   * `get_char_count`, **not** `text()`: that one trims, so a buffer holding two spaces would count as
+   * empty and the hint would be drawn on top of them. "Is anything there" and "is there anything to
+   * send" are two questions and only the second one trims.
+   */
+  #syncPlaceholder(): void {
+    this.#placeholder.visible = (this.#entry.get_buffer()?.get_char_count() ?? 0) === 0;
   }
 
   /** Empty the entry. The *caller* decides whether to — see `keepsDraft`. */
