@@ -1,6 +1,6 @@
 name: Release
 
-# A tag is a release: `git tag v0.1.0 && git push --tags` builds every target and hangs the
+# A tag is a release: `git tag v0.1.1 && git push --tags` builds every target and hangs the
 # packages off the tag on GitHub. Packaging lives ONLY here, never in ci.yml: it costs minutes and
 # several hundred MB per run, and nothing about a push or a PR needs it.
 #

@@ -37,6 +37,25 @@
     <content_attribute id="language-humor">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.1.1" date="2026-10-10">
+      <description>
+        <!-- TRANSLATORS: Release notes for version 0.1.1 - opening line: packages exist now, login from the app, bundled OpenCode in the Flatpak. Keep "OpenCode" and "Flatpak" as they are. -->
+        <p>The first release with installable packages. Kurier can now log you in to your model providers itself, and the Flatpak brings its own copy of OpenCode.</p>
+        <!-- TRANSLATORS: Release notes for version 0.1.1 - the list of what changed -->
+        <ul>
+          <!-- TRANSLATORS: Release notes for version 0.1.1 - logging in to providers from the app, by browser sign-in or API key -->
+          <li>Log in to a model provider from Kurier, with a browser sign-in or an API key, for every provider the agent offers. No terminal needed.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.1 - the Flatpak bundles OpenCode with its own home directory and network access. Keep "OpenCode" and "Flatpak" as they are. -->
+          <li>The Flatpak includes OpenCode, which runs with its own settings and login, separate from any OpenCode already on your computer, and has network access to reach its provider.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.1 - a distinct message for an account without credit -->
+          <li>A clearer message when your account has no credit left, instead of a message that looks like a failed login.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.1 - Windows and macOS fixes -->
+          <li>Fixes for Windows and macOS: agents installed as command shims are found, and the agent's working directory is handled correctly.</li>
+          <!-- TRANSLATORS: Release notes for version 0.1.1 - the package formats now offered, with an honest note that they are unsigned. Keep the file extensions and format names as they are. -->
+          <li>Packages for Debian and Ubuntu (.deb), Fedora (.rpm), AppImage, macOS, Windows and Flatpak. They are not signed yet.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-01">
       <description>
         <!-- TRANSLATORS: Release notes for version 0.1.0 - what Kurier is, and that the agent is a separate program the user installs -->
