@@ -5,7 +5,7 @@
  * table is "a table of programs, not of capabilities" and `lotse agents` prints it as what a person
  * can install and run. The stand-in is a dev fixture inside this repository — a file under
  * `scripts/`, run with Node, reachable only by naming it in a dev hook — and putting it in the table
- * would print "Kurier stand-in agent" to somebody who asked which agents they have, next to OpenCode,
+ * would print "Lotse stand-in agent" to somebody who asked which agents they have, next to OpenCode,
  * with no marker that it is a fixture. A test also pins that table's ids to exactly `['opencode']`.
  *
  * So it is reachable the only other way this surface reaches anything a pointer cannot:
@@ -22,7 +22,7 @@
  * ```
  *
  * **It runs on Node, not GJS, and `program: 'node'` is the honest spelling of that.** The script is
- * `scripts/stand-in-agent.mjs`, a plain ESM module with no GTK and no bundling; kurier's own
+ * `scripts/stand-in-agent.mjs`, a plain ESM module with no GTK and no bundling; lotse's own
  * `AGENTS.md` records the two failures of importing a gjsify package under Node and under GJS when
  * trying to share code between them. The fixture exists to be *run*, not to be shipped, so it uses the
  * one runtime that needs no build step.
@@ -61,7 +61,7 @@ export function standInScriptPath(env: NodeJS.ProcessEnv = process.env): string 
 export function standInCommand(script: string = standInScriptPath()): AgentCommand {
   return {
     id: STAND_IN_AGENT_ID,
-    title: `Kurier stand-in agent (${STAND_IN_SCRIPT})`,
+    title: `Lotse stand-in agent (${STAND_IN_SCRIPT})`,
     program: 'node',
     args: [script],
   };

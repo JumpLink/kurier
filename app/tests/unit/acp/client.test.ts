@@ -233,11 +233,11 @@ export default async () => {
         onClose: () => {},
         close: () => {},
       });
-      // A notification kurier sends: the caller hears about it, and the client knows it is closed.
+      // A notification lotse sends: the caller hears about it, and the client knows it is closed.
       const notifying = new AcpClient({ transport: broken() });
       expect(() => notifying.cancel({ sessionId: 'x' })).toThrow(/EPIPE/);
       expect(notifying.closed).toBe(true);
-      // A request kurier sends: the promise rejects, and the client is closed the same way.
+      // A request lotse sends: the promise rejects, and the client is closed the same way.
       const requesting = new AcpClient({ transport: broken() });
       await expect(requesting.newSession({ cwd: '/tmp', mcpServers: [] })).rejects.toThrow(/EPIPE/);
       expect(requesting.closed).toBe(true);

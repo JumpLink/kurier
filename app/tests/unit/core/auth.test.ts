@@ -120,7 +120,7 @@ export default async function auth(): Promise<void> {
       );
     });
 
-    await it("reads opencode's own shape as a login kurier has to arrange", () => {
+    await it("reads opencode's own shape as a login lotse has to arrange", () => {
       const plan = authPlan([AGENT]);
       expect(plan.kind).toBe('client-arranges-it');
       expect(plan.kind === 'client-arranges-it' && plan.methodId).toBe('opencode-login');
@@ -198,7 +198,7 @@ export default async function auth(): Promise<void> {
       const result = await h.run();
       expect(result.kind).toBe('authenticated');
       expect(result.kind === 'authenticated' && result.methodId).toBe('opencode-terminal');
-      // `viaLogin: false` is the difference the CLI words differently: the agent did it, kurier did not.
+      // `viaLogin: false` is the difference the CLI words differently: the agent did it, lotse did not.
       expect(result.kind === 'authenticated' && result.viaLogin).toBe(false);
       expect(h.opened.length).toBe(1);
       expect(h.ranLogin.length).toBe(0);

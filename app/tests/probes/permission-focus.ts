@@ -1,9 +1,9 @@
 /**
- * Where the keyboard focus is when kurier's permission dialog opens — measured on the real widget.
+ * Where the keyboard focus is when lotse's permission dialog opens — measured on the real widget.
  *
  * **Why this file exists rather than a case in `scripts/probes/alert-dialog-close.mjs`.** That probe
  * measures libadwaita, and it can only build look-alikes out of `Adw.AlertDialog`. This question is
- * about *kurier's* `PermissionDialog` — whether the widget moves the focus, when, and onto what — and
+ * about *lotse's* `PermissionDialog` — whether the widget moves the focus, when, and onto what — and
  * a look-alike cannot answer it: the first version of the dialog left libadwaita's fallback in place
  * and the plain probe said the focus was on the allow button while the app's own screenshot showed a
  * selectable label highlighted instead. Probe and app disagreed because they were different widgets.
@@ -16,12 +16,12 @@
  * DISPLAY=:0 ./node_modules/.bin/gjsify run /tmp/permission-focus.gjs.mjs
  * ```
  *
- * **What it asserts, for six option sets:** the focus is never a button kurier would allow with, it is
+ * **What it asserts, for six option sets:** the focus is never a button lotse would allow with, it is
  * the *narrow* declining button when the agent offered one, and nothing is text-selected when it lands
  * on the diff body (the grey highlight that was visible in `s6-dialog-1024.png`).
  *
  * **Four of the six carry the `*_always` kinds, in both orders** — because that pair is what the probe
- * exists for since kurier began passing them through: `allow_always` is on screen, and Enter must
+ * exists for since lotse began passing them through: `allow_always` is on screen, and Enter must
  * still not reach it. The last case is the one that only exists because of that change: an agent
  * offering `allow_once` and `allow_always` and nothing rejecting leaves no safe button to focus, so the
  * focus has to reach the diff body instead.
@@ -73,7 +73,7 @@ const CASES: readonly {
     expect: 'Decline',
   },
   {
-    label: "reject first, then allow — kurier's order",
+    label: "reject first, then allow — lotse's order",
     options: [
       { optionId: 'reject_once', name: 'Decline', kind: 'reject_once' },
       { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
@@ -96,7 +96,7 @@ const CASES: readonly {
     expect: 'Decline',
   },
   {
-    label: 'all four kinds, "always" first — kurier\'s order and focus win',
+    label: 'all four kinds, "always" first — lotse\'s order and focus win',
     options: [
       { optionId: 'allow_always', name: 'Always allow in this session', kind: 'allow_always' },
       { optionId: 'reject_always', name: 'Always decline in this session', kind: 'reject_always' },
@@ -120,7 +120,7 @@ const CASES: readonly {
  *
  * **The turn-by-turn sequence is the second half of the measurement** — it catches a focus that *passes
  * through* an allow button and lands somewhere safe afterwards, which a single settled reading cannot.
- * It cannot catch the first turn (see `readMapWindow`), because a timer is dispatched after kurier's own
+ * It cannot catch the first turn (see `readMapWindow`), because a timer is dispatched after lotse's own
  * idle; the two measurements together cover both ends.
  */
 const MAX_SAMPLES = 60;
@@ -252,7 +252,7 @@ function next(): void {
       print(`  selected text: ${selection === null ? 'none' : JSON.stringify(selection)}`);
       print(`  expected: ${testCase.expect}`);
       // Two claims, both strict. **Every** sampled turn must not name an allowing button, not just the
-      // settled one: the transition between libadwaita's own assignment and kurier's grab is a real
+      // settled one: the transition between libadwaita's own assignment and lotse's grab is a real
       // turn, and that is where a stray Enter would land. And the settled focus must be the *narrow*
       // decline when one was offered — an accidental Enter must not set a session-wide refusal for a
       // question about one file.
@@ -269,7 +269,7 @@ function next(): void {
         failures += 1;
       } else if (
         // The `reject_once` **this case actually offered**, not a label built from whichever option
-        // happened to be first: `optionLabel` is kurier's sentence for the kind, so a synthetic
+        // happened to be first: `optionLabel` is lotse's sentence for the kind, so a synthetic
         // label from another option would not be the string on the button.
         testCase.options.some((o) => o.kind === 'reject_once') &&
         focused !== optionLabel(testCase.options.find((o) => o.kind === 'reject_once')!)

@@ -1,5 +1,5 @@
 /**
- * The method table — the one place in kurier where an ACP method name is spelled out.
+ * The method table — the one place in lotse where an ACP method name is spelled out.
  *
  * Everything else imports from here, and `scripts/check-schema.mjs` compares this table against
  * `refs/acp/schema.v1.json` on every `npm run check:schema`. A renamed upstream method, a new
@@ -41,7 +41,7 @@ export const AGENT_METHODS = {
 } as const;
 
 /**
- * Methods the agent may send that kurier does **not** answer.
+ * Methods the agent may send that lotse does **not** answer.
  *
  * Listed so the schema check can see them and so their absence is a decision on the record rather
  * than an omission. `terminal/*` is the whole group: `AcpClient` announces

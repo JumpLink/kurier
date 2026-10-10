@@ -1,5 +1,5 @@
 /**
- * The `kurier` binary.
+ * The `lotse` binary.
  *
  * The yargs chrome is copied from postbote's entrypoint, including the three comments that explain
  * the non-obvious options — they are not decoration, each one fixes a failure that a plain yargs
@@ -29,7 +29,7 @@ import {
 import { migratedPaths } from './core/migrate.ts';
 
 // The one place the process environment becomes paths; everything below is handed them. The
-// one-time move from the directories kurier wrote happens here too (`core/migrate.ts`), and its
+// one-time move from the directories lotse wrote happens here too (`core/migrate.ts`), and its
 // notes go to stderr: a directory that moved — or could not be moved — is something *about* the
 // answer, never the answer a pipe is reading.
 const { paths, notes } = migratedPaths();
@@ -49,7 +49,7 @@ const parseArgs = () =>
     .command(authCommand(paths))
     .command(loginCommand(paths))
     .command(agentsCommand(paths))
-    .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
+    .demandCommand(1, 'Please provide a command — `lotse --help` lists them all.')
     .strictCommands()
     .scriptName('lotse')
     .locale('en')

@@ -33,11 +33,11 @@ advice, and nothing here is promised to users: ask Anthropic before advertising 
 
 1. **Host install only, never bundled.** Same order as every agent: the person's own copy. Bundling
    needs the Commercial Terms.
-2. **No Claude login in kurier.** Kurier shows "sign in with `claude` in a terminal", exactly like
+2. **No Claude login in lotse.** Lotse shows "sign in with `claude` in a terminal", exactly like
    `lotse auth`. It never opens, proxies or stores a Claude flow. This also rules out a
    provider-connect screen for Claude, whatever the screen for other providers becomes.
 3. **API key is the documented way,** a subscription is the person's own choice.
-4. **Say it in plain text.** "Runs Claude Code" is allowed; the name or logo in kurier's own name or
+4. **Say it in plain text.** "Runs Claude Code" is allowed; the name or logo in lotse's own name or
    logo is not.
 
 ## Open: billing
@@ -45,5 +45,5 @@ advice, and nothing here is promised to users: ask Anthropic before advertising 
 Sources disagree on whether, since 2026-06-15, Agent SDK and third-party use is metered from a
 separate credit pool at API rates instead of the subscription limits (one report says Anthropic
 shelved the split before it took effect). Unresolved. If the split applies, a subscriber gets a small
-monthly credit through kurier, not their full plan, and the "use your own subscription" pitch does
+monthly credit through lotse, not their full plan, and the "use your own subscription" pitch does
 not hold. Measure it with a real account before building the user-facing text.

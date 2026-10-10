@@ -57,7 +57,7 @@ const command = (paths: LotsePaths): CommandModule => ({
     const store = createSessionStore(paths.sessionsFile);
     const record = store.get(id);
     if (!record) {
-      err(`no session with id ${id} — \`lotse sessions\` lists what kurier has`);
+      err(`no session with id ${id} — \`lotse sessions\` lists what lotse has`);
       process.exitCode = 1;
       return;
     }

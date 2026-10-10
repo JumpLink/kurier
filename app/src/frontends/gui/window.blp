@@ -5,7 +5,7 @@ using Adw 1;
  * The window's shell — the whole widget tree that is the *app* rather than the conversation.
  *
  * **What is left here after `@lotse/widget`.** The two panes, their header bars, the primary menu
- * and the privacy banner: everything that names kurier rather than a chat. The conversation itself —
+ * and the privacy banner: everything that names lotse rather than a chat. The conversation itself —
  * the five states, the transcript and the composer under them — is `packages/widget/src/chat.blp`,
  * slotted into `chatHost`, and `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws that line.
  * This window is now one host among possible others, which is why the split is worth the two files.
@@ -131,7 +131,7 @@ template $LotseMainWindow: Adw.ApplicationWindow {
  *
  * `LotseChat`'s `closed` and `no-agent` states are `Adw.Bin` slots, because the copy on them can
  * only be written by something that knows what surrounds the chat: "pick a session from the list"
- * names this window's sidebar, and the remedy for a missing agent names kurier's own installer and
+ * names this window's sidebar, and the remedy for a missing agent names lotse's own installer and
  * its Preferences dialog. So these two pages are the app's, they live here as markup like every
  * other static tree, and `MainWindow` parents them into the widget's slots.
  *
@@ -144,7 +144,7 @@ Adw.StatusPage closedPage {
   icon-name: "mail-send-receive-symbolic";
   title: _("No session open");
   // Not "on the left": on a narrow window the list is a page of its own. The wording is about
-  // kurier rather than about the agent — no agent is running yet, and copy that implies
+  // lotse rather than about the agent — no agent is running yet, and copy that implies
   // otherwise is a small lie in the first screen anybody sees. "Start a new chat" names the
   // button in the sidebar's header bar, which exists now.
   description: _("Pick a session from the list, or start a new chat. The agent starts when you send your first message.");

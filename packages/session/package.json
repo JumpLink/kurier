@@ -4,7 +4,7 @@
   "license": "LGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "What a kurier session IS: the record, the transcript, and the resume binding. Pure model plus a filesystem store — no ACP client, no agent adapter, no gi://. The store takes a path, so a test writes to a temp dir and the app writes to XDG.",
+  "description": "What a lotse session IS: the record, the transcript, and the resume binding. Pure model plus a filesystem store — no ACP client, no agent adapter, no gi://. The store takes a path, so a test writes to a temp dir and the app writes to XDG.",
   "exports": {
     ".": "./src/index.ts"
   },

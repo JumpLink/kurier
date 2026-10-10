@@ -65,7 +65,7 @@ export function toTranscript(notification: SessionNotification, at: string): Tra
       return [];
     default:
       // An update variant from a newer ACP. Recorded as one opaque line: the turn's shape stays
-      // visible, and dropping it would make kurier's record disagree with the agent's.
+      // visible, and dropping it would make lotse's record disagree with the agent's.
       return [{ ...base, kind: 'system', text: `(${describeUnknown(update)})` }];
   }
 }

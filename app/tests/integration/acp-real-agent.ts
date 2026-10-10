@@ -87,11 +87,11 @@ async function main(): Promise<void> {
     // The advertised capability, not a live fs/read_text_file round trip — see the file header.
     check(
       LOTSE_CLIENT_CAPABILITIES.fs?.readTextFile === false,
-      'kurier advertises clientCapabilities.fs.readTextFile: false',
+      'lotse advertises clientCapabilities.fs.readTextFile: false',
     );
     check(
       LOTSE_CLIENT_CAPABILITIES.fs?.writeTextFile === false,
-      'kurier advertises clientCapabilities.fs.writeTextFile: false',
+      'lotse advertises clientCapabilities.fs.writeTextFile: false',
     );
 
     let sawAvailableCommands = false;

@@ -47,7 +47,7 @@ export type LoginState =
   | { readonly step: 'key'; readonly provider: LoginProvider; readonly method: LoginMethod }
   /** The provider is being asked to begin. */
   | { readonly step: 'beginning'; readonly provider: LoginProvider }
-  /** `prompt.mode` says whether kurier polls (`auto`) or the person pastes a code (`code`). */
+  /** `prompt.mode` says whether lotse polls (`auto`) or the person pastes a code (`code`). */
   | { readonly step: 'waiting'; readonly provider: LoginProvider; readonly prompt: LoginPrompt }
   | { readonly step: 'connected'; readonly provider: LoginProvider }
   | { readonly step: 'failed'; readonly message: string }

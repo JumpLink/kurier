@@ -1,4 +1,4 @@
-# 1. kurier as an embeddable widget
+# 1. lotse as an embeddable widget
 
 - Status: **Proposed**
 - Date: 2026-10-10
@@ -18,8 +18,8 @@ so the reusable parts have to leave `app/`.
 
 1. **Two new LGPL packages.** `@lotse/core` holds the session, agent and login logic moved out
    of the AGPL app. `@lotse/widget` holds a `LotseChat` widget split out of `window.ts`; the
-   kurier window becomes one consumer of it.
-2. **The host bundles its own agent.** It can ship opencode as Flatpak extra-data, as kurier does.
+   lotse window becomes one consumer of it.
+2. **The host bundles its own agent.** It can ship opencode as Flatpak extra-data, as lotse does.
 3. **The host passes its own MCP servers** in ACP `session/new` `mcpServers`. No global opencode
    config is touched.
 4. **Each host gets its own data directory.** The bundled agent runs with its own `HOME` and
@@ -36,7 +36,7 @@ so the reusable parts have to leave `app/`.
 ### Open question
 
 Non-chat one-shot AI jobs (receipt analysis, document classification) are not covered by a chat
-widget. Whether kurier gets a headless API for them or they stay on the host's in-process
+widget. Whether lotse gets a headless API for them or they stay on the host's in-process
 provider is under study. **Decision pending.**
 
 ## Probe result (step 1, done)
@@ -92,7 +92,7 @@ Planned; steps 1 to 8 are done.
    (`createSession`, `appendTurns`, `resolveAgent`) and an optional `gate` wrapper — no `LotsePaths`
    and no store, because both are already behind those. The gate is fail-closed by
    construction: it may answer `'ask'` or `'decline'`, and anything that is not literally `'ask'`
-   resolves the question as `cancelled` — a host can only narrow what kurier would have asked, never
+   resolves the question as `cancelled` — a host can only narrow what lotse would have asked, never
    widen it.
 
    **What stayed in the app**, and why: `window.ts` (the shell — the header bar, the notice banner and
@@ -115,14 +115,14 @@ Planned; steps 1 to 8 are done.
    that can run, the catalog reporting **no** connection, and no earlier "free models" choice. Anything unreadable is
    `unknown` and shows the ordinary chat, so the page fails closed into the behaviour that existed before; a turn that
    then fails on a login still gets the auth dialog with **Log in…**. After a successful login the agent restarts and
-   the page gives way to the chat. Nothing reads or keeps a credential; the page only counts providers. The kurier
+   the page gives way to the chat. Nothing reads or keeps a credential; the page only counts providers. The lotse
    app itself does not opt in. Dev hook: `LOTSE_APP_ONBOARDING=1` (`docs/dev-fixtures.md`). No connected-state signal was
    added; `probeConnections` is exported for a host that wants one.
 7. API docs. **Done:** a README for each package ([core](../../packages/core/README.md),
    [widget](../../packages/widget/README.md)) and the host guide [docs/embedding.md](../embedding.md). The examples are
    type-checked files under `app/tests/examples/`, so the docs follow the signatures.
 8. Flatpak module generator from `bundled-agents.json`. **Done:** `flatpakAgentModule` in `@lotse/core` and
-   `scripts/flatpak-agent-module`; a test pins the output byte for byte to the module in kurier's own manifest.
+   `scripts/flatpak-agent-module`; a test pins the output byte for byte to the module in lotse's own manifest.
 9. Host integration in Steuererklärung.
 
 ## Consequences

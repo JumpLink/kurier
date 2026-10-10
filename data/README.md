@@ -1,6 +1,6 @@
 # `data/` — desktop entry, AppStream metainfo, icons
 
-Everything the GNOME desktop needs to *know* kurier exists. None of it is built or
+Everything the GNOME desktop needs to *know* lotse exists. None of it is built or
 bundled: `gjsify flatpak init` renders the first two from `package.json#gjsify.flatpak`,
 and the icons are hand-written files.
 
@@ -34,6 +34,22 @@ change the config and re-run. The one thing a re-run does lose is the screenshot
 inside the metainfo — which is why the same TODO lives in the config as an absent
 `screenshots` key, not as prose.
 
+### The two elements the generator cannot write
+
+The rename from Kurier needs `<provides><id>eu.jumplink.Kurier</id>` and
+`<replaces><id>eu.jumplink.Kurier</id></replaces>` in the metainfo, so an installed copy
+and its ODRS reviews survive the new app id ([AppStream
+spec](https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html),
+[Flathub](https://docs.flathub.org/docs/for-app-authors/metainfo-guidelines)).
+`gjsify flatpak init` renders `provides.binaries`, `.mimetypes` and `.dbus` and has no
+field for either element, so **both are hand-written into the generated file** — the one
+exception to the paragraph above, and a capability gjsify should grow.
+
+`node scripts/check-metainfo.mjs` is what keeps that from being lost: it fails if the id
+is not `eu.jumplink.Lotse`, if either old-id element is missing, or if the file still
+names a `kurier` binary. It runs as part of `npm run packaging:validate`, so the
+regeneration that drops them fails the gate instead of shipping.
+
 ## Running from a checkout
 
 `gjsify run app/dist/lotse-app.gjs.mjs` needs no installation. Installation buys two
@@ -66,7 +82,7 @@ it, the desktop entry is installed and points at a command that is not on `PATH`
 `eu.jumplink.Lotse.json` is the Flathub build. Its two non-obvious finish-args are
 deliberate and are the reason to read it before trusting it:
 
-- `--talk-name=org.freedesktop.Flatpak` — kurier starts coding agents, and the agents
+- `--talk-name=org.freedesktop.Flatpak` — lotse starts coding agents, and the agents
   are **host** programs (`opencode` and its own credentials, model config and git).
   Inside a Flatpak, `node:child_process` spawns *inside the sandbox*, where those do not
   exist. Reaching the host means `flatpak-spawn --host`, and this argument is the bus
@@ -76,7 +92,7 @@ deliberate and are the reason to read it before trusting it:
   spawns exactly what it always did.
 - `--filesystem=host` — and it is not a detail: granting host spawn to an app whose
   whole job is running a program that edits your files is close to no filesystem
-  sandbox at all. kurier's own permission gate still stands (`session/request_permission`
+  sandbox at all. lotse's own permission gate still stands (`session/request_permission`
   is answered by a person, `fs/*_text_file` is refused), but it governs the ACP channel,
   not the agent process once it is on the host.
 
@@ -89,7 +105,7 @@ infer it from the manifest.
 `packages/core/src/agents/sandbox.ts` rewrites an agent command into
 `flatpak-spawn --host … /bin/sh -c …`, and it is a **no-op outside a Flatpak** — a
 desktop install spawns exactly what it always did. Four things about the host side are
-worth knowing before filing an issue against "kurier cannot find my agent", and each has
+worth knowing before filing an issue against "lotse cannot find my agent", and each has
 a test:
 
 - **Detection is `/.flatpak-info` alone, not `FLATPAK_ID`.** A terminal, editor or IDE
@@ -103,7 +119,7 @@ a test:
   `/dev/null`/stderr, and the inner script hands them back before the agent starts.
 - **The PATH is the host's, recovered from the person's own shell config.** `flatpak-spawn
   --host` passes the *session bus* PATH, which is not the PATH an interactive terminal
-  has, and on this machine it does not contain `~/.opencode/bin` at all. kurier therefore
+  has, and on this machine it does not contain `~/.opencode/bin` at all. lotse therefore
   runs the agent through the host's login shell and reads `~/.zshrc` or `~/.bashrc` first.
   A login shell ALONE is not enough — `-l` does not read `~/.zshrc` — and neither is
   sourcing it from `/bin/sh`, because `~/.zshrc` is zsh syntax that dash cannot parse.
@@ -114,12 +130,12 @@ a test:
 - **`$SHELL` that is not zsh or bash (fish, nushell, csh) gets the login PATH and no
   rc**, because the inner script is POSIX `sh` and their config is not.
 
-Ending the agent is subtler than it looks: the pid kurier holds is the sandbox-side
+Ending the agent is subtler than it looks: the pid lotse holds is the sandbox-side
 `flatpak-spawn`, and SIGTERM to it *is* forwarded (measured — Stop and a closed window
 leave no `opencode acp` behind), while **SIGKILL cannot be forwarded** and would orphan
 the host process. `killGraceMs` exists for that reason.
 
-The build is end to end: it installs `lotse-app` and the `kurier` CLI, both with a
+The build is end to end: it installs `lotse-app` and the `lotse` CLI, both with a
 `#!/usr/bin/gjs -m` shebang, because the manifest's `command` execs them directly and a
 bundle without a shebang is handed to `/bin/sh`, which answers with a syntax error. Two
 generated inputs make it work offline and both are committed: `build-aux/gjsify.gjs.mjs`

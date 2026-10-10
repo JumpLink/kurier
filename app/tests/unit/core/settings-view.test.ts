@@ -105,7 +105,7 @@ export default async function run(): Promise<void> {
       const row = rows.find((entry) => entry.key === 'gamma:bundled');
       expect(row?.selected).toBe(true);
       expect(row?.available).toBe(false);
-      expect(row?.subtitle).toBe('Not known to this version of kurier');
+      expect(row?.subtitle).toBe('Not known to this version of lotse');
       expect(note === null).toBe(false);
     });
 

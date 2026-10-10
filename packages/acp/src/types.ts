@@ -22,7 +22,7 @@
 /** ACP `RequestId`: JSON-RPC allows a number or a string (and `null`, which we never send). */
 export type RequestId = number | string;
 
-/** ACP `SessionId`. An opaque string — the agent owns its shape, kurier never parses it. */
+/** ACP `SessionId`. An opaque string — the agent owns its shape, lotse never parses it. */
 export type SessionId = string;
 
 /** ACP `ProtocolVersion`. Bumped only for breaking changes. */
@@ -33,7 +33,7 @@ export const PROTOCOL_VERSION: ProtocolVersion = 1;
 
 /**
  * The `_meta` bag ACP reserves on every request, response and notification. Implementations
- * MUST NOT assume anything about its contents, and neither does kurier: it is passed through
+ * MUST NOT assume anything about its contents, and neither does lotse: it is passed through
  * untouched and never read.
  */
 export type Meta = Record<string, unknown> | null;
@@ -77,11 +77,11 @@ export interface AgentAuthCapabilities extends Extensible {
 export interface BooleanConfigOptionCapabilities extends Extensible {}
 
 /**
- * Which config-option shapes kurier can act on, announced in
+ * Which config-option shapes lotse can act on, announced in
  * `clientCapabilities.session.configOptions`.
  *
  * **This is a client capability, not an agent one**, and mistaking it for the other way round is
- * easy: an agent answering without it says nothing about whether it *has* options. kurier omits the
+ * easy: an agent answering without it says nothing about whether it *has* options. lotse omits the
  * whole `session` key until the surface exists, and the fact that `opencode acp` 2.0.19 sends 400+
  * model options anyway is a reason to announce, not a reason to skip announcing.
  */
@@ -96,7 +96,7 @@ export interface ClientSessionCapabilities extends Extensible {
 export interface ElicitationCapabilities extends Extensible {}
 
 /**
- * What *we* can do, announced in `initialize`. kurier answers `false` to both file-system
+ * What *we* can do, announced in `initialize`. lotse answers `false` to both file-system
  * capabilities on purpose — see `LOTSE_CLIENT_CAPABILITIES` and the reasoning in
  * `packages/acp/src/gate.ts`.
  */
@@ -118,7 +118,7 @@ export interface InitializeRequest extends Extensible {
  * `AuthMethod` in the schema is a tagged union. In practice agents do not always send the tag:
  * `opencode acp` sends `{ id, name, description }` with no `type`, which is the *agent* variant
  * plus a `description` the schema does not define. Both variants therefore land in
- * `AuthMethodInfo`, and `kind` is what kurier *reads* (`terminal` → the agent can run the login
+ * `AuthMethodInfo`, and `kind` is what lotse *reads* (`terminal` → the agent can run the login
  * itself), not what it trusts.
  */
 export interface AuthMethodInfo extends Extensible {
@@ -212,7 +212,7 @@ export interface McpServerSse extends Extensible {
 
 /**
  * The stdio variant has no `type` in the schema (it is the `anyOf` tail, not a tagged branch).
- * kurier does not care which shape arrived; it forwards the object and never reads past `type`.
+ * lotse does not care which shape arrived; it forwards the object and never reads past `type`.
  */
 export type McpServer = (McpServerStdio & { type?: 'stdio' }) | McpServerHttp | McpServerSse;
 
@@ -387,8 +387,8 @@ export interface LoadSessionRequest extends Extensible {
  * modes and the config options as they stand for this session.
  *
  * That matters more than it looks. Those values are the *agent's* truth about this session, and
- * kurier keeps no copy — so an option row built from anything else would be showing a preference
- * kurier invented. `opencode acp` 2.0.19 sends all three options here as well as on `session/new`.
+ * lotse keeps no copy — so an option row built from anything else would be showing a preference
+ * lotse invented. `opencode acp` 2.0.19 sends all three options here as well as on `session/new`.
  */
 export interface SessionStateCarrier extends Extensible {
   modes?: SessionModeState | null;
@@ -494,7 +494,7 @@ export interface BlobResourceContents extends Extensible {
 
 export type ContentBlock = TextContent | ImageContent | AudioContent | ResourceLink | EmbeddedResource;
 
-/** The one content block type kurier itself can put on the wire. */
+/** The one content block type lotse itself can put on the wire. */
 export function textBlock(text: string): TextContent {
   return { type: 'text', text };
 }
@@ -622,7 +622,7 @@ export interface UsageUpdate extends Extensible {
 }
 
 /**
- * The `session/update` payloads kurier understands, discriminated on `sessionUpdate`.
+ * The `session/update` payloads lotse understands, discriminated on `sessionUpdate`.
  *
  * The schema declares this as a `oneOf` with a `discriminator`, and so do we — deliberately, with
  * **no catch-all branch**. A catch-all arm typed `{ sessionUpdate: string }` overlaps every literal,

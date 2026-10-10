@@ -24,7 +24,7 @@
  *   terminal to inherit … inventing an in-window login would be storing a credential this project
  *   deliberately has no safe place for").
  * - `model` — **the same wire error, arrived at after a turn started.** See the section on
- *   `FailureContext` below; this is the kind that issue <https://github.com/JumpLink/kurier/issues/2>
+ *   `FailureContext` below; this is the kind that issue <https://github.com/JumpLink/lotse/issues/2>
  *   is about.
  * - `unsupported` — the agent ran and refused. Nothing a person can do to this session on this agent,
  *   and the window would otherwise show an empty transcript with no explanation, which plan §6 calls
@@ -40,12 +40,12 @@
  * `opencode/fledge-alpha-free` is geo-blocked from Germany (HTTP 403), and opencode reports any
  * provider 403 on `session/prompt` as JSON-RPC `-32000 "Authentication required: provider
  * authentication required"`. That is the **same error class and the same code** as the real login trap
- * at `session/new`/`session/load`. Before this kind existed, kurier showed the auth dialog on that path
+ * at `session/new`/`session/load`. Before this kind existed, lotse showed the auth dialog on that path
  * — naming `lotse auth`, which does not help anybody: logging in is not what is wrong. Upstream
  * record: issue #2.
  *
  * So the split cannot be made from the message (a reword away) and cannot be made from the code (the
- * codes are identical). What survives is a fact kurier already tracks: **had a prompt gone out?**
+ * codes are identical). What survives is a fact lotse already tracks: **had a prompt gone out?**
  * `AgentSession.#promptSent` is that fact, and it is passed in as `FailureContext.promptSent`. It is a
  * **required** parameter rather than an optional one, so a new call site cannot silently classify a
  * mid-turn refusal as a login trap by omitting it.
@@ -53,7 +53,7 @@
  * **And honestly: this is a better question than a perfect one.** A login that genuinely expires
  * *between* two turns also arrives as `-32000` after a prompt was sent, and it lands here too. That is
  * why the `'model'` notice names **both** remedies in provider-neutral words and why its button offers
- * the one kurier can actually perform — changing a model through the protocol. Saying so in the dialog
+ * the one lotse can actually perform — changing a model through the protocol. Saying so in the dialog
  * rather than in a comment is the point: a person who really has lost their login is told about
  * `lotse auth`, and a person whose free model is blocked from their country is told to pick another
  * one, and neither is told something false.
@@ -68,7 +68,7 @@ import { isAuthRequired, RpcError, UnsupportedCapabilityError } from '@lotse/acp
 
 import type { AgentAttachment } from './turn.ts';
 
-/** What sort of "this did not work" this is. The names are kurier's, not the protocol's. */
+/** What sort of "this did not work" this is. The names are lotse's, not the protocol's. */
 export type FailureKind = 'auth' | 'model' | 'quota' | 'unsupported' | 'start';
 
 /**
@@ -126,7 +126,7 @@ export function isQuotaExhausted(error: unknown): boolean {
  *
  * **Every branch matches on the error's own type or on the turn state, never on its text.** Matching a
  * message would make the whole decision hostage to wording: an agent is free to put "auth" in an
- * unrelated error, and a future reword of kurier's own sentence would silently stop being recognised.
+ * unrelated error, and a future reword of lotse's own sentence would silently stop being recognised.
  * `isAuthRequired` is the protocol's own predicate (`RpcError` with `-32000`) and
  * `UnsupportedCapabilityError` is the class `AcpClient.reattach` rejects with (trap 2) — both are facts
  * about the wire, not about prose.
@@ -135,7 +135,7 @@ export function isQuotaExhausted(error: unknown): boolean {
  * alone cannot separate the two: `opencode acp` 2.0.19 answers a geo-blocked provider 403 on
  * `session/prompt` with the same `-32000` it answers the real login trap with. A prompt having gone out
  * is the structural difference — before it, the agent was never asked to do anything and a refusal can
- * only be about the login; after it, the likeliest cause is the model, and the remedy kurier can
+ * only be about the login; after it, the likeliest cause is the model, and the remedy lotse can
  * perform is a different model. The header says why the notice names both remedies anyway.
  *
  * `AuthRequiredError` is checked first because it is what `withAuthHint` leaves behind: it is the
@@ -156,7 +156,7 @@ export interface FailureNotice {
   /**
    * The command to run, when there is one.
    *
-   * **Only the auth failure has one, and that is the point of the field.** kurier stores no
+   * **Only the auth failure has one, and that is the point of the field.** lotse stores no
    * credential (`AGENTS.md` § Privacy: there is no `secret` tier and adding one needs a reason), so
    * the only honest remedy it can name is the command a person runs themselves. An empty string is
    * never returned: a caller that has nothing to run gets `null` and shows no command line.
@@ -180,7 +180,7 @@ export interface FailureNotice {
  *
  * **A closed union with one member, and that is not a placeholder.** It exists so the *widget* never
  * has to know what a failure was in order to know what a button does: `FailureDialog` is handed an
- * action name and a callback, and the decision of which name is kurier's (`failureNotice`) and whether
+ * action name and a callback, and the decision of which name is lotse's (`failureNotice`) and whether
  * it is available is core's (`failureAction`). A second member is added when a second failure earns a
  * second remedy, and adding it will break the widget's exhaustive handling rather than silently leaving
  * a button that does nothing.
@@ -198,7 +198,7 @@ export type FailureAction = 'choose-model' | 'login';
 export interface FailureActionContext {
   readonly modelChoice: boolean;
   /**
-   * The window can log in itself: the agent is one whose own login API kurier drives (opencode), and its
+   * The window can log in itself: the agent is one whose own login API lotse drives (opencode), and its
    * login server can be reached from here (`whyNoLoginServer`). Without it the `auth` dialog stays a
    * sentence that names `lotse auth`, as before.
    */
@@ -274,10 +274,10 @@ export function staleDialog(shown: AgentAttachment | null, attachment: AgentAtta
  * command run in a terminal, and the other leaves a window with nothing in it and no explanation. The
  * third is `'model'`, which needs a person to pick something different and says so.
  *
- * **Every string is fixed English and every one is kurier's own.** The failure may have arrived with
+ * **Every string is fixed English and every one is lotse's own.** The failure may have arrived with
  * agent text in it, and none of it goes in here — the same reason every label in the permission dialog
  * passes `useMarkup: false`. `AGENTS.md` fixes the house rule: fixed English, no `Intl`. Note that the
- * `'model'` body names the provider but never a model id and never an agent's own words: kurier does not
+ * `'model'` body names the provider but never a model id and never an agent's own words: lotse does not
  * own the model and cannot know which of its limits bit.
  */
 export function failureNotice(kind: FailureKind): FailureNotice | null {
@@ -289,7 +289,7 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
           'It cannot answer a prompt until somebody has logged in. Everything else keeps working; ' +
           'the prompt on screen was not sent.',
         // Stays: the dialog names it as the way in when the window cannot log in itself (an agent that
-        // has no login API kurier drives, or one outside the sandbox), and as the alternative otherwise.
+        // has no login API lotse drives, or one outside the sandbox), and as the alternative otherwise.
         command: AUTH_COMMAND,
         action: 'login',
       };
@@ -301,7 +301,7 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
         // mid-turn all arrive as the same `-32000` — so the sentence names all three and does not pick
         // one. The `lotse auth` advice that used to stand alone here was *wrong* for the case it was
         // written for (issue #2), and dropping it entirely would be wrong for the case that remains; so
-        // it stays, as one half of a sentence, and the button is the half kurier can actually perform.
+        // it stays, as one half of a sentence, and the button is the half lotse can actually perform.
         body:
           'The provider turned this request down. It may be limited by region or rate, or it may need ' +
           'a login. Choose another model, or run lotse auth in a terminal.',
@@ -313,7 +313,7 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
       return {
         heading: 'The provider account has no credit',
         // Fixed words, no agent text. The login worked, so no command is named: the remedies are a free
-        // model (the button) or topping up the account at the provider, which kurier cannot do.
+        // model (the button) or topping up the account at the provider, which lotse cannot do.
         body:
           'You are logged in, but the provider refused this request because the account has no credit. ' +
           'Choose a model that is free, or add credit at the provider.',
@@ -324,8 +324,8 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
       return {
         heading: 'This agent cannot reopen this session',
         body:
-          'It advertises neither session/load nor session/resume, so there is no way for kurier to ' +
-          'attach it to a conversation that already exists. An agent kurier cannot reattach to is ' +
+          'It advertises neither session/load nor session/resume, so there is no way for lotse to ' +
+          'attach it to a conversation that already exists. An agent lotse cannot reattach to is ' +
           'refused, not shown as an empty transcript.',
         command: null,
         action: null,

@@ -4,7 +4,7 @@
  * A small command with one job: make "not installed" and "broken" different sentences. Both look
  * identical from the outside until you know whether the binary exists, and the fix for each is
  * nothing alike. The SOURCE column says where a usable one came from — the person's own install
- * (`host`) or the copy shipped inside this build (`bundled`) — and the last line names the one kurier
+ * (`host`) or the copy shipped inside this build (`bundled`) — and the last line names the one lotse
  * would start now.
  */
 
@@ -75,7 +75,7 @@ export function settingsReport(file: string, settings: Settings, problem: string
 
 const command = (paths: LotsePaths): CommandModule => ({
   command: 'agents',
-  describe: 'list the agent launchers kurier knows how to start',
+  describe: 'list the agent launchers lotse knows how to start',
   builder: (yargs) =>
     yargs
       .option('use', {

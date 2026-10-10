@@ -4,15 +4,15 @@
  * have any reason to send the options in the first place.
  *
  * **Why this is in `packages/acp` and not in the surface.** The values live in the agent, and the
- * agent is the only authority on them. So kurier never keeps a copy: it re-reads them from
+ * agent is the only authority on them. So lotse never keeps a copy: it re-reads them from
  * `session/new`, `session/load`, `session/resume`, from every `set_config_option` answer and from
  * `config_option_update`. A test that pinned "the client remembers the model" would pin the one
  * behaviour that must never exist.
  *
  * **The measurement that is easy to get backwards** (it was, in this repo's own plan, and cost a
  * product decision): `configOptions` is a **client** capability. It sits under
- * `ClientCapabilities.session`, so whether it appears in `initialize` says what *kurier* can do —
- * not what the agent offers. `opencode acp` 2.0.19 sends 400+ models whether kurier announces
+ * `ClientCapabilities.session`, so whether it appears in `initialize` says what *lotse* can do —
+ * not what the agent offers. `opencode acp` 2.0.19 sends 400+ models whether lotse announces
  * anything or not. The announcement is still right, and the tests below pin it in the right
  * direction.
  */
@@ -33,7 +33,7 @@ function currentValueOf(options: SessionConfigOption[] | undefined, id: string):
 
 export default async () => {
   await describe('the capability announcement', async () => {
-    await it('announces session.configOptions, because kurier can act on the options', async () => {
+    await it('announces session.configOptions, because lotse can act on the options', async () => {
       expect(LOTSE_CLIENT_CAPABILITIES.session?.configOptions).toStrictEqual({});
     });
 

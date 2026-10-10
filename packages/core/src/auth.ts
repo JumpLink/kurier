@@ -16,9 +16,9 @@
  * - **The agent can run the login itself** (`kind: 'terminal'`, or it handed over `args`). It gets
  *   `authenticate` with its own method id and does the rest in a terminal it already owns. That is the
  *   protocol's designed path and it is preferred.
- * - **Nobody but the client can.** kurier runs the adapter's own login command, and whatever that
+ * - **Nobody but the client can.** lotse runs the adapter's own login command, and whatever that
  *   wants to open — a browser, a device code, a terminal menu — has to reach the person sitting there.
- *   Then the agent is asked again, so the answer is the agent's own rather than kurier's assumption.
+ *   Then the agent is asked again, so the answer is the agent's own rather than lotse's assumption.
  *
  * **Why this is core and not the CLI.** The decision used to live in `frontends/cli/auth.ts` and the
  * notice in a private function in `run.ts`, which made the window either re-derive both or send a person
@@ -28,7 +28,7 @@
  * arrives as `runLogin`. The CLI inherits its stdio; a window has to do something else entirely.
  *
  * Either way the login is a **person**, it is never forwarded over the ACP channel, and it is never
- * stored: there is nowhere in kurier that could keep a credential, which is the honest reason rather
+ * stored: there is nowhere in lotse that could keep a credential, which is the honest reason rather
  * than a missing feature.
  */
 
@@ -44,9 +44,9 @@ import { openAgent, type AgentHandle, type OpenAgentOptions } from './run.ts';
 /**
  * What an agent's `authMethods` mean for a client, as one value.
  *
- * `agent` is the method id for a login kurier has to arrange, `terminal` the one the agent can run
+ * `agent` is the method id for a login lotse has to arrange, `terminal` the one the agent can run
  * itself; `methods` is everything it advertised, in the order the notice reads them. `unusable` is an
- * agent that advertised authentication but no id kurier can name — not nothing, so it may not be
+ * agent that advertised authentication but no id lotse can name — not nothing, so it may not be
  * treated as `none`.
  */
 export type AuthPlan =
@@ -157,7 +157,7 @@ export type AuthArrangement =
  * Arrange the login an agent asked for: ask it first, run the command second, ask it again.
  *
  * Two handshakes, not one, and the second is the point: the agent is asked whether the login took,
- * instead of kurier assuming a zero exit code meant yes. Both are closed in a `finally` — an ACP agent
+ * instead of lotse assuming a zero exit code meant yes. Both are closed in a `finally` — an ACP agent
  * is a child process with a model behind it, and a leaked one is a leaked session too.
  */
 export async function arrangeAuth(hooks: AuthHooks): Promise<AuthArrangement> {

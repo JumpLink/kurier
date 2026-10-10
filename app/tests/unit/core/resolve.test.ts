@@ -28,7 +28,7 @@ import {
 } from '@lotse/core';
 
 const SHA = 'c'.repeat(64);
-const DATA = '/synthetic/data/kurier';
+const DATA = '/synthetic/data/lotse';
 
 const CATALOG = parseBundledCatalog({
   checked: '2026-01-01',

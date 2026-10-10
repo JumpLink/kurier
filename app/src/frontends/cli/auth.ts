@@ -76,7 +76,7 @@ const command = (paths: LotsePaths): CommandModule => ({
         );
         return;
       case 'unusable':
-        err('the agent advertised an auth method without an id — nothing kurier can do with it');
+        err('the agent advertised an auth method without an id — nothing lotse can do with it');
         process.exitCode = 1;
         return;
       case 'login-missing':

@@ -7,7 +7,7 @@
  *
  * **An unknown `sessionUpdate` is never an error.** It goes to the wire listeners as an ordinary
  * message, tagged with its method, so a caller can log it, forward it, or render a placeholder.
- * Dropping it would make kurier's transcript disagree with the agent's; throwing on it would break
+ * Dropping it would make lotse's transcript disagree with the agent's; throwing on it would break
  * every agent that ships an extension before we do — which is the failure the plan's `_meta` rule
  * exists to prevent, in the one place where the extension is not behind `_meta`.
  */
@@ -75,7 +75,7 @@ export interface UsableConfigValue {
    *
    * **Carried, not rendered.** `SessionConfigSelectOptions` is an `anyOf` on the wire — flat or
    * grouped — and a grouped list has to become the *same* list of values, because a `select` has one
-   * `currentValue` and therefore one flat answer. What a surface does with the group (in kurier's
+   * `currentValue` and therefore one flat answer. What a surface does with the group (in lotse's
    * case: nothing, it puts the group in front of the name) is a presentation decision and lives in
    * `app/src/core/config.ts`; what belongs here is only the fact that there was a group.
    */

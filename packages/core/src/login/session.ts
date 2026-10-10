@@ -14,9 +14,9 @@ import { createLoginApi } from './api.ts';
 import type { LoginSession } from './controller.ts';
 import { connectionFacts, type ConnectionFacts } from '../onboarding.ts';
 
-/** Only opencode has the HTTP login API kurier drives; another adapter keeps the terminal hint. */
+/** Only opencode has the HTTP login API lotse drives; another adapter keeps the terminal hint. */
 export function loginUnavailableReason(agent: AgentCommand): string | null {
-  if (agent.id !== 'opencode') return `${agent.title} has no login kurier can run — use its own login`;
+  if (agent.id !== 'opencode') return `${agent.title} has no login lotse can run — use its own login`;
   const reason = whyNoLoginServer(agent, currentSandboxFacts());
   if (reason) return reason;
   if (!which(agent.program)) return `${agent.program} is not on PATH — install it, then try again`;

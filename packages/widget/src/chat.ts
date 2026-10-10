@@ -9,7 +9,7 @@
  * its own permission policy adds.
  *
  * **What this is not.** A window, a session list, a header bar, a menu, a preferences dialog, a
- * notices banner. `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws that line and kurier's own
+ * notices banner. `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws that line and lotse's own
  * `app/src/frontends/gui/window.ts` is the first consumer on the other side of it: it keeps the
  * sidebar and the shell, and it is now one of several possible hosts rather than the only place the
  * chat exists.
@@ -92,7 +92,7 @@ export type HostGateAnswer = 'ask' | 'decline';
  * **`appendTurns` and `createSession` are callbacks rather than a store passed whole**, because the
  * widget's uses of a store have nothing to do with each other: one writes a record once, the other
  * writes a line per streamed chunk, and a `SessionStore` would drag `all`/`update`/`remove` in beside
- * them. A host that reads the same file for a list of its own (kurier's window does) keeps its own
+ * them. A host that reads the same file for a list of its own (lotse's window does) keeps its own
  * handle on it, and the widget never becomes a second opinion about where sessions live.
  */
 export interface LotseChatOptions {
@@ -350,7 +350,7 @@ export class LotseChat extends Adw.Bin {
   /**
    * Show a session.
    *
-   * **The record is the host's, read as the host wants it read.** kurier's window re-reads its store
+   * **The record is the host's, read as the host wants it read.** lotse's window re-reads its store
    * first, because its own list was loaded at startup and a session that streamed since is longer on
    * disk; a host with a live store hands over what it already has. Either way this takes the record
    * as given and never looks a session up — the widget has no opinion about where sessions live.
@@ -550,7 +550,7 @@ export class LotseChat extends Adw.Bin {
    */
   #onNotice(message: string): void {
     this.#notices.push(message);
-    console.log(`kurier: ${message}`);
+    console.log(`lotse: ${message}`);
     this.#hostNotice?.(message);
   }
 
@@ -655,7 +655,7 @@ export class LotseChat extends Adw.Bin {
    * Open the model dropdown, for the failure dialog's "Choose another model".
    *
    * **Through the row's own method and nothing else** — no `set_selected`, no request, no value. A
-   * dialog that picked a model on the person's behalf would be kurier deciding configuration for the
+   * dialog that picked a model on the person's behalf would be lotse deciding configuration for the
    * agent, which is the "always allow" mistake in different clothes; what this does is put the list
    * in front of them.
    *
@@ -666,7 +666,7 @@ export class LotseChat extends Adw.Bin {
    */
   openModelDropdown(): boolean {
     const opened = this.#config.openModelDropdown();
-    console.log(`kurier: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
+    console.log(`lotse: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
     return opened;
   }
 
@@ -675,7 +675,7 @@ export class LotseChat extends Adw.Bin {
   /**
    * Send a prompt as the composer would, draft cleared first.
    *
-   * For a host control that is not the entry — kurier's `LOTSE_APP_THINKING`, a `lotse serve` task.
+   * For a host control that is not the entry — lotse's `LOTSE_APP_THINKING`, a `lotse serve` task.
    * The guard `#onSend` applies is the *entry's* (an empty line is not a prompt); a caller that has
    * a sentence in hand has already passed it.
    */

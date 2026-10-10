@@ -3,7 +3,7 @@
 #
 # Why this exists at all, when `gjsify ship` builds a real `.deb`/`.rpm`/Flatpak:
 # `ship` packs a payload, it does not put an app into the desktop of the machine
-# running it. Two of kurier's consumers need the files *in place*: GTK resolves
+# running it. Two of lotse's consumers need the files *in place*: GTK resolves
 # the window icon by NAME (`main.ts`: `applicationIcon: APP_ID`), and under Wayland
 # the compositor matches a window to a launcher only through an INSTALLED
 # `.desktop`. `app/data/README.md` in buchhaltung says the same for the same

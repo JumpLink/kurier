@@ -92,11 +92,11 @@ export default async () => {
       expect(view.locations).toStrictEqual(['src/hello.ts:12']);
     });
 
-    await it('keeps all four kinds, in the order kurier decides', async () => {
-      // **The rule as of 2026-10-02, which reverses the earlier one.** kurier does not remember an
+    await it('keeps all four kinds, in the order lotse decides', async () => {
+      // **The rule as of 2026-10-02, which reverses the earlier one.** lotse does not remember an
       // "always" decision — the *agent* does, because it is the agent that keeps sending the question
-      // and kurier stores no policy at all. So both `*_always` kinds are shown like any other option,
-      // and kurier's own sentences are in front of the agent's names.
+      // and lotse stores no policy at all. So both `*_always` kinds are shown like any other option,
+      // and lotse's own sentences are in front of the agent's names.
       //
       // **The order is `reject_once`, `allow_once`, `allow_always`, `reject_always`**, and it is not
       // arbitrary: libadwaita focuses the *first* added response when `default_response` is unset
@@ -113,7 +113,7 @@ export default async () => {
     });
 
     await it('puts the "once" allow before the "always" allow, whatever order the agent used', async () => {
-      // **The order is kurier's, not the agent's.** The riskier promise must never be the first allow
+      // **The order is lotse's, not the agent's.** The riskier promise must never be the first allow
       // a hand lands on, and never the first allow a stray keypress reaches either.
       const alwaysFirst: RequestPermissionRequest = {
         ...request(),
@@ -203,9 +203,9 @@ export default async () => {
 
     await it("an allow_always id is an allow, carried with the agent's own id", async () => {
       // **The pass-through, on the deciding function.** `allow_always` is now a rendered option, so a
-      // press on it is a decision kurier *did* see a person make — and the id that goes back is the
+      // press on it is a decision lotse *did* see a person make — and the id that goes back is the
       // agent's, verbatim. What an "always" then means is the agent's business: it is the party that
-      // keeps asking, and kurier holds no policy between questions.
+      // keeps asking, and lotse holds no policy between questions.
       expect(decideFromView(view, 'allow_always')).toStrictEqual({
         type: 'allowed',
         optionId: 'allow_always',
@@ -235,7 +235,7 @@ export default async () => {
     await it('an allow_always is `selected` with that exact id — the agent keeps the promise', async () => {
       // There is no `allowed_once` in ACP v1 and there is no `allowed_always` in ACP v1 either: the
       // outcome is `selected` plus the id the agent offered. So passing an "always" through changes
-      // nothing about the wire shape — it only stops kurier from hiding a button the person wanted.
+      // nothing about the wire shape — it only stops lotse from hiding a button the person wanted.
       expect(answerFor({ type: 'allowed', optionId: 'allow_always' })).toStrictEqual({
         outcome: { outcome: 'selected', optionId: 'allow_always' },
       });
@@ -253,7 +253,7 @@ export default async () => {
 
       const first = desk.ask(request());
       const second = desk.ask(request({ title: 'Write src/second.ts' }));
-      // Arrival order, and the second is *not* answered: answering it would be kurier deciding.
+      // Arrival order, and the second is *not* answered: answering it would be lotse deciding.
       expect(shown).toStrictEqual(['q1']);
       expect(desk.waiting).toBe(1);
       answer(desk, 'q1', 'reject_once');
@@ -625,18 +625,18 @@ export default async () => {
       // unset libadwaita focuses the *first* added response — the GIR text says "the last added", and
       // that is wrong on libadwaita 1.9.3 (measured both directions, case 9). `show()` sets the focus
       // itself after `map` plus one idle, but there is a frame before that idle runs, and a focused
-      // `Gtk.Button` answers Enter. So the first slot has to be safe *without* kurier's help — which is
+      // `Gtk.Button` answers Enter. So the first slot has to be safe *without* lotse's help — which is
       // only true while it is `reject_once`.
       const view = permissionView(request());
       const first = view.options[0];
       expect(first?.optionId).toBe('reject_once');
       expect(first?.kind.startsWith('allow')).toBe(false);
-      // …and the focus kurier sets is that same button, so winning or losing the race is the same answer.
+      // …and the focus lotse sets is that same button, so winning or losing the race is the same answer.
       expect(initialFocusResponseId(view.options)).toBe(first?.optionId);
     });
   });
 
-  await describe("optionLabel — kurier's voice, not the agent's", async () => {
+  await describe("optionLabel — lotse's voice, not the agent's", async () => {
     const allow: PermissionOption = { optionId: 'a', name: 'Yes', kind: 'allow_once' };
     // Named "No", not "Decline", on purpose: these two are the fixtures whose labels are exercised for
     // *not repeating* the agent's wording, and an agent that calls its reject option "No" is the case
@@ -645,7 +645,7 @@ export default async () => {
     const alwaysAllow: PermissionOption = { optionId: 'aa', name: 'Yes', kind: 'allow_always' };
     const alwaysReject: PermissionOption = { optionId: 'ar', name: 'No', kind: 'reject_always' };
 
-    await it("is kurier's sentence for the kind, whatever the agent called the option", async () => {
+    await it("is lotse's sentence for the kind, whatever the agent called the option", async () => {
       // **The reason this function exists.** ACP lets an agent name its `allow_once` option "Decline",
       // and the dialog used to print the name verbatim — a suggested-looking button reading "Decline"
       // that allows. The person cannot tell, and the styling would have said the opposite thing.
@@ -654,7 +654,7 @@ export default async () => {
       expect(optionLabel({ optionId: 'x', name: 'Decline', kind: 'allow_once' })).toBe('Allow once');
       // …and the agent's wording is gone from the button even when it is short and harmless. It was
       // "Allow once: Yes" for a while; a screenshot then read "Always decline: Always decline in thi…",
-      // the words twice with the ellipsis inside the repeat, unreadable at kurier's own 360 px floor.
+      // the words twice with the ellipsis inside the repeat, unreadable at lotse's own 360 px floor.
       expect(optionLabel({ optionId: 'a', name: 'Yes', kind: 'allow_always' })).toBe('Always allow');
       expect(optionLabel({ optionId: 'r', name: 'No', kind: 'reject_always' })).toBe('Always decline');
     });
@@ -683,7 +683,7 @@ export default async () => {
         ]),
       ).toBe(null);
       // An agent that qualifies its options gets them, quoted so the line reads as the agent's wording
-      // and not as more of kurier's own sentence.
+      // and not as more of lotse's own sentence.
       expect(
         agentNames([
           { optionId: 'a', name: 'Always allow in this session', kind: 'allow_always' },
@@ -697,7 +697,7 @@ export default async () => {
       expect(agentNames([{ optionId: 'a', name: '', kind: 'allow_once' }])).toBe(null);
       // The `allow`/`reject` fixtures in this block are named "Yes"/"No" — genuinely different words
       // from the labels, so they *do* earn a line. That is the honest consequence of a textual rule:
-      // kurier lists what the agent said rather than judging whether it was worth saying.
+      // lotse lists what the agent said rather than judging whether it was worth saying.
       expect(agentNames([allow, reject])).toBe('The agent calls these: "Yes", "No"');
       // Every one that says something is listed, not just the first.
       expect(
@@ -716,9 +716,9 @@ export default async () => {
     });
 
     await it('underscores are doubled, because add_response reads them as a mnemonic', async () => {
-      // **An agent must not choose kurier's Alt accelerator.** GTK parses `_x` in a response label as
+      // **An agent must not choose lotse's Alt accelerator.** GTK parses `_x` in a response label as
       // "Alt+x", so an agent that named its option `Delete_everything` would have handed the agent a
-      // shortcut in kurier's own dialog. Doubling prints a literal underscore. Kurier's own sentences
+      // shortcut in lotse's own dialog. Doubling prints a literal underscore. Lotse's own sentences
       // carry none, so this is belt-and-braces against a future wording — but it stays, because
       // nothing downstream of `add_response` would catch a live one.
       expect(escapeMnemonic('_')).toBe('__');
@@ -736,7 +736,7 @@ export default async () => {
     // **Guardrail 4 is about `_meta`, and this is the same instinct applied to the fields this gate
     // does read.** A message that does not match the schema must not throw out of the gate: a thrown
     // gate is a failed turn, and one malformed message from one agent would then look like a crash in
-    // kurier. It has to project to a view with nothing to press, so the answer is `cancelled`.
+    // lotse. It has to project to a view with nothing to press, so the answer is `cancelled`.
     for (const [name, payload] of [
       ['no toolCall at all', { sessionId: 's1', options: ALL_FOUR }],
       ['a null toolCall', { sessionId: 's1', toolCall: null, options: ALL_FOUR }],
@@ -893,7 +893,7 @@ export default async () => {
       for (const kind of ['allow_whenever', 'allow_always_forever', 'ALLOW_ONCE', '', 1, null, undefined]) {
         expect(isKnownOptionKind(kind)).toBe(false);
       }
-      // `usableOptions` drops the unusable and applies kurier's order, exactly like `permissionView`.
+      // `usableOptions` drops the unusable and applies lotse's order, exactly like `permissionView`.
       const usable = usableOptions({
         sessionId: 's1',
         toolCall: { toolCallId: 't1', title: 'Write' },

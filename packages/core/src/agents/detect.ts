@@ -1,5 +1,5 @@
 /**
- * Which agents are usable, and which one kurier would pick — pure over facts.
+ * Which agents are usable, and which one lotse would pick — pure over facts.
  *
  * The facts are gathered elsewhere (`probe.ts`), so everything here is "facts in, answer out" and a test
  * hands in a synthetic machine. Three sources, and the word is a promise: `host` means a program on the
@@ -80,7 +80,7 @@ export interface Resolution {
  * never skipped quietly:** the fallback is chosen and `note` says what was asked and what runs instead.
  *
  * A person's own install comes before the bundled one because it is the one that carries their login and
- * config; kurier cannot tell whether either is logged in and does not try (AGENTS.md § Privacy).
+ * config; lotse cannot tell whether either is logged in and does not try (AGENTS.md § Privacy).
  */
 export function resolveAgent(input: {
   readonly setting: AgentChoice | null;

@@ -1,5 +1,5 @@
 /**
- * What Ctrl-C means, which depends on what kurier is doing at the time.
+ * What Ctrl-C means, which depends on what lotse is doing at the time.
  *
  * This exists because of a hole measured on the real bundle, not because a module was needed.
  * `runTurn` used to install the `SIGINT` handler itself — and `runTurn` runs *after* the handshake.

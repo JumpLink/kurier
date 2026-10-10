@@ -49,7 +49,7 @@ export function conversationRecord(input: ConversationInput): SessionRecord {
 /**
  * What a person reads when `session/new` succeeded and the record could not be written.
  *
- * **The agent now holds a session kurier has no record of**, so the sentence says that plainly rather
+ * **The agent now holds a session lotse has no record of**, so the sentence says that plainly rather
  * than leaving a generic failure: nothing of this conversation is in the list or the file, and what
  * they typed is on screen only. New chat is the way forward, and it is named because the composer is
  * disabled under this message until it is pressed.

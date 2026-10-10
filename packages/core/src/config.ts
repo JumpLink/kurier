@@ -9,9 +9,9 @@
  * *Configuration Boundaries* says model configuration is "usually owned by the External Agent", and
  * for one agent specifically: "Authentication and model selection are configured through Poolside,
  * not Zed." Zed shows nothing and passes the values through. That works there because the agent has
- * somewhere else to live — beside the editor, in its own TUI. In kurier the agent *is* the window,
+ * somewhere else to live — beside the editor, in its own TUI. In lotse the agent *is* the window,
  * so "elsewhere" is a terminal the person has to leave to open. Showing what the agent reported, and
- * setting it through the protocol, is the same boundary from the other side: kurier holds no
+ * setting it through the protocol, is the same boundary from the other side: lotse holds no
  * configuration authority over the agent (see `LOTSE_CLIENT_CAPABILITIES` and `setConfigOption`).
  *
  * Measured against `opencode acp` 2.0.19, one `session/new` with an empty `mcpServers`:

@@ -4,7 +4,7 @@
  * `packages/acp` never spawns anything, never imports `node:child_process` and never touches
  * `gi://`. Everything a connection needs from the outside is this one interface, so the whole
  * protocol is testable on both runtimes against an injected fixture — and, in the other direction,
- * so kurier can hand the same connection to a stdio child process on GJS, to a WebSocket in a
+ * so lotse can hand the same connection to a stdio child process on GJS, to a WebSocket in a
  * browser extension tomorrow, or to an in-process stub in a test, without the protocol noticing.
  *
  * This is postbote's `store`-knows-no-backend rule, one layer up.

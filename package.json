@@ -4,7 +4,7 @@
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "description": "Kurier — an ACP client. Starts coding agents as subprocesses over the Agent Client Protocol, manages their sessions, and binds them to a surface. Runs on GJS via gjsify.",
+  "description": "Lotse — an ACP client. Starts coding agents as subprocesses over the Agent Client Protocol, manages their sessions, and binds them to a surface. Runs on GJS via gjsify.",
   "workspaces": [
     "packages/*",
     "app"
@@ -18,7 +18,7 @@
     "build": "gjsify workspace lotse-cli build",
     "start": "gjsify workspace lotse-cli start",
     "test": "gjsify workspace lotse-cli test",
-    "packaging:validate": "desktop-file-validate data/eu.jumplink.Lotse.desktop && appstreamcli validate --no-net --explain data/eu.jumplink.Lotse.metainfo.xml",
+    "packaging:validate": "desktop-file-validate data/eu.jumplink.Lotse.desktop && appstreamcli validate --no-net --explain data/eu.jumplink.Lotse.metainfo.xml && node scripts/check-metainfo.mjs",
     "packaging:install": "sh scripts/install-packaging.sh"
   },
   "gjsify": {
@@ -26,7 +26,7 @@
       "appId": "eu.jumplink.Lotse",
       "icon": "data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
       "kind": "app",
-      "name": "Kurier",
+      "name": "Lotse",
       "command": "lotse-app",
       "runtime": "gnome",
       "runtimeVersion": "50",
@@ -52,11 +52,11 @@
       "summaryTranslatorHint": "One line, no full stop: what the app does for the person using it",
       "description": [
         {
-          "p": "Kurier is a client for the Agent Client Protocol (ACP), the open standard a coding agent speaks over a JSON-RPC connection on stdio. It starts the agent as a subprocess, keeps its session, and shows you what the agent says while it works.",
+          "p": "Lotse is a client for the Agent Client Protocol (ACP), the open standard a coding agent speaks over a JSON-RPC connection on stdio. It starts the agent as a subprocess, keeps its session, and shows you what the agent says while it works.",
           "translatorHint": "Opening paragraph: what the app is and which standard it speaks"
         },
         {
-          "p": "The agent decides which model does the work; kurier owns the environment around it — which directory the session runs in, what the agent is allowed to do, and which MCP servers it may reach. A session record says what is reachable, never what is allowed, so every request is checked again, every time.",
+          "p": "The agent decides which model does the work; lotse owns the environment around it — which directory the session runs in, what the agent is allowed to do, and which MCP servers it may reach. A session record says what is reachable, never what is allowed, so every request is checked again, every time.",
           "translatorHint": "Second paragraph: the app's own scope versus the agent's"
         },
         {
@@ -70,7 +70,7 @@
               "translatorHint": "Feature list: streaming a turn and stopping it"
             },
             {
-              "item": "Answer the agent's permission requests yourself — kurier denies by default rather than approving for you",
+              "item": "Answer the agent's permission requests yourself — lotse denies by default rather than approving for you",
               "translatorHint": "Feature list: the permission gate"
             },
             {
@@ -84,9 +84,9 @@
       "license": {
         "project": "AGPL-3.0-or-later"
       },
-      "homepageUrl": "https://github.com/JumpLink/kurier",
-      "bugtrackerUrl": "https://github.com/JumpLink/kurier/issues",
-      "vcsBrowserUrl": "https://github.com/JumpLink/kurier",
+      "homepageUrl": "https://github.com/JumpLink/lotse",
+      "bugtrackerUrl": "https://github.com/JumpLink/lotse/issues",
+      "vcsBrowserUrl": "https://github.com/JumpLink/lotse",
       "categories": [
         "Development",
         "GTK"
@@ -260,7 +260,7 @@
           "sources": [
             {
               "type": "git",
-              "url": "https://github.com/JumpLink/kurier.git",
+              "url": "https://github.com/JumpLink/lotse.git",
               "tag": "v0.1.1",
               "x-checker-data": {
                 "type": "git",

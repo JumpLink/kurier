@@ -2,8 +2,8 @@
  * The modal a start failure earns, and nothing else.
  *
  * **A separate file from `permission-dialog.ts` on purpose.** That one is the reason this project
- * exists and it is built out of the agent's own options with kurier's labels; this one shows two
- * sentences kurier wrote about itself, has no body, and answers with "Close". Sharing a widget would
+ * exists and it is built out of the agent's own options with lotse's labels; this one shows two
+ * sentences lotse wrote about itself, has no body, and answers with "Close". Sharing a widget would
  * have meant a dialog with two shapes and one set of teardown paths, and the permission dialog's
  * three GTK facts (`closed` before `response`, `force_close` emits neither, `default_response`
  * unset focuses the last response) are all about a dialog with buttons that decide something.
@@ -17,7 +17,7 @@ import type { FailureNotice } from '@lotse/core';
 /** The dismissal, and the only string in here that is not part of a sentence. */
 const CLOSE_RESPONSE = 'close';
 const CLOSE_LABEL = 'Close';
-/** The one remedy a failure can offer, and kurier's own words for it. See `core/failure.ts`. */
+/** The one remedy a failure can offer, and lotse's own words for it. See `core/failure.ts`. */
 const MODEL_RESPONSE = 'choose-model';
 const MODEL_LABEL = 'Choose another model';
 const LOGIN_RESPONSE = 'login';
@@ -44,7 +44,7 @@ export interface FailureDialogActions {
  * **`Adw.AlertDialog` with a heading, a body and one response — or two.** `heading` and `body` are plain
  * strings — this class does not set `useMarkup`, and does not need to: `Adw.AlertDialog` has no
  * markup-enabled properties, which is the difference from `Adw.PreferencesRow` in the trap the
- * permission dialog's header names. Both sentences are kurier's own (`core/failure.ts`), so there is
+ * permission dialog's header names. Both sentences are lotse's own (`core/failure.ts`), so there is
  * no agent text on the way in either.
  *
  * **One instance, replaced rather than stacked**, for the same reason `PermissionDialog` does it: a

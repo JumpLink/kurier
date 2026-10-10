@@ -22,10 +22,10 @@
  * **`useMarkup: false` on every label, without exception.** Everything in this dialog is text an agent
  * wrote: a tool title, a file path, a diff. Agent text is data, and Pango markup would let
  * `<b>allowed</b>` or a `<span>` smuggle formatting — or a whole extra row — into a control whose
- * button labels are the decision. The one label in this file that is kurier's own copy has no markup
+ * button labels are the decision. The one label in this file that is lotse's own copy has no markup
  * either, so there is no exception to remember. The copy is fixed English strings, not `Intl`.
  *
- * **The button labels are kurier's, not the agent's** — see `optionLabel` in `core/permission.ts`
+ * **The button labels are lotse's, not the agent's** — see `optionLabel` in `core/permission.ts`
  * and the note where the responses are added. `kind` decides both the words and the appearance, so an
  * agent cannot ship a button that reads "Decline" and allows.
  *
@@ -61,10 +61,10 @@ import { CSS } from './css.ts';
 import { toolIcon } from './tool-line.ts';
 import BodyTemplate from './permission-body.blp';
 
-/** What kurier says when the agent reported no raw input at all. */
+/** What lotse says when the agent reported no raw input at all. */
 const NO_RAW_INPUT = 'The agent did not say what it wanted to do with this.';
 
-/** What kurier says when the agent named no locations. */
+/** What lotse says when the agent named no locations. */
 const NO_LOCATIONS = 'The agent did not say where.';
 
 /**
@@ -77,7 +77,7 @@ const NO_LOCATIONS = 'The agent did not say where.';
  * and `core/permission.ts` fails that closed on the general rule rather than on a special case.
  *
  * Setting it to the agent's rejecting option instead would also work, and it is weaker: it makes
- * safety depend on the agent having offered an id with that exact string, so kurier would have to know
+ * safety depend on the agent having offered an id with that exact string, so lotse would have to know
  * the agent's ids to fail closed. The same probe measures that spelling (case 6). An id no agent can
  * offer is the safer half of the same idea — and it is also the only one that cannot be an
  * `allow_*`, which is the whole point.
@@ -169,7 +169,7 @@ export class PermissionDialog {
    * **Only one at a time, and the second `show` replaces the first.** `core/permission.ts` queues, so
    * a `show` while one is open is either a stale question or a bug — and stacking a second modal
    * dialog over the first would leave the person looking at whichever was drawn last, which is not
-   * something kurier knows the order of. Replacing keeps one dialog, one question, one answer.
+   * something lotse knows the order of. Replacing keeps one dialog, one question, one answer.
    */
   show(question: PermissionQuestion): Promise<string | null> {
     this.close();
@@ -216,7 +216,7 @@ export class PermissionDialog {
           return GLib.SOURCE_REMOVE;
         });
       });
-      // **The focus is kurier's decision, made after the dialog is on screen, and it is never an allow
+      // **The focus is lotse's decision, made after the dialog is on screen, and it is never an allow
       // button.** libadwaita's own fallback is the *last added* response, which is whichever option
       // the agent happened to send last — measured in `scripts/probes/alert-dialog-close.mjs`, case 9:
       // a bare `Adw.AlertDialog` with `allow_once` added first comes up with the focus on the allow
@@ -293,7 +293,7 @@ export class PermissionDialog {
  * **The body is a list of rows, in a fixed order, because that is what a question needs.** What the
  * tool is, what kind of thing it wants to do, where, and then the raw input in full. `Adw.PreferencesGroup`
  * would put every one of those in a list row with its own heading, which is a settings screen around a
- * question; a plain box reads as a question. The heading text is kurier's own and therefore constant.
+ * question; a plain box reads as a question. The heading text is lotse's own and therefore constant.
  *
  * **The raw-input view comes back too**, because it is the focus target when the agent offered no
  * rejecting option — see `show`. A `Gtk.Box` is not focusable, so the body as a whole cannot take the
@@ -315,7 +315,7 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   body._locationsLabel.set_visible(true);
 
   // The agent's own names for its options, as one caption line — and only when at least one of them
-  // says something the kurier labels do not. This is where the wording went when it came off the
+  // says something the lotse labels do not. This is where the wording went when it came off the
   // buttons, so nothing the agent told the person is lost.
   const names = agentNames(view.options);
   if (names !== null) {
@@ -327,7 +327,7 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   body._rawInput.get_buffer()?.set_text(view.rawInput ?? NO_RAW_INPUT, -1);
 
   const dialog = new Adw.AlertDialog({ heading: 'The agent wants permission' });
-  // `extra_child` rather than a longer heading: the heading is one kurier sentence and stays that way,
+  // `extra_child` rather than a longer heading: the heading is one lotse sentence and stays that way,
   // whatever the agent's tool is called. A heading built from the agent's title would let agent text
   // into the part of the dialog that reads as the app's own voice — and into the one string that is
   // the app's own voice, which is exactly the line not to cross.
@@ -335,26 +335,26 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   // **`add_response` per option, in the agent's own order, with no extra one.** There is no
   // `set_choices` on `Adw.AlertDialog` — `add_responses` is the batch form and takes no appearances,
   // so the loop is where the appearance belongs anyway. An allowing option is `SUGGESTED`: that is
-  // emphasis, and it is the only emphasis kurier ever applies to a button, because inventing it on a
-  // question kurier does not own is editorialising. A rejecting option keeps the default appearance,
+  // emphasis, and it is the only emphasis lotse ever applies to a button, because inventing it on a
+  // question lotse does not own is editorialising. A rejecting option keeps the default appearance,
   // which is what the plan asks for and what libadwaita's own guidance says for a negative response.
   //
   // **The label is `optionLabel(option)`, not `option.name`, and the appearance is keyed on `kind`.**
   // Both come from the same place on purpose: an option's `name` is the agent's to choose, and ACP
   // lets an agent call its `allow_once` option "Decline". Printing that verbatim gives a
   // suggested-looking button reading "Decline" that allows, and the person has no way to tell.
-  // `optionLabel` puts kurier's own word — "Allow once" or "Decline" — in front, derived from `kind`,
+  // `optionLabel` puts lotse's own word — "Allow once" or "Decline" — in front, derived from `kind`,
   // and keeps the agent's name only when it adds something; it also doubles underscores, because
-  // `add_response` parses mnemonics and an agent must not choose kurier's Alt accelerator. The
+  // `add_response` parses mnemonics and an agent must not choose lotse's Alt accelerator. The
   // decision and the label therefore cannot disagree: they are the same `kind`.
   //
   // **`default_response` is deliberately not set, and that is not the same as leaving focus alone.**
   // It would decide what the dialog's *default widget* is, and libadwaita's fallback when it is unset
   // is the last added response — which is whichever option the agent sent last, so an agent that
-  // orders `allow_once` last gets a dialog whose first Enter allows. So kurier sets neither the default
+  // orders `allow_once` last gets a dialog whose first Enter allows. So lotse sets neither the default
   // nor the focus implicitly: `show()` puts the focus itself, on the rejecting option's button, from
   // `initialFocusResponseId` in `core/permission.ts`. The fallback this replaces is measured in
-  // `scripts/probes/alert-dialog-close.mjs` case 9 and the result kurier produces is measured on this
+  // `scripts/probes/alert-dialog-close.mjs` case 9 and the result lotse produces is measured on this
   // widget by `app/tests/probes/permission-focus.ts`.
   for (const option of view.options) {
     dialog.add_response(option.optionId, optionLabel(option));

@@ -1,8 +1,8 @@
 /**
  * Where a new conversation runs — pure over facts, like `agents/detect.ts`.
  *
- * `LOTSE_CWD` wins, then the directory the person started kurier from, then `$HOME`. "The directory
- * kurier was started from" is two different questions: outside a Flatpak it is `process.cwd()`; inside
+ * `LOTSE_CWD` wins, then the directory the person started lotse from, then `$HOME`. "The directory
+ * lotse was started from" is two different questions: outside a Flatpak it is `process.cwd()`; inside
  * one the sandbox's own cwd is the app's, not the person's, so the host is asked (`hostCwd`, gathered by
  * `probe.ts`). A candidate that is not an absolute path to something that exists falls through to the
  * next one: a session whose `cwd` is gone would fail at `session/new` with a message about a path the
@@ -12,7 +12,7 @@
 import { envKnob } from './env.ts';
 
 export interface CwdFacts {
-  /** Whether kurier runs inside a Flatpak, i.e. whether `hostCwd` is the one to believe. */
+  /** Whether lotse runs inside a Flatpak, i.e. whether `hostCwd` is the one to believe. */
   readonly sandboxed: boolean;
   /** `process.cwd()`. */
   readonly processCwd: string;

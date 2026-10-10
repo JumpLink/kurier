@@ -2,7 +2,7 @@
  * What Ctrl-C means, and what it used to get wrong.
  *
  * The orphan this file's subject fixes was measured on the real bundle: `opencode acp` takes
- * seconds to answer `initialize` from cold, a Ctrl-C inside that window killed kurier with no
+ * seconds to answer `initialize` from cold, a Ctrl-C inside that window killed lotse with no
  * handler installed, and the agent subprocess stayed running with nothing owning it. So the
  * decision has to be provable without sending signals at a subprocess — which is also the only way
  * to test it on both runtimes, since a real signal test is exactly what produced three confident

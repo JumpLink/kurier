@@ -47,7 +47,7 @@ export type { FailureKind, TurnState };
  * - `agent`: the agent answered `cancelled` and nobody asked it to. An agent that abandons a turn on
  *   its own — the model gave up, a provider dropped the stream — is *not* something a person stopped,
  *   and rendering "Stopped" for it would put a word into their mouth.
- * - `none`: no `stopReason` exists at all. Only reachable when kurier never sent the prompt (Stop
+ * - `none`: no `stopReason` exists at all. Only reachable when lotse never sent the prompt (Stop
  *   during the handshake), because an agent that dies mid-turn takes the `agent-gone` path instead and
  *   must never be dressed up as a finished turn.
  * - `left`: the person moved to another chat and the controller stopped the turn for them (New chat, a
@@ -66,7 +66,7 @@ export type TurnEvent =
   /**
    * The turn settled.
    *
-   * `stopReason` is `null` only for "kurier never sent the prompt". A turn the agent abandoned
+   * `stopReason` is `null` only for "lotse never sent the prompt". A turn the agent abandoned
    * *after* receiving it always has a stop reason, and a turn the agent never answered at all is the
    * `agent-gone` event, not this one: a dying agent must not produce a completion.
    */
@@ -118,7 +118,7 @@ export function transition(state: TurnState, event: TurnEvent): TurnState {
       if (state === 'gone') return 'gone';
       if (event.cancelledBy !== 'window') return 'idle';
       // Stop was pressed and the cancel was ours. Two answers count as a stop, and the second is the
-      // only one that is not the agent's own: `null`, which means kurier never got as far as sending the
+      // only one that is not the agent's own: `null`, which means lotse never got as far as sending the
       // prompt — the Stop landed during the handshake, so there was nothing to stop and the turn ends
       // where it began. Reporting `idle` there would put "the turn finished" on a turn that never ran.
       if (event.stopReason === null || event.stopReason === 'cancelled') return 'stopped';

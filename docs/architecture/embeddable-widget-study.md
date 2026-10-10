@@ -1,4 +1,4 @@
-# Study: kurier as an embeddable widget (`@lotse/widget`)
+# Study: lotse as an embeddable widget (`@lotse/widget`)
 
 Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Facts are from the repo as of 2026-10-09; items marked **UNVERIFIED** were not measured. The `mcpServers` question was measured on 2026-10-10 (section 3).
 
@@ -22,7 +22,7 @@ Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Fa
 - `frontends/cli/*`, `index.ts` (yargs CLI).
 - `frontends/gui/main.ts`, `window.blp`, `session-list.ts`, `preferences.ts`, `hooks.ts`, `hook-value.ts` (dev hooks).
 - `core/paths.ts`, `settings.ts`, `settings-view.ts`, `notices.ts`, `session-groups.ts`. The widget gets paths and
-  settings as constructor options; the host decides. `paths.ts` stays the kurier app's resolver.
+  settings as constructor options; the host decides. `paths.ts` stays the lotse app's resolver.
 - `scripts/stand-in-agent.mjs` and the dev fixtures.
 
 `@lotse/session` (LGPL) already fits: the store takes a path.
@@ -61,7 +61,7 @@ split of `window.ts` came out with five deltas worth recording.
   only an app has: the app id, name and version, the window geometry, `COLLAPSE_WIDTH_PX` and the
   dev-hook prefix.
 - **The two idle pages are the host's widgets, not the widget's copy.** `closed` and `no-agent` are
-  `Adw.Bin` slots in `chat.blp`; kurier's `window.blp` builds two top-level `Adw.StatusPage` objects
+  `Adw.Bin` slots in `chat.blp`; lotse's `window.blp` builds two top-level `Adw.StatusPage` objects
   and passes them as `closedPage` / `noAgentPage`. The widget decides *when* they show (it owns
   `noAgent.sendReason` and the `'no-agent'`-vs-`'new'` choice), the host decides what they say.
 - **The dev hooks stayed in the app and the widget grew the methods they drive.** `hooks.ts`,
@@ -88,7 +88,7 @@ interface LotseChatOptions {
   cwd: string                                    // absolute; host decides the workspace
   mcpServers?: McpServer[]                       // opaque ACP objects, forwarded to session/new
   permissions: PermissionPolicy                  // see below
-  storage: { dataDir: string; sessionsFile?: string }   // per host app, e.g. $XDG_DATA_HOME/<app-id>/kurier
+  storage: { dataDir: string; sessionsFile?: string }   // per host app, e.g. $XDG_DATA_HOME/<app-id>/lotse
   isolation?: 'private' | 'none'                 // default 'private' (own HOME/XDG, see isolation.ts)
   catalog?: BundledCatalog                       // host injects its own bundled-agents data
   features?: { sessionList?: boolean; modelPicker?: boolean; loginInline?: boolean }
@@ -98,7 +98,7 @@ interface LotseChatOptions {
 **Permission policy:** default is the existing fail-closed Adwaita dialog (`permission-dialog.ts`). The host may pass
 a `PermissionGate` wrapper that answers *before* asking a person, e.g. "read-only tools of `steuer` auto-allow,
 everything else asks". It must never grant by session (guardrail 1: scope is not authority) and must keep
-`cancelled` on every path where nobody chose. Auto-allow rules belong to the host, not to kurier.
+`cancelled` on every path where nobody chose. Auto-allow rules belong to the host, not to lotse.
 
 **Signals:** `state-changed` (AgentSnapshot: attaching/attached/failed/exited), `turn-started`, `turn-finished(stopReason)`,
 `session-created(id)`, `permission-requested` (informational; the gate still decides), `failure(kind)`,
@@ -106,7 +106,7 @@ everything else asks". It must never grant by session (guardrail 1: scope is not
 
 **Storage per host app:** the options above replace `paths.ts` lookups. The bundled agent's HOME/XDG already go to
 `<dataDir>/agents/<id>/` (`isolation.ts`, 0700), so a host passing its own `dataDir` gets its own login; nothing is
-shared with the user's `~/.config/opencode` or with the kurier app.
+shared with the user's `~/.config/opencode` or with the lotse app.
 
 ### What the options became (step 5, 2026-10-10)
 
@@ -121,7 +121,7 @@ shipped, and the differences are all in the same direction — fewer things the 
 | `permissions: PermissionPolicy` | `gate?: (q) => HostGateAnswer \| Promise<HostGateAnswer>`, `HostGateAnswer = 'ask' \| 'decline'` | A policy object invites an allow rule. Two words cannot express one: anything that is not literally `'ask'` — including a throw, a rejection or an unexpected value — resolves the question `cancelled`. |
 | `features?: {sessionList, modelPicker, loginInline}` | — (gone) | No session list to switch off (it never entered the widget), and the other two are facts rather than preferences: `hasModelControl` is whether the agent offered one, `hasLogin` whether this agent can log in. |
 | `start()`, `send(text)` | `open(record)`, `newChat()`, `prompt(text)`, `stop()`, `shutdown()` | There is no "start" without a conversation; a host either opens a stored record or starts a new chat. |
-| Signals (`state-changed`, `turn-started`, …) + properties | `onConversation`, `onNotice` callbacks; getters (`turnRunning`, `agentRunning`, `openSessionId`, `snapshot`, …) | GObject signals were not needed by the first consumer, so they were not invented for it. The getters are what kurier's window actually reads; a signal can be added when a second host wants one. |
+| Signals (`state-changed`, `turn-started`, …) + properties | `onConversation`, `onNotice` callbacks; getters (`turnRunning`, `agentRunning`, `openSessionId`, `snapshot`, …) | GObject signals were not needed by the first consumer, so they were not invented for it. The getters are what lotse's window actually reads; a signal can be added when a second host wants one. |
 | — | `closedPage?`, `noAgentPage?`, `noAgent?`, `mcpServers?`, `now?` | The two host slots (above), the pass-through MCP list, and an injected clock so a screenshot run is the only place a real one is used. |
 
 ## 3. Host MCP server via `session/new`
@@ -130,7 +130,7 @@ shipped, and the differences are all in the same direction — fewer things the 
   (also on `LoadSessionRequest`, line ~3324, and the third request at ~4562). `McpServer` is `anyOf` Http / Sse / Stdio.
   `McpServerStdio` = `{name, command (absolute path), args[], env[{name,value}]}`. Http/Sse are gated by the agent's
   `mcpCapabilities`; opencode 2.0.19 advertises `{"http":true,"sse":false}` ([the measured handshake](../../refs/acp/SOURCE.md#what-one-real-agent-answers)), stdio is the baseline.
-- **kurier today:** `AcpClient.newSession` / `reattach` already accept `mcpServers` (`packages/acp/src/client.ts:227-242`)
+- **lotse today:** `AcpClient.newSession` / `reattach` already accept `mcpServers` (`packages/acp/src/client.ts:227-242`)
   and forward them opaquely. Every call site passes `[]`: `packages/core/src/agent-session.ts:682`, `app/src/frontends/cli/start.ts:97`,
   `resume.ts:104`, `cancel.ts:67`. The plumbing is `AgentSessionOptions.mcpServers` (step 4, done).
   Note `reattach` must receive the same list, otherwise a resumed session loses the tools.
@@ -155,7 +155,7 @@ shipped, and the differences are all in the same direction — fewer things the 
   1. An `opencode` module: `extra-data` sources per arch (url, sha256, size) + a script source `apply_extra` that does
      `mkdir -p /app/extra/agents/opencode`, untars, `chmod 0755 …/package/bin/opencode`, removes the tarball.
   2. Same `installPath` so `BUNDLED_PREFIX` matches. A host that wants another prefix needs the prefix injectable.
-  3. finish-args: `--share=network` (provider calls, OAuth), `--filesystem=host` is what kurier uses; a host should prefer
+  3. finish-args: `--share=network` (provider calls, OAuth), `--filesystem=host` is what lotse uses; a host should prefer
      narrower access (the workspace dir only) and avoid the `--talk-name=org.freedesktop.Flatpak` unless it launches host agents.
 - Both the version pin and the checksum live in two places (manifest and JSON). A host should generate the module from the
   JSON, e.g. a `lotse-flatpak-module` script in the widget package, or drift will occur.
@@ -169,7 +169,7 @@ Exists today:
   European providers, excluded ones). `server.ts` starts a private `opencode serve --port 0` on 127.0.0.1 with an in-memory
   Basic-auth password and the same isolation env.
 - `frontends/gui/login-dialog.ts` (352 lines) renders it; `failure-dialog.ts` offers **Log in…** on an `auth` failure.
-- CLI: `lotse login`, `lotse auth`. No credential is stored by kurier: opencode keeps it, an API key lives in memory for one call.
+- CLI: `lotse login`, `lotse auth`. No credential is stored by lotse: opencode keeps it, an API key lives in memory for one call.
 - Model choice: `config-row.ts` with `free-models.json` ordering.
 
 Widget needs:
@@ -183,7 +183,7 @@ Widget needs:
   the same `probeConnections`.
 - The login dialog should become a reusable `Adw.NavigationPage` / `Gtk.Widget` content, the dialog being a thin wrapper.
 - Login must run under the host's isolation dir so credentials land in the host app's agent store (already how `server.ts` works).
-- Provider data policy: the `xai` exclusion and featured lists are kurier decisions; make `login-providers.json` injectable.
+- Provider data policy: the `xai` exclusion and featured lists are lotse decisions; make `login-providers.json` injectable.
 - Browser OAuth in a Flatpak needs `xdg-open` via portal (`Gtk.UriLauncher`) rather than spawning a browser.
 
 ## 6. Steps, sizes, risks
@@ -198,7 +198,7 @@ Widget needs:
 | 6 | **Done** (`onboarding.ts` in core, `onboarding-page.ts` in the widget; see the ADR). Inline provider onboarding page; the connected-state signal was left out | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |
 | 8 | Flatpak module generator from `bundled-agents.json`; make `BUNDLED_PREFIX` configurable | M |
-| 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `LotseChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless kurier API is added. | M |
+| 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `LotseChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless lotse API is added. | M |
 
 **Risks**
 - ~~`window.ts` is a 1356-line god-class; splitting it is the real cost and the likeliest source of regressions

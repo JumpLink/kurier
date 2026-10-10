@@ -1,5 +1,5 @@
 /**
- * `@lotse/core` — kurier without a surface.
+ * `@lotse/core` — lotse without a surface.
  *
  * Layer 2, between the protocol (`@lotse/acp`) and whatever is rendering: which agent to start
  * and how to start it, the session a prompt turn runs in, the view models a chat is drawn from,
@@ -9,7 +9,7 @@
  *
  * **Nothing here knows a toolkit.** No `gi://`, no yargs, no widget: the pieces that need a
  * decision take it as an argument. Paths arrive as a `LotsePaths`, the agent choice as an
- * `AgentChoice`, the permission answer as a `ClientGate`. That is what lets a host put kurier's
+ * `AgentChoice`, the permission answer as a `ClientGate`. That is what lets a host put lotse's
  * conversation in its own data directory, and what keeps every file in here testable on Node as
  * well as on GJS.
  *
@@ -18,7 +18,7 @@
  * a promise to the widget and to any host; an internal helper stays internal.
  */
 
-// ── Where kurier keeps things ────────────────────────────────────────────────────────────────────
+// ── Where lotse keeps things ────────────────────────────────────────────────────────────────────
 // The shape, and the layout a host gets. The app's own XDG/`LOTSE_*` resolver stays in the app,
 // and `envKnob` is how both sides read a knob under its new name and its old one.
 export { envKnob } from './env.ts';
@@ -134,7 +134,7 @@ export {
   type ConversationInput,
 } from './conversation.ts';
 
-// ── The login an agent asks for, and the login kurier can arrange ────────────────────────────────
+// ── The login an agent asks for, and the login lotse can arrange ────────────────────────────────
 export {
   arrangeAuth,
   authPlan,

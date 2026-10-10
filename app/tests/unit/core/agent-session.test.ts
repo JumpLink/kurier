@@ -134,7 +134,7 @@ function harness(options: HarnessOptions = {}): Harness {
     ...(options.source ? { source: options.source } : {}),
     ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
     ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
-    // The gate kurier passes is the gate the client answers with, so the refusal assertions are about
+    // The gate lotse passes is the gate the client answers with, so the refusal assertions are about
     // the wire and not about a local array — that is what makes guardrail 2 a measurement.
     open: async (openOptions) => {
       opened.push(openOptions.command);
@@ -567,7 +567,7 @@ export default async () => {
     await it('records the history an agent replays on load exactly once, not twice', async () => {
       // `FixtureAgent.loadSession` replays its chunks as `session/update`, and it uses the same
       // `chunks` list for the prompt turn. So one `load` plus one turn would be **two** occurrences of
-      // the word if kurier recorded the replay — and kurier already has that conversation on disk, so
+      // the word if lotse recorded the replay — and lotse already has that conversation on disk, so
       // writing it again is a duplication in the store, not a detail.
       //
       // `reattach` runs before `runTurn` subscribes, which is what makes this one. Measured here rather
@@ -634,7 +634,7 @@ export default async () => {
       const h = harness({ permissionOptions: PERMISSION });
       await h.session.prompt('do a thing');
       const outcome = h.agent.permissionOutcomes[0]?.outcome;
-      // `null` is the one answer any gate may give, and it is `cancelled` — not `reject`, because kurier
+      // `null` is the one answer any gate may give, and it is `cancelled` — not `reject`, because lotse
       // did not pick one of the agent's options on a person's behalf.
       expect(outcome).toStrictEqual({ outcome: 'cancelled' });
     });
@@ -773,7 +773,7 @@ export default async () => {
     await it('an answer that arrives after the Stop cannot turn cancelled into an allow', async () => {
       // The dialog's promise resolves *after* the Stop, with the allowing id. A surface that does that
       // is not misbehaving — GTK settles a dialog in either order while it is being torn down — so the
-      // question is whether the answer kurier already gave can still be an allow. It cannot: the desk
+      // question is whether the answer lotse already gave can still be an allow. It cannot: the desk
       // holds no open question, so the late id lands on nothing and the outcome is already `cancelled`.
       let release: (id: string) => void = () => {};
       const asked = new Promise<void>((resolve) => {
@@ -807,7 +807,7 @@ export default async () => {
       // The transport ends with the question still up: `#reportFailure` is the path that settles it.
       h.agent.vanish();
       await turn;
-      // Nothing goes back over a dead wire — the agent is gone — so the assertion is on kurier's own
+      // Nothing goes back over a dead wire — the agent is gone — so the assertion is on lotse's own
       // record: the question is settled, and the line says `agent-gone` rather than claiming a person
       // refused anything.
       expect(h.session.snapshot.attachment.status).toBe('gone');
@@ -832,9 +832,9 @@ export default async () => {
     });
 
     await it('an "always allow" pressed on the staged request goes back with that exact id', async () => {
-      // The pass-through end to end, through the controller and over the wire: kurier relays the agent's
+      // The pass-through end to end, through the controller and over the wire: lotse relays the agent's
       // own option id and adds nothing. The agent is what remembers the decision, so this is not a
-      // promise kurier made.
+      // promise lotse made.
       const h = harness({
         onPermission: async () => 'allow-always',
       });
@@ -1290,7 +1290,7 @@ export default async () => {
 
   // Issue #2. The same `-32000` as the login trap, but the agent handshook, loaded the session and
   // answered the turn — with a refusal. Nothing on the wire separates it from trap 1 except the prompt
-  // that went out first, and kurier used to show the login dialog here, naming a command that does not
+  // that went out first, and lotse used to show the login dialog here, naming a command that does not
   // help. See `core/failure.ts`.
   await describe('agent-session — the provider refused the turn', async () => {
     await it('is the `model` kind, not the auth trap, and it earns a dialog', async () => {

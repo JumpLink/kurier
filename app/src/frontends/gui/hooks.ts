@@ -75,7 +75,7 @@ export interface LotseHooks extends FrameworkHooks {
    * with a line in the log rather than quietly picking a value.
    *
    * **It goes through the real path and sends a prompt if none has run**, because an option can only be
-   * set on a live agent and kurier starts the agent on the first prompt (plan §6). So the hook sends
+   * set on a live agent and lotse starts the agent on the first prompt (plan §6). So the hook sends
    * `LOTSE_APP_PROMPT` (or a fixture sentence), waits for `session/load` to answer with the options, and
    * then calls `session/set_config_option` — which is also why it is applied before `LOTSE_APP_THINKING`:
    * one prompt, one turn, one set. What a screenshot then shows is the row in the state a person's
@@ -250,7 +250,7 @@ export interface LotseHooks extends FrameworkHooks {
  * Read `LOTSE_APP_*` at startup.
  *
  * **The framework's reader is spread in, and it does not read these ten.** `readAppDevHooks` knows
- * `VIEW`, `FILE` and `DEBUG` and nothing else, so kurier's hooks are read here — the earlier version
+ * `VIEW`, `FILE` and `DEBUG` and nothing else, so lotse's hooks are read here — the earlier version
  * of this comment claimed the framework's "empty means unset" and truthiness rules were being used,
  * which was false for every key, and it named `LOTSE_APP_THINKING=0` as the disagreement it prevented
  * while being the disagreement: `trimmed()` returns the **string** `'0'`, which is truthy, so

@@ -18,7 +18,7 @@ import { createSessionStore } from '@lotse/session';
 import { LotseChat } from '@lotse/widget';
 
 export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): LotseChat {
-  // Everything kurier writes goes under `dataRoot`, in the host's own data directory.
+  // Everything lotse writes goes under `dataRoot`, in the host's own data directory.
   const paths = lotsePathsUnder(dataRoot);
   const store = createSessionStore(paths.sessionsFile);
 

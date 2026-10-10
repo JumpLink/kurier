@@ -24,7 +24,7 @@ const ANSWERED: TurnEvent = { kind: 'permission-answered' };
 const ASKED: TurnEvent = { kind: 'permission-asked' };
 const GONE: TurnEvent = { kind: 'agent-gone', reason: 'exited with code 1' };
 
-/** A settled turn. `stopReason` is `null` only for "kurier never sent the prompt". */
+/** A settled turn. `stopReason` is `null` only for "lotse never sent the prompt". */
 function ended(stopReason: StopReason | null, cancelledBy: CancelledBy): TurnEvent {
   return { kind: 'turn-ended', stopReason, cancelledBy };
 }

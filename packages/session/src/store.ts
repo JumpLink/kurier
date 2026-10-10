@@ -9,7 +9,7 @@
  *   only way to get "either the old file or the new one" out of a filesystem.
  * - **Mode `0600`.** The file holds the text of a person's conversations with an agent. The
  *   directory is `0700`. Set explicitly, not inherited, because the umask of whoever started the
- *   process is not a decision kurier may leave to chance.
+ *   process is not a decision lotse may leave to chance.
  * - **Location is the caller's.** The store takes a path and never decides one. The app resolves
  *   `$XDG_DATA_HOME`; a test passes a temp dir. That is what keeps the store free of any opinion
  *   about the machine it runs on.
@@ -69,7 +69,7 @@ export function createSessionStore(file: string): SessionStore {
     }
     if (parsed?.version !== FILE_VERSION || !Array.isArray(parsed.sessions)) {
       throw new Error(
-        `${file} is not a kurier session file (version ${String(parsed?.version)}, expected ${FILE_VERSION})`,
+        `${file} is not a lotse session file (version ${String(parsed?.version)}, expected ${FILE_VERSION})`,
       );
     }
     for (const record of parsed.sessions) {

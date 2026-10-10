@@ -1,5 +1,5 @@
 /**
- * The sidebar's session list: kurier's own records, grouped under "Today" / "Yesterday" / "This
+ * The sidebar's session list: lotse's own records, grouped under "Today" / "Yesterday" / "This
  * week" / "Earlier", newest first.
  *
  * **The window never reads the store itself.** It is handed the records, or a failure, by whoever

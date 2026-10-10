@@ -1,7 +1,7 @@
 /**
- * `lotse sessions` — kurier's own records, for one principal.
+ * `lotse sessions` — lotse's own records, for one principal.
  *
- * Note what this lists and what it does not: these are *kurier's* records, not the agent's. The
+ * Note what this lists and what it does not: these are *lotse's* records, not the agent's. The
  * agent has its own history and hands it over on request; this is the local file, which is what a
  * resume needs and what a person wants when asking "what did I open here last week".
  */
@@ -16,7 +16,7 @@ import { err, pickArgv, showSession, showSessionTable } from './output.ts';
 
 const command = (paths: LotsePaths): CommandModule => ({
   command: 'sessions',
-  describe: 'list the sessions kurier has recorded',
+  describe: 'list the sessions lotse has recorded',
   builder: (yargs) =>
     yargs
       .option('all', { type: 'boolean', describe: 'include sessions of other principals' })
@@ -43,7 +43,7 @@ const command = (paths: LotsePaths): CommandModule => ({
     if (records.length === 0) {
       err(
         pickArgv<boolean>(raw, 'all') === true
-          ? 'kurier has no sessions yet — `lotse start` opens one'
+          ? 'lotse has no sessions yet — `lotse start` opens one'
           : `no sessions for principal "${principal}" (try --all)`,
       );
     }

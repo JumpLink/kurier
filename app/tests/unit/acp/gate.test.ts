@@ -266,7 +266,7 @@ export default async () => {
 
   await describe('classifyAuthMethods — trap 1', async () => {
     await it('the measured opencode shape (no type tag) classifies as agent, not terminal', async () => {
-      // Real wire shape, cast because `kind` is what kurier *derives*, never what the agent sends.
+      // Real wire shape, cast because `kind` is what lotse *derives*, never what the agent sends.
       const measured = {
         id: 'opencode-login',
         name: 'Login with opencode',

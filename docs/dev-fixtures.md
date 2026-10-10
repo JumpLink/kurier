@@ -34,14 +34,14 @@ LOTSE_STANDIN_PERMISSION=1       # asks session/request_permission mid-turn and 
 That is the point of the fixture: the two `*_always` kinds used to be filtered out of the projection,
 and a stand-in that only sent the `*_once` pair would have let that filter pass.
 
-**The order on screen is not the order kurier adds them, and neither is the order the stand-in lists
+**The order on screen is not the order lotse adds them, and neither is the order the stand-in lists
 them.** Three orders, all measured (`orderOptions` in `packages/core/src/permission.ts` has the reasoning;
 case 9 of `alert-dialog-close.mjs` prints the two GTK facts):
 
 | | order |
 | --- | --- |
 | the stand-in sends | `allow_once`, `allow_always`, `reject_once`, `reject_always` |
-| kurier **adds** the buttons | `reject_once`, `allow_once`, `allow_always`, `reject_always` |
+| lotse **adds** the buttons | `reject_once`, `allow_once`, `allow_always`, `reject_always` |
 | they appear on screen, top to bottom | `Always decline`, `Always allow`, `Allow once`, `Decline` |
 
 The screen order is the reverse of the add order — libadwaita fills the row bottom-up — so the first
@@ -57,8 +57,8 @@ hook here):
 | Variable                              | What it sends                                             | Why it is a knob |
 | ------------------------------------- | --------------------------------------------------------- | ---------------- |
 | `LOTSE_STANDIN_PERMISSION_ONCE`          | only `allow_once` + `reject_once`                          | what an agent with no lasting grant looks like — the minimal two-button dialog |
-| `LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST`  | all four, `*_always` listed **first**                      | the order that used to decide where libadwaita put the focus, so a screenshot can show kurier's order winning |
-| `LOTSE_STANDIN_PERMISSION_NO_REJECT`     | only `allow_once` + `allow_always`                         | **the state with nothing safe to name.** There is no decline, so `default_response` has nothing to point at and libadwaita's fallback lands on `allow_once`; kurier's own grab in `show()` is the only thing keeping the focus on the diff body (case 10 measures what happens without one). Off by default, because the default keeps a decline available |
+| `LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST`  | all four, `*_always` listed **first**                      | the order that used to decide where libadwaita put the focus, so a screenshot can show lotse's order winning |
+| `LOTSE_STANDIN_PERMISSION_NO_REJECT`     | only `allow_once` + `allow_always`                         | **the state with nothing safe to name.** There is no decline, so `default_response` has nothing to point at and libadwaita's fallback lands on `allow_once`; lotse's own grab in `show()` is the only thing keeping the focus on the diff body (case 10 measures what happens without one). Off by default, because the default keeps a decline available |
 
 ```sh
 # four buttons — the default, and the dialog to photograph
@@ -72,7 +72,7 @@ LOTSE_APP_AGENT=stand-in LOTSE_APP_THINKING=1 LOTSE_STANDIN_PERMISSION=1 LOTSE_S
 `LOTSE_APP_THINKING=1` sends the prompt, `LOTSE_APP_PROMPT=<text>` says which. The two rules about *reading* a
 knob — what `LOTSE_STANDIN_CHUNKS` does with a number, and that both spellings of "off" are off — are stated
 once, in `AGENTS.md` § Run / build / test, and the front matter above says why they are not here again.
-What a fixture needs from them is only that the stand-in's `flag()` and kurier's
+What a fixture needs from them is only that the stand-in's `flag()` and lotse's
 `frontends/gui/hook-value.ts` read one value the same way, which is tested on both runtimes.
 
 **The config row, in the same spirit: one flag, and the values it carries.** `LOTSE_STANDIN_CONFIG=1`
@@ -112,7 +112,7 @@ LOTSE_APP_AGENT=stand-in LOTSE_STANDIN_CONFIG=1 LOTSE_STANDIN_CONFIG_REFUSE=1 \
 controls sit in a `Gtk.FlowBox` (`max-children-per-line: 3`) with each dropdown inside an `Adw.Clamp` that
 caps what it asks for (`CONFIG_CONTROL_WIDTH_PX`), so a long model id cannot force a wrap. The row sits on
 the composer's card rather than in a strip of its own, so the width cap around it is the composer's clamp.
-The window stops at 360 however the row wraps — so the floor is `Adw.NavigationSplitView`'s and not kurier's content's. The row's own
+The window stops at 360 however the row wraps — so the floor is `Adw.NavigationSplitView`'s and not lotse's content's. The row's own
 minimum is 293 px with a 32-character model id, which is where "raises no floor" comes from rather than
 from the clamp: a clamp caps a natural width and passes the minimum through
 (`scripts/probes/window-min-width.mjs` prints both, and the sweep).
@@ -143,7 +143,7 @@ pointing at nothing.
 **Four stand-in knobs for the states no real agent in reach produces**, same off-rule as `flag()`
 (`LOTSE_STANDIN_AUTH` / `LOTSE_STANDIN_PROMPT_AUTH` / `LOTSE_STANDIN_NO_RESUME` / `LOTSE_STANDIN_USAGE`). They exist
 because each of the four is a failure or a line that a healthy agent produces in the middle of a
-conversation, and kurier's surface has a decision for each that nothing else here reaches:
+conversation, and lotse's surface has a decision for each that nothing else here reaches:
 
 ```sh
 # trap 1: initialize succeeds, session/load answers -32000 → the auth dialog naming `lotse auth`
@@ -167,7 +167,7 @@ with **no login**: the anonymous default model `opencode/fledge-alpha-free` is g
 `-32000 "Authentication required: provider authentication required"` — the same class and the same
 code as `LOTSE_STANDIN_AUTH`'s answer at `session/load`. Nothing on the wire separates the two except that
 one has a prompt behind it, which is what `failureKind`'s `promptSent` reads. Upstream:
-<https://github.com/JumpLink/kurier/issues/2>.
+<https://github.com/JumpLink/lotse/issues/2>.
 
 **Nothing streams first.** The measured turn carries no `stopReason` and no text at all, so a fixture
 that echoed the prompt or wrote a thought before refusing would photograph a window that looks as though
@@ -260,7 +260,7 @@ GJSIFY_DEVTOOLS=1 LOTSE_SETTINGS_FILE=/tmp/x/settings.json LOTSE_APP_AGENT=stand
 
 Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version. `app/src/core/settings-view.ts` decides the rows, and an unavailable agent stays listed rather than disappearing. **Inside a Flatpak the dialog opens before the host has answered** — rows read `Checking…` and fill in asynchronously — because waiting would show nothing at all for as long as `flatpak-spawn` takes.
 
-**A save never destroys a settings file kurier could not read** (`saveDecision`): a `version` newer than this build refuses the write outright, and anything else unreadable is first moved to `settings.json.bak`. A change applies the next time kurier starts, because the window resolves its agent once and keeps it.
+**A save never destroys a settings file lotse could not read** (`saveDecision`): a `version` newer than this build refuses the write outright, and anything else unreadable is first moved to `settings.json.bak`. A change applies the next time lotse starts, because the window resolves its agent once and keeps it.
 
 ## The login dialog
 
@@ -274,7 +274,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 
 **First run is an empty `LOTSE_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `lotse start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `LOTSE_APP_NEW_CHAT` all activate that one action.
 
-**The cwd** is `LOTSE_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
+**The cwd** is `LOTSE_CWD` → the directory lotse was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
 
 - `LOTSE_APP_NEW_CHAT=1` — press New chat through `win.new-chat`. With a turn running it waits for the turn to end, so `LOTSE_APP_THINKING=1 LOTSE_APP_PROMPT=… LOTSE_APP_NEW_CHAT=1` photographs the empty composer *after* a chat exists. The action is activated with `lookup_action('new-chat').activate(null)`: `this.activate_action('win.new-chat', null)` resolves to `Gio.ActionGroup`'s on a window, takes no prefix, returns nothing and did nothing (measured).
 - `LOTSE_APP_NEW_CHAT_MIDTURN=1` — press New chat **while the turn is streaming**: polls (50 ms) until the agent has said something and the turn is still running, then activates `win.new-chat`. New chat stops the turn the way Stop does (`session/cancel`; an open permission settles `cancelled`, `turn-cancelled`), the turn ends `idle` (never `Stopped.` on the new chat), and anything the old turn still says goes to its own record and never to the visible pane — the same holds for opening another row mid-turn (`bind`). After the agent has exited (`gone`), New chat retires the dead handle (awaiting its `close()`) so the next prompt starts a fresh agent; a record that cannot be written after `session/new` says so (`unsavedMessage`: not saved, why, press New chat).
@@ -323,7 +323,7 @@ print the numbers, and the split between the two kinds of probe, are in [## Prob
 
 **The rank behind the order** (`orderOptions`) is `reject_once`, `allow_once`, `allow_always`,
 `reject_always`, stable within a kind, and the row appears **bottom-up from that** — the order on screen
-is the mirror of the order kurier adds in. The rules that follow from it (both end slots a decline,
+is the mirror of the order lotse adds in. The rules that follow from it (both end slots a decline,
 `buildDialog` naming `default_response`, `show()` grabbing the focus, and the four short button labels
 with the agent's wording moved into the body's caption line `agentNames`) are in `AGENTS.md` § Run /
 build / test; what is measured here is why they hold — case 9 prints both the focus and the layout
@@ -374,7 +374,7 @@ has the `dbus-run-session`/`mutter --headless` invocation and the numbers that c
 ## Probes
 
 **Two kinds of GTK probe, and which is which.** `scripts/probes/` measures *libadwaita* with
-look-alikes (`gjs -m scripts/probes/<name>.mjs`); `app/tests/probes/` measures *kurier's own widget*,
+look-alikes (`gjs -m scripts/probes/<name>.mjs`); `app/tests/probes/` measures *lotse's own widget*,
 so it is a TypeScript entry that imports the widget and has to be bundled first:
 
 ```sh
@@ -399,7 +399,7 @@ allow-button test matches the *rendered* label of **any** allowing kind rather t
 focused "Always allow" answers Enter exactly as a focused "Allow once" does, and also widens the answer.
 It also samples the focus **every main-loop turn until it settles**, not once, so a focus that passes
 through an allow button and lands somewhere safe afterwards cannot pass. The last two cases exist only
-because kurier began passing the `*_always` kinds through: an agent offering `allow_once` and
+because lotse began passing the `*_always` kinds through: an agent offering `allow_once` and
 `allow_always` and nothing rejecting leaves no safe button, and the probe fails if any sampled turn names
 one.
 
@@ -410,7 +410,7 @@ at all. The first sample is the body in the first two and `Allow once` in the th
 So **a grab is what matters**, not which kind; the synchronous form is kept because an idle libadwaita
 queues after ours, which is a structural argument and not a measured one. That
 case cannot be reproduced against `PermissionDialog` at all: `present()` maps synchronously, so by the
-time `permission-focus.ts` has a timer running, kurier's grab has already happened and the pre-idle frame
+time `permission-focus.ts` has a timer running, lotse's grab has already happened and the pre-idle frame
 is not observable from outside. The widget probe therefore covers the **settled** focus and the
 turn-by-turn sequence; neither result is stretched to answer the other.
 
@@ -446,7 +446,7 @@ relies on gets a probe in `scripts/probes/` that prints the numbers the comment 
 - With no `default_response` set, libadwaita focuses the **first added** response — contrary to
   `Adw-1.gir` which says "the last added response will be focused by default"
 
-**Kurier owns the button order, not just the button set** (`orderOptions`). The agent's order is chosen
+**Lotse owns the button order, not just the button set** (`orderOptions`). The agent's order is chosen
 by the agent; the rank is `reject_once`, `allow_once`, `allow_always`, `reject_always`, stable within a
 kind, and the row appears **bottom-up from that**, so the first added is the bottom button and the last
 added is the topmost. Two measured libadwaita facts fix it: with no `default_response` **the focus goes
@@ -458,8 +458,8 @@ add order choose it, and `show()` grabs the focus — **case 10 builds a look-al
 for that grab. It is not observable from outside `PermissionDialog` (`present()` maps synchronously), so
 the widget probe measures the settled focus and every turn in between instead.
 
-**The button labels are kurier's four short sentences and the agent's own names are not on them.** A
-button is the decision, so its label has to fit one line — the labels were once "kurier's word + the
+**The button labels are lotse's four short sentences and the agent's own names are not on them.** A
+button is the decision, so its label has to fit one line — the labels were once "lotse's word + the
 agent's name" and read "Always decline: Always decline in thi…" at the 360 px floor. The agent's wording
 moved into the body as one caption line (`agentNames`), shown only when a name says something the kind
 does not. The terminal prompt follows the same rule: it prints `y = Allow once`, the option a `y` actually

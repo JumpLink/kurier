@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "Kurier app: the `kurier` binary \u2014 a CLI over @lotse/acp and @lotse/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
+  "description": "Lotse app: the `lotse` binary \u2014 a CLI over @lotse/acp and @lotse/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -40,7 +40,7 @@
       "appId": "eu.jumplink.Lotse",
       "binaryName": "lotse-app",
       "kind": "app",
-      "name": "Kurier",
+      "name": "Lotse",
       "bundle": {
         "linux": "dist/lotse-app.gjs.mjs",
         "darwin": "dist/lotse-app.node.mjs",
@@ -73,10 +73,10 @@
       "license": {
         "project": "AGPL-3.0-or-later"
       },
-      "description": "Kurier is a client for the Agent Client Protocol (ACP). It starts an agent such as OpenCode as a subprocess, keeps the conversation, and shows what the agent says while it works. The agent and the model behind it are not part of Kurier.",
-      "homepageUrl": "https://github.com/JumpLink/kurier",
-      "bugtrackerUrl": "https://github.com/JumpLink/kurier/issues",
-      "vcsBrowserUrl": "https://github.com/JumpLink/kurier",
+      "description": "Lotse is a client for the Agent Client Protocol (ACP). It starts an agent such as OpenCode as a subprocess, keeps the conversation, and shows what the agent says while it works. The agent and the model behind it are not part of Lotse.",
+      "homepageUrl": "https://github.com/JumpLink/lotse",
+      "bugtrackerUrl": "https://github.com/JumpLink/lotse/issues",
+      "vcsBrowserUrl": "https://github.com/JumpLink/lotse",
       "flatpak": {
         "finishArgs": [
           "--device=dri",

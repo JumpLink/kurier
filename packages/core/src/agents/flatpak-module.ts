@@ -3,8 +3,8 @@
  *
  * **Why generated.** The module is a function of the catalog entry: url, sha256 and size per arch, the
  * unpack directory and the binary's path. Written by hand in each host's manifest it is a second copy of
- * the pin that drifts on the next refresh. Kurier's own manifest and a host's (Steuererklärung) both take
- * this output, so what a host installs is what kurier installs.
+ * the pin that drifts on the next refresh. Lotse's own manifest and a host's (Steuererklärung) both take
+ * this output, so what a host installs is what lotse installs.
  *
  * **No download here.** The catalog validator already refuses an entry without a 64-hex sha256 and a
  * positive size, so a missing checksum fails when the catalog is parsed — this function never fetches or

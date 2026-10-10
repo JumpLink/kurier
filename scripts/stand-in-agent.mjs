@@ -15,12 +15,12 @@
  *
  * **The framing is newline-delimited JSON, not `Content-Length` headers.** Worth stating because LSP
  * uses the headers and a reader skimming for them will reach for them: ACP's stdio transport is one
- * JSON value per line — `jsonrpc.ts`'s file header says so, and `MessageReader` is the parser kurier
+ * JSON value per line — `jsonrpc.ts`'s file header says so, and `MessageReader` is the parser lotse
  * uses against real agents. So this script appends `\n` and nothing else.
  *
  * It speaks `initialize`, `session/new`, `session/load`, `session/resume`, `session/set_mode`,
  * `session/set_config_option`, `session/prompt` and `session/cancel`, and pushes `session/update`.
- * Anything else gets the protocol's own "method not found", which is what an agent kurier has never
+ * Anything else gets the protocol's own "method not found", which is what an agent lotse has never
  * heard of deserves.
  *
  * ## Switches — all from the environment, all defaulting to a turn that finishes normally
@@ -171,7 +171,7 @@ let nextRequestId = 1_000_000;
  * Ask the client to run a tool, and wait for what it says.
  *
  * **A request the agent makes of the client, in the direction the schema has it.** The options are
- * every `session/request_permission` kind kurier can show, by default all four: a fixture that only
+ * every `session/request_permission` kind lotse can show, by default all four: a fixture that only
  * offered `allow_once`/`reject_once` would let a dialog that renders `allow_always` — and the ordering,
  * styling and focus rules that go with it — pass against a stand-in that never sent one.
  *
@@ -213,12 +213,12 @@ function askPermission(sessionId) {
  *
  * **The knob is for the *order* and for the *set*, not for whether "always" exists.** `LOTSE_STANDIN_PERMISSION_ONCE=1`
  * sends only the two `*_once` kinds — which is what an agent that offers no lasting grant looks like,
- * and the one shape kurier's dialog has no `reject` to fall back on in a two-allow list. `LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST=1`
+ * and the one shape lotse's dialog has no `reject` to fall back on in a two-allow list. `LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST=1`
  * lists the two `*_always` options *first*, the order that used to decide where libadwaita put the
- * focus, so a screenshot can show kurier's order winning rather than the agent's.
+ * focus, so a screenshot can show lotse's order winning rather than the agent's.
  *
  * Default all four, in the order a real agent sends them (`opencode acp` included), so the plain
- * `LOTSE_STANDIN_PERMISSION=1` photographs the dialog kurier actually shows. `reject_always` never goes
+ * `LOTSE_STANDIN_PERMISSION=1` photographs the dialog lotse actually shows. `reject_always` never goes
  * missing from the default: without a rejecting option the dialog has nothing safe to focus, and that
  * is a state worth being able to reach — which is what `LOTSE_STANDIN_PERMISSION_ONCE=1` plus
  * `LOTSE_STANDIN_PERMISSION_NO_REJECT=1` is for.
@@ -286,17 +286,17 @@ input.on('line', (line) => {
       return reply(id, sessionState(newSessionId()));
     case 'session/load':
     case 'session/resume':
-      // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code kurier's
+      // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code lotse's
       // `isAuthRequired` matches and `withAuthHint` turns into a `lotse auth` sentence, and it is
       // refused *after* `initialize` succeeded — which is the point: the handshake works and the
       // session does not, so the failure cannot be caught anywhere earlier than the reattach.
       if (AUTH) return replyError(id, -32_000, 'Authentication required: run `opencode auth login`');
-      // The id the client asked for: kurier prompts the session its store holds, not this script's.
-      // No history is replayed — a real agent does, and kurier deliberately does not record that
+      // The id the client asked for: lotse prompts the session its store holds, not this script's.
+      // No history is replayed — a real agent does, and lotse deliberately does not record that
       // replay; see `AgentSession.#bindAgent`.
       return reply(id, sessionState(String(params.sessionId ?? SESSION_ID)));
     case 'session/set_mode':
-      // `session/set_mode` is the *other* door to the mode, and kurier does not use it (the config row
+      // `session/set_mode` is the *other* door to the mode, and lotse does not use it (the config row
       // sets `mode` as a config option, see `core/config-row.ts`). It is answered by moving the mode
       // option anyway, so the two doors a real agent keeps in step stay in step here too — otherwise a
       // future caller of this door would see a mode that never changed.
@@ -305,7 +305,7 @@ input.on('line', (line) => {
       return setConfigOption(String(params.sessionId ?? SESSION_ID), params, id);
     case 'session/cancel':
       // A notification, so nothing comes back: the schema says a client that sends it must answer the
-      // turn itself, and this script does that in `runTurn` when it wakes up. That is also why kurier's
+      // turn itself, and this script does that in `runTurn` when it wakes up. That is also why lotse's
       // Stop is "send the notification, then wait for the answer" and never a signal.
       cancelTurn();
       return;
@@ -344,7 +344,7 @@ async function runTurn(id, sessionId, prompt) {
       return replyError(id, -32_000, 'Authentication required: provider authentication required');
     }
     if (ECHO) {
-      // Real agents echo the prompt back as `user_message_chunk`, and kurier drops its own echo: the
+      // Real agents echo the prompt back as `user_message_chunk`, and lotse drops its own echo: the
       // surface draws the prompt the instant Send is pressed. Echoing here keeps that path exercised.
       const first = Array.isArray(prompt) ? prompt[0] : undefined;
       notify(sessionId, {
@@ -359,7 +359,7 @@ async function runTurn(id, sessionId, prompt) {
       if (token.cancelled) break;
       if (EXIT_MID_TURN && index === 2) {
         // One last useful thing on stderr, the way a real agent gives one, and then vanish without
-        // answering the request. The transport's EOF is the whole event: kurier has no stop reason to
+        // answering the request. The transport's EOF is the whole event: lotse has no stop reason to
         // report and must not invent one.
         process.stderr.write('stand-in: leaving mid-turn\n');
         await flushStdout();
@@ -388,7 +388,7 @@ async function runTurn(id, sessionId, prompt) {
 
     if (USAGE && !token.cancelled) {
       // **A cost with the float an agent really sends.** `0.0014555100000000001` is not a typo: it is
-      // what a double looks like after a division, and it is the value kurier's transcript used to
+      // what a double looks like after a division, and it is the value lotse's transcript used to
       // print verbatim. Sending it here is what makes the rounded line photographable rather than
       // asserted.
       notify(sessionId, {
@@ -400,7 +400,7 @@ async function runTurn(id, sessionId, prompt) {
     }
 
     // `cancelled` when this script was told to stop, `end_turn` otherwise — the two answers the schema
-    // defines, and the difference kurier's state machine reads to decide `stopped` from `idle`.
+    // defines, and the difference lotse's state machine reads to decide `stopped` from `idle`.
     reply(id, { stopReason: token.cancelled ? 'cancelled' : 'end_turn' });
   } finally {
     turn = null;
@@ -515,7 +515,7 @@ function modeId() {
  *   unreachable against a real agent and the one the "a refusal does not move the row" rule is about;
  * - an unknown `configId` or a value outside the option's list is an error, as `opencode` 2.0.19 does;
  * - a non-string value is refused, because `opencode` implements no boolean options — which is why
- *   kurier does not announce the capability (see `LOTSE_CLIENT_CAPABILITIES`).
+ *   lotse does not announce the capability (see `LOTSE_CLIENT_CAPABILITIES`).
  */
 function setConfigOption(sessionId, params, id) {
   if (CONFIG_REFUSE) {

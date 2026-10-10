@@ -4,7 +4,7 @@
  * **The problem this file exists for.** A coding agent is a *host* program: `opencode` lives in the
  * person's own `~/.opencode/bin`, keeps its credentials and its model config there, and edits the
  * files in the project you are looking at. Inside a Flatpak, `node:child_process` starts a process
- * in the *sandbox*, where none of that exists — so kurier as shipped could not start the one thing
+ * in the *sandbox*, where none of that exists — so lotse as shipped could not start the one thing
  * it exists to start. The two finish-args in the manifest are what make the crossing possible, and
  * both are honest costs rather than conveniences:
  *
@@ -15,7 +15,7 @@
  *   filesystem sandbox at all — **this manifest is an installer, not isolation**, and any Flathub
  *   reviewer has to be told that rather than left to infer it.
  *
- * kurier's own permission gate still stands, but it governs the *ACP channel*, not the agent process
+ * lotse's own permission gate still stands, but it governs the *ACP channel*, not the agent process
  * once it is on the host. That is a real limit of the design, not a bug to be papered over.
  *
  * **Everything here is pure.** `isSandboxed` and `toHostCommand` take their one fact as an argument
@@ -59,7 +59,7 @@ export function currentSandboxFacts(): SandboxFacts {
 }
 
 /**
- * Is kurier inside a Flatpak?
+ * Is lotse inside a Flatpak?
  *
  * **`/.flatpak-info` and nothing else.** The file is written by the sandbox into its own root, so it
  * exists exactly when this process is sandboxed. `FLATPAK_ID` is deliberately NOT consulted, because
@@ -69,7 +69,7 @@ export function currentSandboxFacts(): SandboxFacts {
  * app that already has the host's PATH, actively loses it. The cost of this choice is the reverse
  * case: a hand-rolled sandbox that sets the variable without the file is treated as a desktop
  * install, and its agent fails to be found. That is the cheap direction to be wrong in, and there is
- * no configuration in which kurier is running under such a sandbox today.
+ * no configuration in which lotse is running under such a sandbox today.
  *
  * Outside a Flatpak the fact is false and every command passes through untouched — see
  * `toHostCommand`.
@@ -82,7 +82,7 @@ export function isSandboxed(facts: SandboxFacts): boolean {
  * The outer wrapper. Runs in `/bin/sh` — POSIX, always present, and the only shell flatpak's runtime
  * is guaranteed to have — and it does three jobs before the person's own shell is involved at all.
  *
- * **1. It fences the protocol pipes off (the reason this layer exists twice over).** kurier talks to
+ * **1. It fences the protocol pipes off (the reason this layer exists twice over).** lotse talks to
  * the agent over stdio, so the child's fd 0 and fd 1 ARE the JSON-RPC channel. Everything that runs
  * before the agent is started inherits them, and a login shell reads four or five files first:
  * `/etc/profile`, `~/.profile`, `.zshenv`, `.zprofile`, `.zlogin`, `.zshrc`. Any of those may print a
@@ -93,7 +93,7 @@ export function isSandboxed(facts: SandboxFacts): boolean {
  *
  * So the two protocol descriptors are parked on high-numbered fds, which a person's rc has no
  * reason to touch, and the inherited stdin/stdout are pointed somewhere harmless — `/dev/null` and
- * stderr, where output is still visible in `kurier`'s log rather than on the wire:
+ * stderr, where output is still visible in `lotse`'s log rather than on the wire:
  *
  * ```
  * exec 3<&0 4>&1 0</dev/null 1>&2
@@ -103,7 +103,7 @@ export function isSandboxed(facts: SandboxFacts): boolean {
  * so the agent inherits exactly three descriptors and nothing else. Measured, with a fake HOME whose
  * profile and rc both print to stdout and `read` from stdin: before this, the profile's output
  * appeared on the protocol stream and the program received an empty stdin; after it, stdout is
- * byte-for-byte the program's own output and the program receives what kurier sent.
+ * byte-for-byte the program's own output and the program receives what lotse sent.
  *
  * **2. It picks the shell, and only zsh and bash are trusted with a config file.** The inner script
  * below is POSIX `sh`, so it must run under `sh`; but a PATH that only exists in an *interactive* rc
@@ -136,7 +136,7 @@ export function isSandboxed(facts: SandboxFacts): boolean {
  *
  * **3. An unrecognised `$SHELL` gets the login PATH and nothing more.** fish, nushell and csh are not
  * POSIX, so neither the inner script nor a borrowed rc is theirs to run; their login configuration is
- * left alone and kurier starts with whatever `/etc/profile` and `~/.profile` gave `/bin/sh -l`. That
+ * left alone and lotse starts with whatever `/etc/profile` and `~/.profile` gave `/bin/sh -l`. That
  * is a real, narrower answer rather than a wrong one, and the same is true when `$SHELL` is unset
  * entirely — the fallback is `/bin/sh`, and `PATH` then comes only from the login files, which is
  * enough for an agent installed in a system-wide directory and not enough for one in `~/.local/bin`.
@@ -225,7 +225,7 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
 }
 
 /**
- * The command that starts `command`'s program **on the host**, or `command` itself when kurier is
+ * The command that starts `command`'s program **on the host**, or `command` itself when lotse is
  * not sandboxed.
  *
  * The passthrough is the common case and is not an optimisation: a desktop install must behave
@@ -242,14 +242,14 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
  * ## How the host process is actually ended — measured, and not what the argv suggests
  *
  * The argv looks like one `exec` chain, and it is tempting to conclude that signalling the child
- * kurier spawned signals the agent. **It does not: the pid kurier holds is the sandbox-side
+ * lotse spawned signals the agent. **It does not: the pid lotse holds is the sandbox-side
  * `flatpak-spawn`, and the agent is a different process on the other side of the bus.** Every claim
  * below was measured on this machine, inside a GNOME 50 Flatpak, by starting a host process through
  * `flatpak-spawn --host` and then signalling the carrier from inside the sandbox:
  *
  * ```
  * process tree of the agent      opencode  ←  flatpak-session-helper  ←  systemd --user
- *                                 (not a child of flatpak-spawn, and not in kurier's process group)
+ *                                 (not a child of flatpak-spawn, and not in lotse's process group)
  *
  * SIGTERM → flatpak-spawn        carrier dies, and the host process ends with it   (forwarded)
  * SIGKILL → flatpak-spawn        carrier dies, and the host process SURVIVES        (orphaned)
@@ -259,14 +259,14 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
  * So: **SIGTERM is forwarded** and does the real work, which is why Stop and a closed window leave
  * nothing behind — verified with a live `opencode acp` turn, gone after `flatpak kill`. **SIGKILL is
  * the sharp edge**: it cannot be forwarded, because a process that cannot be caught cannot forward
- * anything, and the host process is then left running. kurier's `terminate()` escalates to SIGKILL
+ * anything, and the host process is then left running. lotse's `terminate()` escalates to SIGKILL
  * after `killGraceMs`, so an agent that ignores SIGTERM is the case where the escalation can orphan
- * a host process. That is a property of crossing the sandbox, not of kurier — but it is a claim
- * about a process kurier does not own, so it is written down here rather than assumed, and it is
+ * a host process. That is a property of crossing the sandbox, not of lotse — but it is a claim
+ * about a process lotse does not own, so it is written down here rather than assumed, and it is
  * the reason `killGraceMs` defaults to a real 2 s rather than 0.
  */
 export function toHostCommand(command: AgentCommand, facts: SandboxFacts): AgentCommand {
-  // A bundled agent lives in `/app/extra`, which the host cannot see, and runs where kurier runs.
+  // A bundled agent lives in `/app/extra`, which the host cannot see, and runs where lotse runs.
   if (!isSandboxed(facts) || command.bundled) return command;
   return {
     id: command.id,
@@ -277,7 +277,7 @@ export function toHostCommand(command: AgentCommand, facts: SandboxFacts): Agent
 }
 
 /**
- * The argv that asks the host's shell to resolve `program`, or `null` when kurier is not sandboxed.
+ * The argv that asks the host's shell to resolve `program`, or `null` when lotse is not sandboxed.
  *
  * `null` and not an empty array, so the caller can tell "there is nothing to ask" from "the answer
  * was nothing" — the difference between a PATH walk that already succeeded and a host that does not
@@ -290,7 +290,7 @@ export function hostProbeArgv(program: string, facts: SandboxFacts): string[] | 
 
 /**
  * The argv that asks the host where its shell is — `flatpak-spawn --host` starts it in the directory
- * kurier was launched from when the host can see it, else in the host's home. `null` when kurier is not
+ * lotse was launched from when the host can see it, else in the host's home. `null` when lotse is not
  * sandboxed, for the same reason `hostProbeArgv` answers `null`: there is nothing to ask.
  */
 export function hostCwdArgv(facts: SandboxFacts): string[] | null {

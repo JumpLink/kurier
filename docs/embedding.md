@@ -1,4 +1,4 @@
-# Embedding a Kurier chat in your GTK4 app
+# Embedding a Lotse chat in your GTK4 app
 
 A step-by-step guide for a host application written in GJS (TypeScript or JavaScript) with GTK 4 and
 libadwaita that wants an agent chat inside its own window. You get a transcript, a composer, tool cards,
@@ -22,9 +22,9 @@ it matches the signatures.
 `@lotse/session` supplies `createSessionStore`, a small JSON store you may use or replace; the widget
 only needs two callbacks (step 4). `@lotse/acp` (the protocol layer) comes in transitively.
 
-## 2. Give kurier its own data directory
+## 2. Give lotse its own data directory
 
-Kurier writes inside **one directory you choose**. It never reads `HOME`, `XDG_*` or `LOTSE_*` for this:
+Lotse writes inside **one directory you choose**. It never reads `HOME`, `XDG_*` or `LOTSE_*` for this:
 the directory arrives as a `LotsePaths` value.
 
 ```ts
@@ -43,7 +43,7 @@ its whole private state under `<dataDir>/agents/<id>/{home,config,data,state,cac
 `XDG_*` point there, so it never reads or writes the person's own `~/.config`, `~/.claude` or login.
 Moving `dataDir` moves all of it.
 
-`lotsePaths()` (XDG plus `LOTSE_*` overrides) belongs to kurier's app, not to the packages — build your
+`lotsePaths()` (XDG plus `LOTSE_*` overrides) belongs to lotse's app, not to the packages — build your
 own value.
 
 ## 3. Choose the agent
@@ -59,7 +59,7 @@ const empty = emptyStateView({ agent: found });
 - `found.command` is what you pass as `agent`; `found.source` (`'host'` or `'bundled'`) is `agentSource`.
 - To honour a saved preference, pass an `AgentChoice` as the second argument. The settings file is yours.
 - To **bundle** an agent, ship the program the catalog names (`packages/core/data/bundled-agents.json`,
-  `bundledProgram`). Kurier's own Flatpak does this; for yours, see [Bundle the agent](#bundle-the-agent-flatpak).
+  `bundledProgram`). Lotse's own Flatpak does this; for yours, see [Bundle the agent](#bundle-the-agent-flatpak).
 - Inside a Flatpak, probing the person's own agent goes through the host; use the async
   `gatherResolveContextAsync(paths)` there so the window is not blocked.
 - When nothing is found, `agent` must still be a command (`requireLauncher(DEFAULT_AGENT)`) and you pass
@@ -69,7 +69,7 @@ const empty = emptyStateView({ agent: found });
 
 ### Bundle the agent (Flatpak)
 
-Generate the module from the catalog instead of copying kurier's manifest:
+Generate the module from the catalog instead of copying lotse's manifest:
 
 ```bash
 ./scripts/flatpak-agent-module opencode --out opencode-module.json   # --arch x86_64 to restrict
@@ -78,7 +78,7 @@ Generate the module from the catalog instead of copying kurier's manifest:
 Put the module in your manifest's `modules`, **before** your own module, and keep `--share=network` in
 `finish-args` (the agent runs inside the sandbox). It is `extra-data`: url, sha256 and size come from the
 catalog, nothing is downloaded when you generate, and an entry without a checksum fails loudly. In code,
-`flatpakAgentModule(agent, arches?)` from `@lotse/core` returns the same object. Kurier's own manifest
+`flatpakAgentModule(agent, arches?)` from `@lotse/core` returns the same object. Lotse's own manifest
 carries the identical module (a test compares them byte for byte), so a refresh of the pin reaches you by
 regenerating. Then point `agentSource` at `'bundled'`, as above.
 
@@ -112,7 +112,7 @@ chat.newChat();
 ## 5. Pass your MCP servers
 
 `mcpServers: McpServer[]` goes **unchanged** to the agent in `session/new` and on reattach, so the agent
-can call your application's tools. Kurier never reads past `type` and never edits the agent's own
+can call your application's tools. Lotse never reads past `type` and never edits the agent's own
 config. Stdio servers have `name`, `command`, `args`, `env`; remote ones `type: 'http' | 'sse'`, `url`,
 `headers`.
 
@@ -152,7 +152,7 @@ chat, and a turn that fails on a login still offers **Log in…**. Add an entry 
 `chat.hasLogin` and `chat.openLogin()` (for example a menu item). The mechanics, measurements and the
 private login server: [login.md](login.md).
 
-Kurier never reads or stores a credential; the agent keeps its own (for a bundled agent: under
+Lotse never reads or stores a credential; the agent keeps its own (for a bundled agent: under
 `<dataDir>/agents/<id>/`).
 
 ## 8. Shut down with the window
@@ -175,7 +175,7 @@ window event, call it from your application's shutdown path as well.
 `<dataRoot>` holds conversation text (and, for a bundled agent, the agent's own login). It is the
 contents of people's work:
 
-- **Mode `0700`** on `<dataRoot>`. Kurier creates its own files `0600` and its subdirectories `0700`;
+- **Mode `0700`** on `<dataRoot>`. Lotse creates its own files `0600` and its subdirectories `0700`;
   you create the root, so you set its mode.
 - **Never inside a repository** or a synced public folder.
 - **Declare it** in your backup or state manifest: `sessions.json` is irreplaceable user data;
@@ -186,7 +186,7 @@ contents of people's work:
 ## Privacy: free hosted models never get private data
 
 `@lotse/core` keeps a small list of hosted models that are free and documented as zero-retention
-(`FREE_MODELS`, `freeModelFirst`) and sorts them to the top of the model dropdown. It is a **hint**: kurier
+(`FREE_MODELS`, `freeModelFirst`) and sorts them to the top of the model dropdown. It is a **hint**: lotse
 never selects a model, hides one or guesses. "Free" still means time-limited, and what you send goes to
 the provider that hosts the model; the onboarding page says so.
 

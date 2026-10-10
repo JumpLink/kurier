@@ -1,8 +1,8 @@
 /**
  * One OAuth login, as a function of an API and a few hooks — and nothing else.
  *
- * **What kurier does here and what it never does.** opencode starts the flow and finishes it: it holds the
- * device code, talks to the provider and writes the credential into its own store. kurier's part is to
+ * **What lotse does here and what it never does.** opencode starts the flow and finishes it: it holds the
+ * device code, talks to the provider and writes the credential into its own store. lotse's part is to
  * *show* the person a URL and a code, to hand a pasted code back when the provider wants one, and to ask
  * whether it is done yet. No token, key or code ever lives longer here than the call that carries it, and
  * nothing is written to disk — which is why this module is allowed to exist next to § Privacy.
@@ -12,7 +12,7 @@
  * contract, and it has no widget in it.
  *
  * **Two modes, because the provider decides.** `auto` — the person approves in a browser and the status
- * flips by itself; kurier polls. `code` — the provider shows a code in the browser that has to be pasted
+ * flips by itself; lotse polls. `code` — the provider shows a code in the browser that has to be pasted
  * back, and `askCode` is where a surface collects it.
  */
 
@@ -74,7 +74,7 @@ export type LoginResult =
 export const POLL_MS = 2000;
 /** Consecutive status calls that may fail before the attempt is given up as failed. */
 export const MAX_POLL_FAILURES = 3;
-/** How long past the announced expiry kurier keeps asking before it stops waiting on its own clock. */
+/** How long past the announced expiry lotse keeps asking before it stops waiting on its own clock. */
 export const EXPIRY_GRACE_MS = 15_000;
 
 function messageOf(error: unknown): string {

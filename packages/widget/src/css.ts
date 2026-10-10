@@ -241,7 +241,7 @@ export const WIDGET_CSS = `
    uses for its in-app empty lists.
 
    This one is the widget's and the host's at once — the widget's own \`new\` and \`empty\` pages carry the
-   class, and so does every idle page an app fills a chat slot with (kurier's \`window.blp\`). It stays
+   class, and so does every idle page an app fills a chat slot with (lotse's \`window.blp\`). It stays
    here because the rule belongs to the surface whose empty states it sizes. */
 .lotse-calm image.icon {
   -gtk-icon-size: 64px;

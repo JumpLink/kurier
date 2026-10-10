@@ -3,7 +3,7 @@
  *
  * The ids and the one predicate over them, because `empty-state.ts` decides what a surface says and has
  * to ask. Where the dismissals are *kept* is the app's decision — the file, its allowlist parser and its
- * writer stay in `app/src/core/notices.ts`, and a host that embeds kurier may remember them its own way.
+ * writer stay in `app/src/core/notices.ts`, and a host that embeds lotse may remember them its own way.
  */
 
 export type NoticeId = 'bundled-agent';

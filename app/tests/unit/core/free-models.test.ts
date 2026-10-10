@@ -37,7 +37,7 @@ export default async function freeModels(): Promise<void> {
   await describe('free-model hint — the file it reads', async () => {
     await it('carries ids, the date they were checked, and the link they were read from', async () => {
       // A hint nobody can audit is a hint nobody can correct. `checked` is what tells a stale entry from
-      // a current one, and `link` is the only authority kurier has on the question at all.
+      // a current one, and `link` is the only authority lotse has on the question at all.
       expect(FREE_MODELS.checked).toBe('2026-10-02');
       expect(FREE_MODELS.link).toContain('opencode.ai');
       expect(FREE_MODELS.ids.length).toBeGreaterThan(0);

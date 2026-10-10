@@ -20,7 +20,7 @@
 export const APP_ID = 'eu.jumplink.Lotse';
 
 /** What the window and the about dialog call the app. */
-export const APP_NAME = 'kurier';
+export const APP_NAME = 'lotse';
 
 /** Read from the package so the about dialog cannot drift from the installed version. */
 export const APP_VERSION = '0.1.1';
@@ -38,7 +38,7 @@ export const DEV_HOOK_PREFIX = 'LOTSE_APP';
  *
  * **1024×600, and the number is a decision with a reason.** GNOME's HIG asks every app for a
  * sensible default as well as a minimum. 1024 is a desktop conversation at a readable measure; the
- * floor that actually decides whether kurier fits a phone is `WINDOW_MIN_WIDTH_PX` below, and the two
+ * floor that actually decides whether lotse fits a phone is `WINDOW_MIN_WIDTH_PX` below, and the two
  * are deliberately not the same number.
  */
 export const WINDOW_WIDTH = 1024;
@@ -67,7 +67,7 @@ export const WINDOW_HEIGHT = 600;
  * **The right-hand column is the finding, and it corrects the left one.** With no floor of its own the
  * window grants 420 and 360 and then refuses to go narrower, on a tree where the content could not
  * have been the reason: asked for its minimum, the transcript column wants 126, the composer 153, the
- * content header bar 98 and the sidebar list 138. Nothing in kurier's own layout asks for 360. The
+ * content header bar 98 and the sidebar list 138. Nothing in lotse's own layout asks for 360. The
  * limit is `Adw.NavigationSplitView` plus the toplevel chrome, and 360 is where they stop.
  *
  * So the old `widthRequest: 480` was **not** a measurement of this layout, and neither is this one:
@@ -82,7 +82,7 @@ export const WINDOW_MIN_WIDTH_PX = 360;
  *
  * The same 720 px `createNavShell` uses, and the same measurement behind it: it is the point where a
  * 300 px sidebar plus a readable conversation stops being possible. Copied rather than imported
- * because kurier builds its own `Adw.NavigationSplitView` — the packaged shell takes a readonly
+ * because lotse builds its own `Adw.NavigationSplitView` — the packaged shell takes a readonly
  * `NavItem[]`, has no list handle for date headers, and no bottom bar for the composer.
  */
 export const COLLAPSE_WIDTH_PX = 720;

@@ -2,7 +2,7 @@
  * The launcher table.
  *
  * **This is a table of programs, not of capabilities.** It says which binary to start for which
- * name — and nothing else. The plan's guardrail is explicit that kurier builds no central
+ * name — and nothing else. The plan's guardrail is explicit that lotse builds no central
  * capability registry ("not even in gjsify: it would be exactly the gate beifahrer forbids, only
  * one level up and therefore worse, because it looks neutral"), and a table that grew a
  * `canReadFiles: true` column would be that registry with a different name. If you find yourself
@@ -15,7 +15,7 @@
 import { OPENCODE_COMMAND } from './opencode.ts';
 import type { AgentCommand } from './stdio.ts';
 
-/** The agent commands kurier knows how to start from the person's PATH. Only opencode today. */
+/** The agent commands lotse knows how to start from the person's PATH. Only opencode today. */
 export const LAUNCHERS: readonly AgentCommand[] = [OPENCODE_COMMAND];
 
 /** The adapter id used when nothing else chose one. */

@@ -3,7 +3,7 @@
  *
  * Start the process, shake hands, get out of the way. Everything protocol-shaped lives in
  * `@lotse/acp`; everything decision-shaped lives in the `ClientGate` the caller passes in. What
- * is left here is the part that is *only* true of kurier: which launcher, which working
+ * is left here is the part that is *only* true of lotse: which launcher, which working
  * directory, and what to do when the agent says it needs a login.
  *
  * The `finally` blocks are the reason this file exists as a unit. An ACP agent is a child process
@@ -52,7 +52,7 @@ export interface OpenAgentOptions {
    * handshake, not after it.
    *
    * The gap this closes is a real orphan, not a theoretical one: a cold `opencode acp` takes
-   * seconds to answer `initialize`, and a Ctrl-C inside that window used to kill kurier with no
+   * seconds to answer `initialize`, and a Ctrl-C inside that window used to kill lotse with no
    * handler installed and the agent still running. Handing the caller a closer at spawn time means
    * there is no interval in which a process exists that nobody can end. See `interrupt.ts`.
    */

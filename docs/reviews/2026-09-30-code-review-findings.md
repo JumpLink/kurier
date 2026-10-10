@@ -1,4 +1,4 @@
-# kurier — Code Review Findings
+# lotse — Code Review Findings
 
 > **Status as of 2026-10-03.** The body below is the review **as it was written on 2026-09-30**
 > against `main` and is kept unedited, because a review that gets rewritten is no longer a record of
@@ -50,7 +50,7 @@
 > | 13  | check-schema misses auth/capability shapes       | partly — `AuthMethodInfo`, `SessionCapabilities` checked   |      |
 > | 14  | `session/update` variants unchecked              | fixed                                                      |      |
 > | 15  | TS-stricter fields only noted                    | open                                                       |      |
-> | 16  | "kurier never parses" stderr comment             | partly — new line added, old one still duplicated above it |      |
+> | 16  | "lotse never parses" stderr comment             | partly — new line added, old one still duplicated above it |      |
 > | 17  | `AuthMethodInfo.kind` "a guess"                  | open                                                       |      |
 > | 18  | `#send` throws, `#write` closes                  | fixed — every failed write closes; split documented        | yes  |
 > | 19  | `ClosedTransport.onClose` fires in a microtask   | fixed — listener called synchronously                      | yes  |
@@ -190,7 +190,7 @@ export interface AgentAuthCapabilities extends Extensible {
   logout?: LogoutCapabilities | null;
 }
 ```
-Breaks when: These types exist but `LOTSE_CLIENT_CAPABILITIES` in `gate.ts` only sets `auth: { terminal: false }` and never uses `logout`. The schema defines `auth.logout` but kurier never sends or handles it. Not a bug, but dead code that adds cognitive load.
+Breaks when: These types exist but `LOTSE_CLIENT_CAPABILITIES` in `gate.ts` only sets `auth: { terminal: false }` and never uses `logout`. The schema defines `auth.logout` but lotse never sends or handles it. Not a bug, but dead code that adds cognitive load.
 Fix shape: Remove if not planned for Slice 1, or add a comment linking to the slice where they'll be used.
 
 ### `app/src/core/transcript.ts:57-61` — Two `session/update` kinds explicitly ignored
@@ -268,23 +268,23 @@ for (const field of ts.required) {
   }
 }
 ```
-Breaks when: A field is required in TypeScript (e.g., `NewSessionRequest.cwd`) but optional in the schema. The check reports it as a note, not a failure. This means a client that omits the field would be valid per schema but rejected by kurier's types — a client that *accepts* such a request would be more permissive than kurier.
-Fix shape: Decide if this is acceptable (it's documented as intentional) or make it a failure. The comment says "some fields are required by kurier's own use" — but that's a client-side requirement, not a wire requirement.
+Breaks when: A field is required in TypeScript (e.g., `NewSessionRequest.cwd`) but optional in the schema. The check reports it as a note, not a failure. This means a client that omits the field would be valid per schema but rejected by lotse's types — a client that *accepts* such a request would be more permissive than lotse.
+Fix shape: Decide if this is acceptable (it's documented as intentional) or make it a failure. The comment says "some fields are required by lotse's own use" — but that's a client-side requirement, not a wire requirement.
 
 ---
 
 ## 6. Comments That Lie / Mislead
 
-### `app/src/core/agents/stdio.ts:49-50` — Claims "kurier never parses" stderr, but CLI prints it
+### `app/src/core/agents/stdio.ts:49-50` — Claims "lotse never parses" stderr, but CLI prints it
 ```
 Evidence:
-/** Lines the agent writes to stderr. ACP says stderr is for logs; kurier never parses it. */
+/** Lines the agent writes to stderr. ACP says stderr is for logs; lotse never parses it. */
 onStderr?: (line: string) => void;
 ```
-Breaks when: A reader assumes stderr is completely opaque. In `auth.ts:72-74` and `start.ts:82-84`, stderr lines are prefixed with `[agent] ` and printed to kurier's stderr. "Never parses" is technically true (no JSON parsing), but "never looks at" is false.
-Fix shape: Change to "kurier does not parse stderr as protocol messages; it may forward lines for display".
+Breaks when: A reader assumes stderr is completely opaque. In `auth.ts:72-74` and `start.ts:82-84`, stderr lines are prefixed with `[agent] ` and printed to lotse's stderr. "Never parses" is technically true (no JSON parsing), but "never looks at" is false.
+Fix shape: Change to "lotse does not parse stderr as protocol messages; it may forward lines for display".
 
-### `packages/acp/src/types.ts:98-109` — `AuthMethodInfo.kind` described as "what kurier reads" but it's a guess
+### `packages/acp/src/types.ts:98-109` — `AuthMethodInfo.kind` described as "what lotse reads" but it's a guess
 ```
 Evidence:
 /** `terminal` when the agent advertises the tag, `agent` otherwise. A guess, deliberately. */
@@ -379,7 +379,7 @@ Evidence:
 Unverified: The error message includes the method name, which is excellent. But if `reason` is a `ProtocolError` from a parse failure, the cause chain might be deep. No test visible for this path.
 
 ### `scripts/check-schema.mjs` — Whether it runs in CI
-Unverified: The script exists and is documented in AGENTS.md, but no `.github/workflows` visible in the kurier submodule. Need to check if the parent werkstatt CI runs it.
+Unverified: The script exists and is documented in AGENTS.md, but no `.github/workflows` visible in the lotse submodule. Need to check if the parent werkstatt CI runs it.
 
 ---
 

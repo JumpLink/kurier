@@ -16,7 +16,7 @@
  *
  * **The gate asks a person, and it fails closed.** Every `session/request_permission` is put to the
  * surface through `onPermission`, which shows the modal dialog of plan §7 step 6 and resolves with the
- * id of the button that was pressed — one of the agent's own options, never an id kurier invented. The
+ * id of the button that was pressed — one of the agent's own options, never an id lotse invented. The
  * decision logic is `core/permission.ts`; this file owns the *timing*: when the turn goes into
  * `waiting-for-you`, when it comes back, and the four paths where nobody chose and the answer has to
  * be `cancelled` — dismissal, Stop, a closing window, an agent that died. There is no surface (the
@@ -173,7 +173,7 @@ interface PendingConversation {
  * **The plan says "cancel, await the turn, then terminate. Never terminate first", and this is the
  * escape hatch that makes that rule survivable.** An agent that has been told to stop and does not stop
  * is a real thing — a stuck provider call, a wedged tool — and a window that cannot be closed because
- * kurier is politely waiting for it is a worse defect than a lost flush. So the wait is bounded: with a
+ * lotse is politely waiting for it is a worse defect than a lost flush. So the wait is bounded: with a
  * cooperative agent the turn settles in milliseconds and the window closes with its own `cancelled`
  * answer recorded, and only a silent one is terminated — which is what makes the pending
  * `session/prompt` reject, so the turn still settles instead of hanging.
@@ -218,7 +218,7 @@ export interface AgentSessionOptions {
   /**
    * The host's own MCP servers (ACP `McpServer`), sent unchanged in `session/new` and in the reattach
    * of a stored session. Absent means `session/new` carries `[]` and a reattach adds nothing — what the
-   * app and the CLI send. kurier never edits the agent's global config for this.
+   * app and the CLI send. lotse never edits the agent's global config for this.
    */
   readonly mcpServers?: readonly McpServer[];
 }
@@ -296,8 +296,8 @@ export class AgentSession {
    *
    * **Held, never derived and never persisted.** `session/new`, `session/load` / `session/resume`, a
    * `config_option_update` and the answer to a set all carry the **full** list, so the last one wins
-   * and there is never a merge to get wrong. Nothing about it is written to disk: a model kurier
-   * remembered across a restart would be a preference kurier invented, and the agent's `currentValue`
+   * and there is never a merge to get wrong. Nothing about it is written to disk: a model lotse
+   * remembered across a restart would be a preference lotse invented, and the agent's `currentValue`
    * is the truth on every reattach. Before the agent has answered this is `null`, not `[]`, because
    * "nothing yet" and "nothing to offer" must not draw the same thing.
    */
@@ -309,7 +309,7 @@ export class AgentSession {
    * starts nothing (plan §6), so the second `bind(B)` must empty the row — but the *agent* is still
    * holding A, so `bind(A)` again has nothing to re-request: `#bindAgent` returns early because the
    * agent's own session never changed. Clearing on the way out and nothing on the way back leaves the
-   * row empty for the rest of the window's life, for a session kurier already knows everything about.
+   * row empty for the rest of the window's life, for a session lotse already knows everything about.
    *
    * **A cache of what the agent last said, not configuration authority.** Nothing is written down, the
    * values are never merged or reinterpreted, and the agent's `currentValue` still wins on every answer —
@@ -838,7 +838,7 @@ export class AgentSession {
    * One process per window, started on the first prompt, reused for every turn after it.
    *
    * **A failure here is a sentence, not an exception.** `openAgent` rejects for a binary that is not
-   * on PATH, a handshake that times out, a protocol version kurier does not implement, and — through
+   * on PATH, a handshake that times out, a protocol version lotse does not implement, and — through
    * `withAuthHint` — for `auth_required`, whose remedy is `lotse auth` in a terminal this window does
    * not have (plan §6, trap 1). All four become `AgentAttachment: 'failed'` with the message, which is
    * what the composer puts under the entry, so the person reads what to do instead of watching a
@@ -1038,9 +1038,9 @@ export class AgentSession {
    * **The option ids are the schema's own kinds with fixture ids**, because the *kinds* are what the
    * projection reads and a fixture with invented kinds would exercise nothing. All four kinds are on
    * the wire here, which is the point: a dialog photographed with only two buttons would not show that
-   * kurier relays the `*_always` kinds, nor the three things that makes them safe — that they are added
+   * lotse relays the `*_always` kinds, nor the three things that makes them safe — that they are added
    * in `orderOptions`' order (`reject_once` first, so libadwaita's own focus fallback is a decline),
-   * that only `allow_once` carries `SUGGESTED`, and that the labels are kurier's four short sentences
+   * that only `allow_once` carries `SUGGESTED`, and that the labels are lotse's four short sentences
    * with the agent's own wording demoted to one caption line in the body.
    *
    * Resolves with the answer that was reached, so a caller can log it; nothing in the window waits on
@@ -1090,7 +1090,7 @@ export class AgentSession {
    *
    * **The history an agent replays on load is not recorded, and that is deliberate.** Replaying is what
    * `session/load` is for and it arrives as ordinary `session/update` notifications, but this runs
-   * *before* `runTurn` subscribes — and a conversation kurier already has on disk must not be written to
+   * *before* `runTurn` subscribes — and a conversation lotse already has on disk must not be written to
    * disk a second time. `tests/unit/core/agent-session.test.ts` pins that with the fixture agent,
    * which replays.
    *
@@ -1181,7 +1181,7 @@ export class AgentSession {
    * Set one option through `session/set_config_option`, and redraw from the answer.
    *
    * **The one door, not two.** The agent can be asked through `session/set_mode` as well, and opencode
-   * keeps the two in step; kurier uses only the option door, because the `mode` option is the one the
+   * keeps the two in step; lotse uses only the option door, because the `mode` option is the one the
    * row draws and a second path is a second way for the row and the agent to disagree.
    *
    * **Three refusals before anything is sent, and none of them is defensive.**

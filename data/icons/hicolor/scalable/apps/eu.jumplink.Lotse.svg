@@ -6,7 +6,7 @@
     `main.ts` sets `applicationIcon: APP_ID`, so GTK resolves the window's icon by
     NAME and needs an installed `eu.jumplink.Lotse.svg` before the about dialog and
     the taskbar stop falling back to a generic missing-image. That is all this file
-    has to be for kurier to be installable and correct — and it is deliberately
+    has to be for lotse to be installable and correct — and it is deliberately
     geometric so nobody mistakes it for art somebody chose.
 
     This comment lives INSIDE the root element on purpose, and must not move above
@@ -16,7 +16,7 @@
     same file with the comment above `<svg>` is rejected, the same file with it
     inside is accepted. Nothing else in the file was changed.
 
-    TODO: replace with a real mark (see https://github.com/JumpLink/kurier/issues).
+    TODO: replace with a real mark (see https://github.com/JumpLink/lotse/issues).
     Until then it is the same shape as the symbolic variant, which is the only thing
     that makes the pair recognisable as one icon.
   -->

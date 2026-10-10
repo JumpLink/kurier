@@ -2,7 +2,7 @@
  * `lotse login` — log in to a provider through opencode's own OAuth flow, without a terminal login.
  *
  * `lotse auth` hands the person to `opencode auth login`, which needs a terminal and a menu. This is the
- * other path, the one a window can use too: kurier starts a private `opencode serve`, asks it to begin the
+ * other path, the one a window can use too: lotse starts a private `opencode serve`, asks it to begin the
  * login, shows the URL and the code it answers with, and waits until the provider is done. It stores
  * nothing — the credential lands in the agent's own store (`core/login/flow.ts`).
  *
@@ -198,7 +198,7 @@ const command = (paths: LotsePaths): CommandModule => ({
       }
       const provider = providers.find((candidate) => candidate.id === wanted.toLowerCase());
       if (!provider) {
-        err(`"${wanted}" is not a provider kurier offers a login for. These are:`);
+        err(`"${wanted}" is not a provider lotse offers a login for. These are:`);
         listProviders(providers);
         process.exitCode = 1;
         return;
@@ -254,7 +254,7 @@ const command = (paths: LotsePaths): CommandModule => ({
           err(
             prompt.mode === 'code'
               ? '  then paste the code the page shows you.'
-              : '  kurier waits here until the provider is done. Ctrl-C cancels.',
+              : '  lotse waits here until the provider is done. Ctrl-C cancels.',
           );
         },
         askCode: () => readLine('code: '),

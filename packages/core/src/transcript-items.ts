@@ -39,7 +39,7 @@
  *
  * **A tool line has no body, and that is the honest outcome rather than a missing feature.** A
  * `tool_call` carries `rawInput` and `rawOutput` in whatever shape the agent's tool used, and
- * `toTranscript` deliberately keeps neither (its own file header is about this), so kurier holds a
+ * `toTranscript` deliberately keeps neither (its own file header is about this), so lotse holds a
  * tool call's title and status and nothing else. The first version put the recorded line, the agent's
  * `toolCallId` and the raw ISO timestamp in the body — which is the summary again, an internal id,
  * and a timestamp no surface renders. Repeating the summary behind a disclosure and calling it a
@@ -121,7 +121,7 @@ export interface ThoughtItem extends DisclosureItem {
 }
 
 /**
- * A tool call, closed by default — and with no body, because kurier records the line and not the
+ * A tool call, closed by default — and with no body, because lotse records the line and not the
  * call's payload. See the file header; the `detail` a future one would carry is a tool's output, and
  * `TranscriptEntry` is where it would have to arrive.
  */

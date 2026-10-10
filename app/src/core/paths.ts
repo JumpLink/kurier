@@ -1,5 +1,5 @@
 /**
- * Where kurier keeps things — this app's answer, resolved from the environment.
+ * Where lotse keeps things — this app's answer, resolved from the environment.
  *
  * The one promise: **nothing is ever written inside the repository.** A session file holds the text
  * of a person's conversations with an agent, and this repository is public — a stray session file
@@ -9,7 +9,7 @@
  * Every function takes the environment as an argument, so a test says "with `XDG_DATA_HOME` set to
  * this" instead of mutating the world to find out where the code writes.
  *
- * The `LotsePaths` shape itself, and `lotsePathsUnder(root)` for a host that hands kurier a
+ * The `LotsePaths` shape itself, and `lotsePathsUnder(root)` for a host that hands lotse a
  * directory, are in `@lotse/core`: core takes the paths and never resolves them, and XDG plus the
  * `LOTSE_*` overrides are a decision only an app gets to make.
  *

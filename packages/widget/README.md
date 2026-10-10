@@ -27,7 +27,7 @@ The packages are `private` and not yet on a registry; depend on them as a worksp
 import { LotseChat } from '@lotse/widget';
 ```
 
-`.` is the public entry. Two further sub-paths exist for kurier's own tests (`@lotse/widget/tool-line`,
+`.` is the public entry. Two further sub-paths exist for lotse's own tests (`@lotse/widget/tool-line`,
 `@lotse/widget/permission-dialog`); a host does not need them.
 
 ## Minimal example
@@ -101,7 +101,7 @@ This is `app/tests/examples/embed.ts`, which is type-checked with the app. Each 
 | `createSession` | `(record: SessionRecord) => void` | Write a new conversation's record. `SessionStore.create`. |
 | `appendTurns` | `(sessionId, entries) => void` | Persist streamed transcript lines, once per arriving batch, in order. `SessionStore.append`. |
 | `resolveAgent` | `(id, source) => Promise<RecordedResolution>` | The agent a stored session names, on the copy that held it: `resolveRecorded`. Leave out to run every session on `agent`. |
-| `mcpServers` | `readonly McpServer[]` | Your MCP servers, sent unchanged in `session/new` and on reattach. Never read by kurier past `type`. |
+| `mcpServers` | `readonly McpServer[]` | Your MCP servers, sent unchanged in `session/new` and on reattach. Never read by lotse past `type`. |
 | `noAgent` | `{ kind: 'no-agent', … }` | Nothing was found: Send is off, and `showNoAgent()` shows the `noAgentPage`. Take the value from `emptyStateView`. |
 | `closedPage` | `Gtk.Widget` | Your "nothing is open" page. Absent: that state renders nothing. |
 | `noAgentPage` | `Gtk.Widget` | Your "no agent found" page. Absent: that state renders nothing. |
@@ -151,7 +151,7 @@ After a successful login the agent restarts. Nothing here reads or keeps a crede
 
 `stageOnboarding`, `stagePermissionRequest`, `stageConfigOption`, `openModelDropdown`,
 `chooseModelInDialog`, `hasModelControl`, `permissionAsked`, `streamed` and `failureShown` exist for
-kurier's own dev fixtures and screenshots ([dev-fixtures](../../docs/dev-fixtures.md)); a host does not
+lotse's own dev fixtures and screenshots ([dev-fixtures](../../docs/dev-fixtures.md)); a host does not
 need them.
 
 `shutdown()` order matters: it cancels first so the agent can answer `cancelled` and flush, and

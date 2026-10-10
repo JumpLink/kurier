@@ -1,12 +1,16 @@
-# Kurier
+# Lotse
 
 An [ACP](https://agentclientprotocol.com) client: a command-line tool that starts a coding agent
 (currently [opencode](https://opencode.ai)) as a subprocess, talks to it over the **Agent Client
 Protocol** — JSON-RPC 2.0 over stdio — and keeps a local record of your sessions.
 
-Kurier has no agent of its own and no model of its own. It runs on **GJS** (GNOME's JavaScript
+Lotse has no agent of its own and no model of its own. It runs on **GJS** (GNOME's JavaScript
 runtime) via [gjsify](https://github.com/gjsify/gjsify), like [postbote](../mail/README.md) and
 [beifahrer](../beifahrer/README.md).
+
+> **Formerly Kurier.** Everything up to and including 0.1.1 was released under that name; the
+> rename to Lotse — the pilot who comes aboard and steers a ship through unfamiliar water —
+> happened before the first npm publish. See [CHANGELOG.md](CHANGELOG.md).
 
 > **Status: early.** One adapter (opencode), one prompt turn per `start`/`resume` call. A GTK4 /
 > libadwaita surface exists and is being built slice by slice; it runs from source, not yet from a
@@ -14,13 +18,13 @@ runtime) via [gjsify](https://github.com/gjsify/gjsify), like [postbote](../mail
 
 ## Why ACP instead of one SDK per agent
 
-ACP is the reason kurier does not need a driver for every coding agent it wants to run. The agent
-decides which model does the work; kurier only owns the environment — which working directory the
+ACP is the reason lotse does not need a driver for every coding agent it wants to run. The agent
+decides which model does the work; lotse only owns the environment — which working directory the
 session runs in, what it is allowed to do, and which MCP servers it may connect to. That split is
 standard, not something this project invented: `session/request_permission` is how an agent asks
 for permission, `fs/read_text_file`/`fs/write_text_file` are how it would read or write files
-*through kurier* if kurier allowed it (it does not — those two are answered `false`), and
-`session/new` with `mcpServers` is how it reaches whichever MCP servers kurier hands it.
+*through lotse* if lotse allowed it (it does not — those two are answered `false`), and
+`session/new` with `mcpServers` is how it reaches whichever MCP servers lotse hands it.
 
 Measured, not assumed — a real `initialize` handshake against `opencode acp` 2.0.19, run entirely
 inside one GJS process with no Node process anywhere in the chain:
@@ -51,14 +55,14 @@ lotse auth --agent opencode
 ```
 
 `opencode acp` advertises an interactive login (`Run \`opencode auth login\` in the terminal`) as
-its auth method — not a token kurier could hand over by itself. Without `lotse auth`, a session
+its auth method — not a token lotse could hand over by itself. Without `lotse auth`, a session
 started before you are logged in dies on `-32000 auth_required` instead of on your prompt.
 
 ## Commands
 
 ```bash
 lotse start [--agent opencode] [prompt…]   # new session, one prompt turn, prints the agent's stream
-lotse sessions                             # list kurier's own records for the local principal
+lotse sessions                             # list lotse's own records for the local principal
 lotse resume <id> [prompt…]                # reattach a stored session, then optionally one prompt turn
 lotse cancel <id>                          # send session/cancel
 lotse auth [--agent opencode]              # the interactive-login escape hatch
@@ -97,10 +101,14 @@ state are in [docs/design/](docs/design/README.md).
 
 ## Where your data lives
 
-Kurier keeps one record per session — which agent, which directory, the transcript, whether it is
+Lotse keeps one record per session — which agent, which directory, the transcript, whether it is
 bound to anything else — at `$XDG_DATA_HOME/lotse/sessions.json` (mode `0600`), written
 atomically. Never inside this repository: **this repository is public**, and `.gitignore` is only
 the second line of defence, not the first.
+
+Through 0.1.1 that directory was `$XDG_DATA_HOME/kurier` (and `$XDG_CONFIG_HOME/kurier`). Lotse
+renames each one once on startup, when the new name is free; it never merges two directories and
+keeps using the old one — saying so on stderr — if the move fails.
 
 A session record says what is *reachable*, never what is *allowed*. Nothing in it can grant a
 future call permission on its own — every request the agent makes is checked again, every time. See
@@ -109,7 +117,7 @@ future call permission on its own — every request the agent makes is checked a
 ## What it does not do yet
 
 No packaged surface yet (the libadwaita window runs from source — never a browser page), no Telegram
-bot, no wiring to kurier's own MCP servers, no policy for more than one person in a session, and no
+bot, no wiring to lotse's own MCP servers, no policy for more than one person in a session, and no
 adapter for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
 
 ## Releasing
@@ -119,7 +127,7 @@ passes, builds and attaches every installable format to the tag's GitHub release
 `.AppImage`, a Flatpak (`eu.jumplink.Lotse.flatpak`, from the manifest in
 [data/README.md](data/README.md)), a macOS `.app.zip` (arm64 + x64), and a Windows program
 directory `.zip` and `.msi` (x64). All of it packages the GUI (`lotse-app`), the one binary with
-a desktop entry and an App-ID; the `kurier` CLI installs alongside it inside the `.deb`/`.rpm`/
+a desktop entry and an App-ID; the `lotse` CLI installs alongside it inside the `.deb`/`.rpm`/
 Flatpak but ships no format of its own.
 
 Everything is unsigned, which is a legitimate deliverable rather than a placeholder (gjsify ADR

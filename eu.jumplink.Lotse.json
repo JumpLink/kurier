@@ -83,7 +83,7 @@
       "sources": [
         {
           "type": "git",
-          "url": "https://github.com/JumpLink/kurier.git",
+          "url": "https://github.com/JumpLink/lotse.git",
           "tag": "v0.1.1",
           "x-checker-data": {
             "type": "git",

@@ -1,5 +1,5 @@
 /**
- * The preferences dialog: which agent kurier connects to.
+ * The preferences dialog: which agent lotse connects to.
  *
  * **Action rows with radio check buttons, not an `Adw.ComboRow`.** A combo row shows one line per item
  * and no subtitle, so the path and version that tell "my opencode" from "the bundled one" would be lost —
@@ -10,7 +10,7 @@
  * What is listed is decided in `core/settings-view.ts`; this file renders it and passes a choice back.
  * **An unavailable row is selectable**: the choice may be for an install that is coming, and the note says
  * what runs meanwhile. A write that fails is shown here, and the rows are re-read so they show what the
- * file really holds. A settings file kurier must not overwrite locks the rows (`ChoicesView.readOnly`).
+ * file really holds. A settings file lotse must not overwrite locks the rows (`ChoicesView.readOnly`).
  *
  * **The dialog opens before the host has answered.** `load(null)` is the cheap view; where a host question
  * exists (a Flatpak) `detect()` runs it asynchronously, and the rows are drawn again from its result. A
@@ -46,7 +46,7 @@ export interface PreferencesActions {
 /** What `select` did, so a caller never claims a write that did not happen. */
 export type SelectOutcome = 'chose' | 'unchanged' | 'refused' | 'failed' | 'missing';
 
-const SCOPE_LINE = 'A change applies the next time kurier starts. This window keeps its agent.';
+const SCOPE_LINE = 'A change applies the next time lotse starts. This window keeps its agent.';
 
 export class PreferencesDialog {
   readonly #actions: PreferencesActions;

@@ -9,7 +9,7 @@
  * **The conversation is no longer this file's.** `@lotse/widget`'s `LotseChat` owns the
  * transcript, the composer, the config row, the three dialogs and the agent behind them;
  * `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws the line and this window is now one host
- * among possible others. What is left here is what names *kurier*: the sidebar and its list, the
+ * among possible others. What is left here is what names *lotse*: the sidebar and its list, the
  * primary menu, Preferences, the privacy banner, the window's own actions and the dev hooks that
  * photograph them. Every one of those reaches the conversation through the widget's own methods
  * rather than around them, which is the same rule the hooks already followed for the composer.
@@ -33,7 +33,7 @@
  * the one control that belongs under the conversation rather than in it. The breakpoint is copied
  * from it verbatim.
  *
- * The gap is upstream, and the honest move is both: build the shell kurier needs, and file the
+ * The gap is upstream, and the honest move is both: build the shell lotse needs, and file the
  * feature request — https://github.com/gjsify/gjsify/issues/1911. A slice is not hostage to somebody
  * else's release train, and a workaround that ossifies is worse than a small local one that is
  * honestly labelled.
@@ -325,7 +325,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     // **The widget, built from this window's own options.** The two idle pages travel with it as
     // `closed` and `no-agent` slots — they are markup of this file's (`window.blp`) because their
-    // copy names this window's sidebar and kurier's own installer, and the widget parents them into
+    // copy names this window's sidebar and lotse's own installer, and the widget parents them into
     // its stack. `onConversation` is the host half of a new chat: the row, the selection and the
     // title, run *before* the widget shows the conversation, which is the order a person reads in.
     this.#chat = new LotseChat({
@@ -370,7 +370,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   /**
    * The nothing-found page: what `emptyStateView` said, on screen, with the commands selectable.
    *
-   * **The page is filled here and shown by the widget.** The copy names kurier's own install command
+   * **The page is filled here and shown by the widget.** The copy names lotse's own install command
    * and its Preferences dialog, so writing it is the app's; deciding that `no-agent` is the state the
    * conversation is in belongs to the widget, which is why the last line is a call rather than a
    * `visibleChildName` assignment.
@@ -658,21 +658,19 @@ export class MainWindow extends Adw.ApplicationWindow {
     if (hooks.session !== undefined) {
       const record = this.#sessions.select(hooks.session);
       if (record) this.#open(record);
-      else console.log(`kurier: LOTSE_APP_SESSION=${hooks.session} — no such session in the list`);
+      else console.log(`lotse: LOTSE_APP_SESSION=${hooks.session} — no such session in the list`);
     }
     if (hooks.config !== undefined) {
       const spec = parseConfigOptionSpec(hooks.config);
       if (!spec) {
         // A hook that cannot be parsed is a typo, and a typo that silently did nothing is how a surface
         // ends up with a screenshot nobody can account for. Named loudly, with the format.
-        console.log(
-          `kurier: LOTSE_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`,
-        );
+        console.log(`lotse: LOTSE_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`);
       } else if (!this.#chat.hasChat) {
-        console.log('kurier: LOTSE_APP_CONFIG — no session is open, so there is no agent to ask');
+        console.log('lotse: LOTSE_APP_CONFIG — no session is open, so there is no agent to ask');
       } else {
         console.log(
-          `kurier: LOTSE_APP_CONFIG — setting ${spec.controlId} to ${spec.value} through the real path`,
+          `lotse: LOTSE_APP_CONFIG — setting ${spec.controlId} to ${spec.value} through the real path`,
         );
         // Through `stageConfigOption`, so the prompt that starts the agent, the `session/load` that
         // binds it and the `session/set_config_option` that sets the value are all the real ones. A hook
@@ -718,13 +716,13 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     if (hooks.noticeDismiss === true) {
       if (this.#notice) {
-        console.log('kurier: LOTSE_APP_NOTICE_DISMISS — pressing the banner’s Got it');
+        console.log('lotse: LOTSE_APP_NOTICE_DISMISS — pressing the banner’s Got it');
         this._noticeBanner.emit('button-clicked');
       } else {
-        console.log('kurier: LOTSE_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
+        console.log('lotse: LOTSE_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
       }
     }
-    if (hooks.debug) console.log('kurier: verbose dev logging on');
+    if (hooks.debug) console.log('lotse: verbose dev logging on');
     // `LOTSE_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
     // turn against whatever agent was selected — no staged fake stream — because a fake one would test
     // the staging code instead of the window. The prompt defaults to a fixture sentence rather than to
@@ -735,12 +733,12 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (unavailable) {
         // The composer refuses to send here, so the hook does too: a hook that could send where a person
         // cannot would photograph a window that does not exist.
-        console.log(`kurier: LOTSE_APP_THINKING — not sent: ${unavailable}`);
+        console.log(`lotse: LOTSE_APP_THINKING — not sent: ${unavailable}`);
       } else if (!this.#chat.hasChat) {
-        console.log('kurier: LOTSE_APP_THINKING — no session is open, so there is nowhere to send it');
+        console.log('lotse: LOTSE_APP_THINKING — no session is open, so there is nowhere to send it');
       } else {
         console.log(
-          `kurier: LOTSE_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
+          `lotse: LOTSE_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
         );
         this.#chat.clearDraft();
         this.#chat.prompt(prompt);
@@ -752,11 +750,11 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#applyFailureHooks(hooks);
     this.#applyPreferencesHooks(hooks);
     if (hooks.onboarding === true) {
-      console.log('kurier: LOTSE_APP_ONBOARDING — staging the provider onboarding page');
+      console.log('lotse: LOTSE_APP_ONBOARDING — staging the provider onboarding page');
       this.#chat.stageOnboarding();
     }
     if (hooks.login === true) {
-      console.log('kurier: LOTSE_APP_LOGIN — opening the login dialog');
+      console.log('lotse: LOTSE_APP_LOGIN — opening the login dialog');
       this.#chat.openLogin();
     }
   }
@@ -771,13 +769,13 @@ export class MainWindow extends Adw.ApplicationWindow {
   #applyNewChatHook(hooks: LotseHooks): void {
     if (hooks.newChat !== true) return;
     const press = (): void => {
-      console.log('kurier: LOTSE_APP_NEW_CHAT — activating win.new-chat');
+      console.log('lotse: LOTSE_APP_NEW_CHAT — activating win.new-chat');
       // The action itself, not `this.activate_action(…)`: on a window GJS resolves that name to
       // `Gio.ActionGroup`'s, which takes the name *without* the `win.` prefix and returns nothing — the
       // prefixed spelling is a silent no-op (measured: the first version of this hook did nothing and
       // logged success). `activate` on the action is what the button's `action-name` ends up calling.
       const action = this.lookup_action('new-chat');
-      if (!action) console.log('kurier: LOTSE_APP_NEW_CHAT — no such action on this window');
+      if (!action) console.log('lotse: LOTSE_APP_NEW_CHAT — no such action on this window');
       else action.activate(null);
     };
     if (!this.#chat.turnRunning) {
@@ -802,9 +800,9 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#midTurnSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MIDTURN_HOOK_STEP_MS, () => {
       if (!this.#chat.turnRunning || this.#chat.streamed === 0) return GLib.SOURCE_CONTINUE;
       this.#midTurnSource = null;
-      console.log('kurier: LOTSE_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
+      console.log('lotse: LOTSE_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
       const action = this.lookup_action('new-chat');
-      if (!action) console.log('kurier: LOTSE_APP_NEW_CHAT_MIDTURN — no such action on this window');
+      if (!action) console.log('lotse: LOTSE_APP_NEW_CHAT_MIDTURN — no such action on this window');
       else action.activate(null);
       return GLib.SOURCE_REMOVE;
     });
@@ -816,10 +814,10 @@ export class MainWindow extends Adw.ApplicationWindow {
     const dialog = this.#preferences;
     const app = this.application;
     if (!dialog || !app) {
-      console.log('kurier: LOTSE_APP_PREFERENCES — this window has no preferences dialog');
+      console.log('lotse: LOTSE_APP_PREFERENCES — this window has no preferences dialog');
       return;
     }
-    console.log('kurier: LOTSE_APP_PREFERENCES — opening the dialog through app.preferences');
+    console.log('lotse: LOTSE_APP_PREFERENCES — opening the dialog through app.preferences');
     app.activate_action('preferences', null);
     const key = hooks.preferencesAgent;
     if (key === undefined) return;
@@ -833,7 +831,7 @@ export class MainWindow extends Adw.ApplicationWindow {
         failed: `choosing ${key} did not save — see the dialog`,
         missing: `no row ${key} in the dialog`,
       };
-      console.log(`kurier: LOTSE_APP_PREFERENCES_AGENT — ${said[outcome]}`);
+      console.log(`lotse: LOTSE_APP_PREFERENCES_AGENT — ${said[outcome]}`);
     });
   }
 
@@ -892,7 +890,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (!this.#chat.failureShown) return GLib.SOURCE_CONTINUE;
       hooks.waiting = false;
       if (hooks.dismiss) {
-        console.log('kurier: LOTSE_APP_DISMISS_FAILURE — closing the failure dialog');
+        console.log('lotse: LOTSE_APP_DISMISS_FAILURE — closing the failure dialog');
         hooks.dismiss = false;
         this.#chat.closeFailure();
         // **A step of its own, so the walk starts only after the dismissal has had a frame.** The
@@ -908,7 +906,7 @@ export class MainWindow extends Adw.ApplicationWindow {
         // as "the button was never offered" rather than as a broken fixture.
         const pressed = this.#chat.chooseModelInDialog();
         console.log(
-          `kurier: LOTSE_APP_CHOOSE_MODEL — ${
+          `lotse: LOTSE_APP_CHOOSE_MODEL — ${
             pressed ? 'pressing Choose another model' : 'the dialog offers no such button'
           }`,
         );
@@ -929,12 +927,12 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     const record = this.#sessions.select(next);
     if (record === undefined) {
-      console.log(`kurier: LOTSE_APP_SWITCH=${next} — no such session in the list, not opened`);
+      console.log(`lotse: LOTSE_APP_SWITCH=${next} — no such session in the list, not opened`);
     } else {
       // `#open`, because that is what a row click does — `SessionList`'s `onOpen` is a closure over
       // this method. A hook that called the widget's agent directly would skip the window's own half
       // and photograph a session the window did not open.
-      console.log(`kurier: LOTSE_APP_SWITCH — opening ${next}`);
+      console.log(`lotse: LOTSE_APP_SWITCH — opening ${next}`);
       this.#open(record);
     }
     return GLib.SOURCE_CONTINUE;
@@ -956,7 +954,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   #applyStopHook(hooks: LotseHooks): void {
     if (hooks.stop !== true && hooks.stopEscape !== true) return;
     if (!this.#chat.hasChat) {
-      console.log('kurier: LOTSE_APP_STOP — no session is open, so there is no turn to stop');
+      console.log('lotse: LOTSE_APP_STOP — no session is open, so there is no turn to stop');
       return;
     }
     // **No timer, and the earlier version had one that could not do anything.** `AgentSession.prompt()`
@@ -966,7 +964,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     // or has already missed the turn, which is why the version this replaces gave up on tick 2 and left
     // its own deadline unreachable. One check, and the log says what it did.
     if (!this.#chat.turnRunning) {
-      console.log('kurier: LOTSE_APP_STOP — no turn is running, so nothing was stopped');
+      console.log('lotse: LOTSE_APP_STOP — no turn is running, so nothing was stopped');
       return;
     }
     if (hooks.stopEscape === true) {
@@ -974,12 +972,12 @@ export class MainWindow extends Adw.ApplicationWindow {
       // id `'close'`, `decideFromView` maps that to `not-answered: dismissed`, and `answerFor` sends
       // `cancelled` — so `dismissPermission('dismissed')` is literally what Escape does, and the turn
       // keeps running afterwards, which is the difference from Stop that `dismissed` names.
-      console.log('kurier: LOTSE_APP_STOP_ESCAPE — dismissing the open permission dialog as Escape does');
+      console.log('lotse: LOTSE_APP_STOP_ESCAPE — dismissing the open permission dialog as Escape does');
       this.#chat.dismissPermission('dismissed');
       this.#chat.closePermission();
     }
     if (hooks.stop === true) {
-      console.log('kurier: LOTSE_APP_STOP — pressing Stop');
+      console.log('lotse: LOTSE_APP_STOP — pressing Stop');
       this.#chat.stop();
     }
   }
@@ -1004,14 +1002,12 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #stagePermission(): void {
     if (!this.#chat.hasChat) {
-      console.log('kurier: LOTSE_APP_PERMISSION — no session is open, so there is nothing to ask about');
+      console.log('lotse: LOTSE_APP_PERMISSION — no session is open, so there is nothing to ask about');
       return;
     }
-    console.log('kurier: LOTSE_APP_PERMISSION — staging a fixture request through the real gate');
+    console.log('lotse: LOTSE_APP_PERMISSION — staging a fixture request through the real gate');
     void this.#chat.stagePermissionRequest().then((answer) => {
-      console.log(
-        `kurier: LOTSE_APP_PERMISSION — the staged question was answered ${JSON.stringify(answer)}`,
-      );
+      console.log(`lotse: LOTSE_APP_PERMISSION — the staged question was answered ${JSON.stringify(answer)}`);
     });
   }
 }

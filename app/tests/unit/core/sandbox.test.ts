@@ -324,7 +324,7 @@ export default async () => {
      * The fake HOME is hostile on purpose: its profile AND its rc print to stdout and `read` from
      * stdin. Without the fence, the print lands in the middle of the JSON-RPC stream and the `read`
      * eats the request; with it, stdout is byte-for-byte the program's own output and the program
-     * receives what kurier sent. `SOCKET`-style isolation is not needed — this is a pipe.
+     * receives what lotse sent. `SOCKET`-style isolation is not needed — this is a pipe.
      */
     await it('leaves stdout untouched and stdin intact, with a profile and rc that print and read', async () => {
       if (process.platform === 'win32') return;
@@ -607,7 +607,7 @@ export default async () => {
         // is found on Windows because NTFS is case-insensitive, and that is a property of the
         // FILESYSTEM, not of `which` — which is why the fixture used to be written lower-case: it
         // passed on macOS (APFS, case-insensitive) and failed on the Linux CI runner (ext4,
-        // case-sensitive) with `undefined`, a red run that said nothing about kurier. The shipped
+        // case-sensitive) with `undefined`, a red run that said nothing about lotse. The shipped
         // path is untouched either way: macOS and Linux never set PATHEXT, so these candidates
         // are never walked there.
         writeFileSync(join(dir, 'opencode.CMD'), '@echo off\n');
@@ -808,7 +808,7 @@ export default async () => {
           expect(out).toContain('ARGV:one|two');
           // `realpathSync`, not `dir`: macOS's `/tmp` is a symlink to `/private/tmp`, and the
           // child's own `pwd` reports the resolved target — asserting the unresolved path is a
-          // test bug, not a product one, because kurier never promised the CWD comes back
+          // test bug, not a product one, because lotse never promised the CWD comes back
           // byte-identical to what it passed, only that the process actually started there.
           expect(out).toContain(`CWD:${realpathSync(dir)}`);
           expect(out).toContain('ENV:present');

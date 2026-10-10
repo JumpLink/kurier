@@ -73,7 +73,7 @@ jobs:
 
       # The vendored ACP schema against the code. A hand-written copy of a protocol schema drifts,
       # and the drift is silent at runtime: a renamed method is a `-32601` against a live agent, and
-      # a field that became required is an agent that ignores what kurier sent.
+      # a field that became required is an agent that ignores what lotse sent.
       - name: Check the code against refs/acp/schema.v1.json
         run: node scripts/check-schema.mjs
 

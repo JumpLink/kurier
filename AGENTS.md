@@ -1,6 +1,6 @@
-# AGENTS.md — kurier
+# AGENTS.md — lotse
 
-Operating guide for AI agents in the **kurier** repo. Follows the [agents.md](https://agents.md/)
+Operating guide for AI agents in the **lotse** repo. Follows the [agents.md](https://agents.md/)
 convention; the human overview is [README.md](README.md). This repo is a submodule of
 **werkstatt**, whose [AGENTS.md](../../AGENTS.md) carries the broader workspace rules — this file
 is the lotse-specific layer and wins where they differ.
@@ -13,9 +13,9 @@ their sessions, and binds them to a surface. Runs on **GJS via gjsify**, like po
 beifahrer.
 
 No agent of its own, no model of its own, no policy engine of its own — ACP brings that in as the
-standard protocol instead of kurier's own invention. `session/request_permission` is the policy
+standard protocol instead of lotse's own invention. `session/request_permission` is the policy
 layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `session/new` with
-`mcpServers` lets the agent reach kurier's own MCP servers without a line of suite-specific code.
+`mcpServers` lets the agent reach lotse's own MCP servers without a line of suite-specific code.
 
 ## Package layout — and the one rule that holds it together
 
@@ -62,7 +62,7 @@ from `@lotse/core` for a host), a test passes a temp dir.
 
 ```bash
 lotse start [prompt..] --agent opencode   # new session, one prompt turn
-lotse sessions [--all] [--long]           # kurier's own records, one principal
+lotse sessions [--all] [--long]           # lotse's own records, one principal
 lotse resume <id> [prompt..]              # reattach, then optionally one turn
 lotse cancel <id>                         # session/cancel
 lotse auth [--agent opencode]             # trap 1's way out
@@ -83,7 +83,7 @@ The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is
 precedence is `--agent` (CLI) / `LOTSE_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
 `lotse agents --use <id>[:bundled|host]|none` writes it.
-The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time kurier starts, and a settings file kurier could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `LOTSE_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
+The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time lotse starts, and a settings file lotse could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `LOTSE_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
 An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `LOTSE_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `lotse start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `LOTSE_APP_AGENT` pins one; hooks `LOTSE_APP_NEW_CHAT`/`LOTSE_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `LOTSE_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
@@ -129,15 +129,15 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
   name is free, never merges two of them, and keeps using the old one — out loud — when the move
   fails. Every `LOTSE_*` knob also answers to its `KURIER_*` spelling (`envKnob`), new name wins,
   and a pinned path turns the move off.
-- There is **no `secret` tier, and adding one needs a reason.** kurier stores no credential:
-  `lotse auth` runs the agent's own login. The agent keeps its credentials and kurier never reads them
+- There is **no `secret` tier, and adding one needs a reason.** lotse stores no credential:
+  `lotse auth` runs the agent's own login. The agent keeps its credentials and lotse never reads them
   back; a pasted API key (`lotse login`, login dialog) is held in memory for one call, never written. Do not
   put a token in a session record, in a launcher `env`, or in any file here — there is no file here
   with a safe place for it.
 - Test fixtures are **synthetic only**. A real session id, a real prompt or a real model reply from
   a machine's history never goes into a test.
 - The transcript is a *record of what happened*, not a re-derivation of it. The agent's own
-  `session/load` is the authority on history; kurier's copy exists so `lotse sessions` can show
+  `session/load` is the authority on history; lotse's copy exists so `lotse sessions` can show
   something without spawning a process. Do not add filtering to it as "protection" — a filter with
   no gate behind it is a policy in the wrong place.
 
@@ -155,11 +155,11 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
    — Escape, Stop, a closing window, an agent that died, a closed dialog. Never "auto-allow because the
    agent asked". **`allow_always`/`reject_always` are passed through**, not filtered: the **agent**
    remembers an "always" (ACP has no `allowed_always` — the answer is `selected` plus the agent's own
-   option id, and it decides whether to ask again), while kurier stores no policy at all. What still
+   option id, and it decides whether to ask again), while lotse stores no policy at all. What still
    holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
    `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
    says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
-   kurier could pick. **`lotse serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
+   lotse could pick. **`lotse serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
    its gate answers `allow_once` only for a question the person answered yes or an area the person
    released in the task configuration, and that policy only narrows what the owning app allows. It
    strips every `*_always` option and never selects one; a yes mints one single-use token bound to
@@ -168,12 +168,12 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
    access through that channel at all. File access is a decision, not a default — these two may be
-   enabled later for a **canvas surface**, where kurier would hold the real buffer and hand it over
+   enabled later for a **canvas surface**, where lotse would hold the real buffer and hand it over
    deliberately rather than proxying a path the agent named.
 4. **`_meta` is passed through, never parsed.** `opencode acp` sends
    `_meta: {"opencode/child-session-updates": true}` and a `sessionCapabilities.fork` marker the v1
    schema does not define. Unknown `_meta` must never be an error — otherwise every agent with an
-   extension kurier doesn't know breaks.
+   extension lotse doesn't know breaks.
 
 Plus two more that are in the code, not just the plan: **no central capability registry** (not
 even in gjsify — it would be exactly the gate beifahrer forbids, one level up and worse because it
@@ -242,7 +242,7 @@ rules that change behaviour stay here:
   and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply still
   arriving, where the newest bubble is below the fold — and the default was `5` against a list of four,
   which read as a knob that could grow and could not.
-- **A hook set to `0` or `false` is off**, in kurier and in the stand-in alike, so there is one rule
+- **A hook set to `0` or `false` is off**, in lotse and in the stand-in alike, so there is one rule
   for "is this on" in the repo. The reading rules are in `frontends/gui/hook-value.ts`, not in
   `hooks.ts`: `readHooks` imports the framework's reader, whose barrel imports `Adw`, so a test that
   imported it could not run on Node at all — and the rules (unset, empty, `0` and `false` are off; a
@@ -269,7 +269,7 @@ and `unsupported` and **`null` for `start`** — a bad command or a handshake ti
 composer's caption. No failure is written to the transcript: no turn ran, so nothing to record.
 
 **`'auth'` and `'model'` are told apart structurally, because the wire cannot** ([issue
-#2](https://github.com/JumpLink/kurier/issues/2), measured in
+#2](https://github.com/JumpLink/lotse/issues/2), measured in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#ku_standin_prompt_auth1--the-same-error-code-a-different-kind)):
 a **geo-blocked provider 403** reaches `session/prompt` as the login trap's own `-32000`, so matching the
 message is one reword from wrong and matching the code is *already* wrong. What survives is whether a
@@ -296,15 +296,15 @@ ever shown one" flag, because `AgentSession` builds a **new** attachment per fai
 second failure has to be shown.
 
 **Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@lotse/core`'s `login/`, [docs/login.md](docs/login.md)): the
-agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
+agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; lotse
 stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
 a host opencode in a Flatpak) the dialog names `lotse auth`. `'model'`/`'quota'` offer **Choose another model**: it
 opens the row's dropdown and picks nothing, and `failureAction` withholds either button when the window cannot do it.
 
 **The permission dialog, in two halves.** `LOTSE_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
-wire** — so a screenshot shows kurier's ordering, labels, styling and focus rules acting on the full
-set the agent offered, `*_always` included. `LOTSE_APP_PERMISSION=1` is kurier's side: it puts a fixture
+wire** — so a screenshot shows lotse's ordering, labels, styling and focus rules acting on the full
+set the agent offered, `*_always` included. `LOTSE_APP_PERMISSION=1` is lotse's side: it puts a fixture
 request through **the same gate** the agent's requests go through, so a screenshot shows the gate's
 behaviour rather than a dialog built for the screenshot. It is a fallback, not a competitor, and it
 waits by polling for the gate to be asked rather than for a fixed delay (`window.ts`) — a fixed delay
@@ -313,13 +313,13 @@ measured GTK facts behind it are in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#the-permission-dialog); what it does and does not do is
 decided in `packages/core/src/permission.ts` and tested on both runtimes, while the widget only renders.
 
-**Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
+**Lotse owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
 measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd).
 The rules that survive here: the first added button is the bottom one and the last added is the topmost,
 so **both end slots are a decline**; `buildDialog` names `default_response` explicitly rather than letting
 the add order choose it; and `show()` grabs the focus.
 
-**The button labels** are kurier's four short sentences; the agent's own names are not on them
+**The button labels** are lotse's four short sentences; the agent's own names are not on them
 (captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd)). A button label must fit one line.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
@@ -374,7 +374,7 @@ the same way. `packaging:install` installs metadata only: `bin/lotse-app` is pro
 `gjsify ship`, not by this script.
 
 **Three finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
-reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
+reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them lotse
 cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
 this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
 `--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).

@@ -17,7 +17,7 @@
  * rather than whatever a consumer could resolve. The two exceptions exist for measurements, not for
  * hosts, and each is one file with no widget in its import graph:
  *
- * - `@lotse/widget/tool-line` — `tool-line.ts` has no imports at all, so kurier's unit test for it
+ * - `@lotse/widget/tool-line` — `tool-line.ts` has no imports at all, so lotse's unit test for it
  *   runs on **Node** as well as GJS. Reaching it through this barrel would pull `Adw` in and the
  *   Node half of the dual run would be gone, which is the split `AGENTS.md` calls the entire point.
  * - `@lotse/widget/permission-dialog` — `app/tests/probes/permission-focus.ts` measures where GTK
@@ -29,5 +29,5 @@
 export { LotseChat, type HostGateAnswer, type LotseChatOptions } from './chat.ts';
 
 // The stylesheet is installed by `LotseChat` itself; only the class-name map is public, for a host
-// that styles its own widgets next to the chat (kurier's app reuses `calm`).
+// that styles its own widgets next to the chat (lotse's app reuses `calm`).
 export { CSS } from './css.ts';

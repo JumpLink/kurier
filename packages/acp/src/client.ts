@@ -133,7 +133,7 @@ export class AcpClient {
    * The `initialize` handshake, and the only call that must come first.
    *
    * The version is checked, and a mismatch is fatal. ACP says the client should disconnect if it
-   * does not support the version the agent answers with, and kurier takes that literally: a v2
+   * does not support the version the agent answers with, and lotse takes that literally: a v2
    * agent and a v1 client agreeing to muddle along is how a session dies twenty minutes later
    * inside a field that does not exist yet.
    */
@@ -322,10 +322,10 @@ export class AcpClient {
 
   // ─── session configuration ─────────────────────────────────────────────────────────────────
   //
-  // Both of these write a value **inside the agent**, for the lifetime of that session. kurier
+  // Both of these write a value **inside the agent**, for the lifetime of that session. lotse
   // keeps no copy: the agent's `currentValue` is the truth, and it is re-read on every
   // `session/new`, `session/load` and `config_option_update`. A surface that remembered a preferred
-  // model in a kurier file would be holding configuration authority over the agent — the same
+  // model in a lotse file would be holding configuration authority over the agent — the same
   // mistake as "always allow" in different clothes.
 
   /**
@@ -400,7 +400,7 @@ export class AcpClient {
   }
 
   /** Close the connection. Pending requests reject; late agent traffic is ignored, not answered. */
-  close(reason = 'kurier closed the connection'): void {
+  close(reason = 'lotse closed the connection'): void {
     if (this.#closed) return;
     this.#closed = true;
     this.#failAll(new Error(reason));
@@ -414,9 +414,9 @@ export class AcpClient {
    *
    * **A failed write closes the connection on every path**: a transport that threw once has lost
    * a line, and the next line would arrive at a peer that never saw the one before it. What
-   * differs is the caller. `#send` (kurier's own notifications) throws and `#request` rejects,
+   * differs is the caller. `#send` (lotse's own notifications) throws and `#request` rejects,
    * because somebody is waiting on the call and has to learn it never went out. `#write` (answers
-   * to the agent) returns quietly, because nobody on kurier's side is waiting for those — the
+   * to the agent) returns quietly, because nobody on lotse's side is waiting for those — the
    * agent asked, and a closed connection is the only answer it can still get. A closed connection
    * is the same split: `#send` throws, `#request` rejects, `#write` drops the line.
    */
@@ -560,7 +560,7 @@ export class AcpClient {
    * doing parallel tool calls can send two `session/request_permission` requests before it has an
    * answer to the first; a terminal gate happens to survive that because a person reads lines in
    * order, but a modal dialog cannot — it has one window, and the second question either vanishes
-   * behind the first or overwrites it. Serialising here means every gate kurier ever grows,
+   * behind the first or overwrites it. Serialising here means every gate lotse ever grows,
    * including the GTK one, can be written as "answer this, then that", with no queue of its own.
    *
    * The order is arrival order. Reversing it would answer the second question first, which is the
@@ -613,7 +613,7 @@ export class AcpClient {
    */
   #reportError(what: string, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`kurier: ${what}: ${message}`);
+    console.error(`lotse: ${what}: ${message}`);
   }
 
   /**
@@ -647,7 +647,7 @@ export class ProtocolVersionMismatchError extends Error {
   constructor(negotiated: number | undefined, supported: number, agentInfo?: Implementation | null) {
     const who = agentInfo ? `${agentInfo.name} ${agentInfo.version}` : 'the agent';
     super(
-      `${who} speaks ACP version ${negotiated ?? 'none'}, kurier implements version ${supported}. ` +
+      `${who} speaks ACP version ${negotiated ?? 'none'}, lotse implements version ${supported}. ` +
         'Refusing to continue — a mismatch found halfway through a turn is far more expensive.',
     );
     this.name = 'ProtocolVersionMismatchError';

@@ -9,7 +9,7 @@
  * - **a refused set must not move the row** — the person clicked, the agent said no, and a dropdown
  *   still showing the value they chose is a lie about what the agent is doing;
  * - **re-selecting the current value sends nothing** — the row is rebuilt on every answer, and a
- *   rebuild that fires a request turns "kurier showed the model" into "kurier set the model";
+ *   rebuild that fires a request turns "lotse showed the model" into "lotse set the model";
  * - **a value the agent did not offer is never sent**, whatever the widget believes is selected.
  *
  * Each of those compiles, each of them runs, and each of them is the bug. `permission.ts` made the
@@ -24,11 +24,11 @@
  * **The agent's `currentValue` is the only truth.** Every view here is built from the last list the
  * agent reported — from `session/new`, from `session/load`/`session/resume`, from a
  * `config_option_update`, and from the answer to a set. Nothing is remembered between sessions and
- * nothing is persisted: kurier keeping a preferred model would be kurier holding configuration
+ * nothing is persisted: lotse keeping a preferred model would be lotse holding configuration
  * authority over the agent, which is the "always allow" mistake in different clothes (see
  * `LOTSE_CLIENT_CAPABILITIES`).
  *
- * **A `boolean` option is skipped, and that is not an oversight.** kurier announces
+ * **A `boolean` option is skipped, and that is not an oversight.** lotse announces
  * `session.configOptions: {}` without the `boolean` capability (`gate.ts`), so an agent entitled to
  * believe it has promised no booleans — and the one agent measured (`opencode acp` 2.0.19) refuses a
  * tagged value outright. `projectConfigOptions` still projects them, because the `type` check belongs

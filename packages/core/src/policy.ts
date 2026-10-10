@@ -16,7 +16,7 @@
  *   silence.
  * - **Nothing is remembered here either.** A second identical request asks again, whatever the first
  *   answer was: this file holds no policy between calls. An `allow_always` answer is therefore a
- *   promise the *agent* keeps — it is the agent that decides not to ask again — and kurier asking a
+ *   promise the *agent* keeps — it is the agent that decides not to ask again — and lotse asking a
  *   second time is the fail-closed direction, never the dangerous one.
  * - **`y` picks the narrowest allow on offer, and the prompt says so.** Both `allow_once` and
  *   `allow_always` are choices the agent offered, so neither is filtered; but a single `y` typed into a
@@ -76,7 +76,7 @@ export function terminalGate(options: TerminalGateOptions): PermissionGate {
     if (allowing.length === 0) {
       // Nothing to allow. There is no decision to collect, so there is no way to say yes — and the
       // answer is the decline the agent offered, not `null`, so the agent learns *which* of its own
-      // options kurier picked. `null` is the last resort, for an agent that offered nothing rejecting.
+      // options lotse picked. `null` is the last resort, for an agent that offered nothing rejecting.
       terminal.write('  the agent offers no allowing option — declined\n');
       onDecision?.(declined);
       return declined;

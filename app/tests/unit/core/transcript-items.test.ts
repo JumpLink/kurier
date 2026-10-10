@@ -60,7 +60,7 @@ export default async () => {
       expect(thought.expanded).toBe(false);
       const tool = items[1];
       if (tool?.kind !== 'tool') throw new Error('expected a tool item');
-      // `null`, and this is the assertion that says so: kurier holds a tool call's title and status
+      // `null`, and this is the assertion that says so: lotse holds a tool call's title and status
       // and no payload (`toTranscript` keeps neither `rawInput` nor `rawOutput`), so a body could
       // only be the summary repeated, the agent's internal id and a raw timestamp.
       expect(tool.detail).toBeNull();

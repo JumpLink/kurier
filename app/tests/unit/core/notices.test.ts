@@ -41,7 +41,7 @@ export default async () => {
       expect('notices' in parsed && parsed.notices.seen[0]).toBe('bundled-agent');
     });
 
-    await it('leaves out an id this build does not know, so a newer kurier’s notice never breaks this one', async () => {
+    await it('leaves out an id this build does not know, so a newer lotse’s notice never breaks this one', async () => {
       const parsed = parseNotices('{"version":1,"seen":["bundled-agent","from-the-future"]}');
       expect('notices' in parsed && parsed.notices.seen.length).toBe(1);
     });

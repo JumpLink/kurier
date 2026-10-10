@@ -1,5 +1,5 @@
 /**
- * The bundled-agent catalog: what the validator refuses, and that the file kurier ships passes it.
+ * The bundled-agent catalog: what the validator refuses, and that the file lotse ships passes it.
  *
  * Every rejection case starts from one valid object and breaks exactly one thing, so a failure names the
  * rule rather than a fixture. Synthetic values only — the shipped file is the one real input, and it is
@@ -183,7 +183,7 @@ export default async () => {
           }
         });
 
-        await it(`${file} unpacks ${agent.id} where bundledProgram looks, before kurier's own module`, async () => {
+        await it(`${file} unpacks ${agent.id} where bundledProgram looks, before lotse's own module`, async () => {
           const index = modules.findIndex((entry) => entry['name'] === agent.id);
           expect(index >= 0).toBe(true);
           expect(index < modules.findIndex((entry) => entry['name'] === 'lotse')).toBe(true);

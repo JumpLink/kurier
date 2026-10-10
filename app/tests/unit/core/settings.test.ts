@@ -262,7 +262,7 @@ export default async () => {
   });
 
   await describe('the problem kind', async () => {
-    await it('a higher version number is newer-version, even with keys this kurier lacks', async () => {
+    await it('a higher version number is newer-version, even with keys this lotse lacks', async () => {
       expect(kindOf('{"version":2,"agent":null}')).toBe('newer-version');
       expect(kindOf('{"version":9,"theme":"dark"}')).toBe('newer-version');
       expect(kindOf('{"version":9,"token":"x"}')).toBe('newer-version');

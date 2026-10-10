@@ -6,7 +6,7 @@
  * which is the whole reason that file is vendored. But a hand-written copy of a schema drifts the
  * moment upstream moves, and drift here is silent: a renamed method becomes a runtime "method not
  * found" against a live agent, and a field that became required becomes an agent that ignores what
- * kurier sent. Both are found in production, not in the build.
+ * lotse sent. Both are found in production, not in the build.
  *
  * So this script reads the schema and checks the two things that actually break:
  *
@@ -214,7 +214,7 @@ for (const name of LOAD_BEARING) {
   }
   // The other direction, reported but not failed: a field the schema marks optional that the
   // interface requires is a client that rejects valid agents. That is worth knowing too, and it
-  // is a note rather than a failure because some fields are required *by kurier's own use* of
+  // is a note rather than a failure because some fields are required *by lotse's own use* of
   // them (e.g. `NewSessionRequest.cwd` is echoed into the session record).
   for (const field of ts.required) {
     // `type` is ACP's union discriminator — the schema declares it on the `anyOf` wrapper
@@ -250,7 +250,7 @@ function schemaOptional(spec, field) {
 
 // ─── 3. the agent→client direction ─────────────────────────────────────────────────────────
 //
-// Everything above checks what kurier SENDS. This part checks what an agent SENDS, which is where
+// Everything above checks what lotse SENDS. This part checks what an agent SENDS, which is where
 // the drift is more dangerous: the client→agent direction fails loudly (a `-32601` against a live
 // agent, in the first minute), while a wrongly-shaped inbound type fails silently — a capability
 // read as absent, an `authMethods` entry read as the wrong variant, a new `sessionUpdate` variant
@@ -258,7 +258,7 @@ function schemaOptional(spec, field) {
 //
 // That last one is not hypothetical. `SESSION_UPDATE_KINDS` in types.ts is a hand-maintained list of
 // the schema's `SessionUpdate.oneOf` discriminators. If upstream adds a variant and the list is not
-// extended, kurier keeps working — every new update goes to the wire listeners instead of the
+// extended, lotse keeps working — every new update goes to the wire listeners instead of the
 // typed ones, and nothing anywhere reports it.
 
 const TS_SOURCE = readFileSync(TYPES, 'utf8');
@@ -296,7 +296,7 @@ if (!tsKinds || schemaKinds.length === 0) {
   for (const kind of schemaKinds) {
     if (!tsKinds.has(kind)) {
       fail(
-        `the schema defines sessionUpdate "${kind}" and SESSION_UPDATE_KINDS does not — kurier ` +
+        `the schema defines sessionUpdate "${kind}" and SESSION_UPDATE_KINDS does not — lotse ` +
           'would route it to the wire listeners instead of the typed ones, with nothing reporting it',
       );
     }
@@ -310,7 +310,7 @@ if (!tsKinds || schemaKinds.length === 0) {
 }
 
 // Capability markers: the schema's `SessionCapabilities` is what `AcpClient` branches on, and a
-// missing marker in the TypeScript is a capability kurier silently believes no agent has.
+// missing marker in the TypeScript is a capability lotse silently believes no agent has.
 const SESSION_CAPABILITY_KEYS = Object.keys(defs['SessionCapabilities']?.properties ?? {}).filter(
   (key) => key !== '_meta',
 );
@@ -322,7 +322,7 @@ if (!tsCapabilities) {
     if (!tsCapabilities.required.has(key) && !tsCapabilities.optional.has(key)) {
       fail(
         `SessionCapabilities.${key} is a capability marker in the schema and absent from the ` +
-          'TypeScript — kurier would report the capability as unsupported for every agent',
+          'TypeScript — lotse would report the capability as unsupported for every agent',
       );
     }
   }
@@ -330,7 +330,7 @@ if (!tsCapabilities) {
 }
 
 // `authMethods` is trap 1 of the plan, and it is the one place where a wrong read changes what a
-// person has to do by hand: misreading it as a terminal method means kurier never runs the login,
+// person has to do by hand: misreading it as a terminal method means lotse never runs the login,
 // and the first session dies on `-32000`. So the union is checked structurally — both branches must
 // exist, and `AuthMethodInfo` must actually carry the fields the schema marks required.
 // The union arms are inline wrappers, not bare `$ref`s: each is `{ properties: { type: { const } },
@@ -389,7 +389,7 @@ const PAYLOAD_PRIMITIVES = {
 // asserted here rather than trusted:
 //
 // - both arms must exist in the schema and both must be named in `KNOWN_CONFIG_OPTION_TYPES`, so a
-//   new arm cannot appear without kurier deciding what to do with it;
+//   new arm cannot appear without lotse deciding what to do with it;
 // - the fields the schema marks required **on each arm** must be checked, because that is the
 //   information the flat type throws away.
 //
@@ -506,7 +506,7 @@ for (const type of schemaConfigTypes) {
   }
 }
 
-// Categories: both directions, because a name kurier invents and a name the schema drops are both
+// Categories: both directions, because a name lotse invents and a name the schema drops are both
 // drift, and only the second is visible by reading the schema.
 const schemaCategories = (defs['SessionConfigOptionCategory']?.anyOf ?? [])
   .map((entry) => entry?.const)

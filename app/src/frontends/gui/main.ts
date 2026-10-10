@@ -7,7 +7,7 @@
  * decided in here.
  *
  * **Its own bundle, not a subcommand of the CLI.** `import Gtk from '@girs/gtk-4.0'` becomes a
- * top-level `gi://Gtk` in the bundle, so folding this into `kurier.gjs.mjs` would make every
+ * top-level `gi://Gtk` in the bundle, so folding this into `lotse.gjs.mjs` would make every
  * `lotse sessions` in a terminal — including over SSH, where there is no display at all — load GTK
  * and libadwaita and die. Two entry points, one kernel. Verified by the build: `gi://Adw` and
  * `gi://Gtk` appear 0× in the CLI bundle and ≥1× in this one.
@@ -62,7 +62,7 @@ void Gtk;
 const hooks = readHooks();
 
 /**
- * The paths — and, on the first run after the rename, the move from the ones kurier wrote
+ * The paths — and, on the first run after the rename, the move from the ones lotse wrote
  * (`core/migrate.ts`). A note per directory that was not already in place, printed like the
  * settings notes below, because a person whose conversations just moved deserves to be told, and a
  * person whose move *failed* deserves to be told more.
@@ -97,7 +97,7 @@ const agent = chooseAgent(hooks.agent, () => {
   if (note) settingsNotes.push(note);
   if (!found || hooks.noAgent) {
     nothingFound = true;
-    console.log(`kurier: ${NO_AGENT_MESSAGE}`);
+    console.log(`lotse: ${NO_AGENT_MESSAGE}`);
     return null;
   }
   return found;
@@ -113,12 +113,12 @@ const emptyView = noAgent ? emptyStateView({ agent: null }) : null;
  */
 const noticesPath = paths.noticesFile;
 const noticesRead = readNotices(noticesPath);
-if (noticesRead.problem) console.log(`kurier: ${noticesRead.problem}`);
+if (noticesRead.problem) console.log(`lotse: ${noticesRead.problem}`);
 const notice = noAgent
   ? null
   : noticeView(hooks.notice === true ? 'bundled' : agent.source, noticesRead.notices.seen);
-for (const note of settingsNotes) console.log(`kurier: ${note}`);
-if (agent.note) console.log(`kurier: ${agent.note}`);
+for (const note of settingsNotes) console.log(`lotse: ${note}`);
+if (agent.note) console.log(`lotse: ${agent.note}`);
 
 const sandboxed = isSandboxed(currentSandboxFacts());
 
@@ -137,12 +137,12 @@ const status = await runAdwaitaApp({
     applicationIcon: APP_ID,
     developerName: 'JumpLink / Art+Code Studio',
     version: APP_VERSION,
-    website: 'https://github.com/JumpLink/kurier',
+    website: 'https://github.com/JumpLink/lotse',
     license: 'AGPL-3.0-or-later',
     comments:
       'An ACP client for GNOME: start a coding agent as a subprocess, watch it work, and answer ' +
       'the questions it asks. The agent brings its own model, its own tools and its own login — ' +
-      'kurier shows what it offers and asks before it acts. The same kernel as the command line.',
+      'lotse shows what it offers and asks before it acts. The same kernel as the command line.',
   },
   // The same read `lotse sessions` does, principal filter included: two surfaces listing different
   // sessions from one file would make one of them wrong, and nobody could say which.
@@ -160,7 +160,7 @@ const status = await runAdwaitaApp({
                 writeNotices(noticesPath, markSeen(readNotices(noticesPath).notices, id));
               } catch (error) {
                 console.log(
-                  `kurier: could not remember the notice — ${error instanceof Error ? error.message : String(error)}`,
+                  `lotse: could not remember the notice — ${error instanceof Error ? error.message : String(error)}`,
                 );
               }
             },

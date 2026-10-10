@@ -1,5 +1,5 @@
 /**
- * The session record — what a kurier session *is*.
+ * The session record — what a lotse session *is*.
  *
  * The design rule that shaped this file, taken from beifahrer's ADR 0006 ("recipes are data and
  * hold no gate") and restated for sessions: **a session is a scope, not a permission.** The record
@@ -12,7 +12,7 @@
  * TypeScript type cannot stop a later `{ ...session, grants: [...] }`. The canary is what makes
  * this type more than a comment.
  *
- * `boundTo` is optional **on purpose**: kurier has to run standalone, with no postbote anywhere
+ * `boundTo` is optional **on purpose**: lotse has to run standalone, with no postbote anywhere
  * near it. A messenger integration binds a session to a conversation later; a person at a terminal
  * does not. Nothing else changes.
  */
@@ -32,7 +32,7 @@ export type EntryKind = 'user' | 'agent' | 'thought' | 'tool' | 'system';
  * One line of the transcript.
  *
  * The transcript is a *record of what happened*, not a re-derivation of it: an agent's own
- * `session/load` is the authority on history, and kurier's copy exists so `lotse sessions` and
+ * `session/load` is the authority on history, and lotse's copy exists so `lotse sessions` and
  * `lotse resume` can show something without spawning a process. A transcript that claimed more
  * than that would be a second source of truth about someone else's conversation.
  */
@@ -55,7 +55,7 @@ export interface TranscriptEntry {
 export type AgentSource = 'host' | 'bundled';
 
 export interface SessionRecord {
-  /** The agent's own session id. Opaque; kurier stores it and hands it back, never parses it. */
+  /** The agent's own session id. Opaque; lotse stores it and hands it back, never parses it. */
   id: SessionId;
   /** Which adapter started the agent, e.g. `opencode`. */
   agent: string;
@@ -106,7 +106,7 @@ export function newSession(input: NewSession): SessionRecord {
     reattach: input.reattach ?? null,
     turns: [],
   };
-  // Left off the record when not given, so a record stays byte-identical to what older kurier wrote.
+  // Left off the record when not given, so a record stays byte-identical to what older lotse wrote.
   if (input.agentSource) record.agentSource = input.agentSource;
   assertScopeIsNotAuthority(record as unknown as Record<string, unknown>);
   return record;
@@ -147,7 +147,7 @@ export function forPrincipal(records: SessionRecord[], principal: Principal): Se
  *
  * "Opening answer" means the **whole run of leading agent turns**, not the first one. An agent's
  * reply arrives as `session/update` chunks and a stream boundary lands wherever the model happened
- * to emit — measured: a one-word answer split into `RESUME-` and `OK`, two turns, and a `kurier
+ * to emit — measured: a one-word answer split into `RESUME-` and `OK`, two turns, and a `lotse
  * sessions` row labelled `RESUME-`. Joining until the first user turn is what makes the label a
  * sentence rather than a fragment of one.
  */

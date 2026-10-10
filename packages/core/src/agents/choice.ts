@@ -5,7 +5,7 @@
  * different choices: they keep separate logins and histories (`agents/isolation.ts`). `detect.ts` and
  * `resolve.ts` take one as an argument, which is why it lives here rather than beside the settings
  * file; reading and writing `settings.json` is the app's job (`app/src/core/settings.ts`), and a host
- * that embeds kurier may have no such file at all.
+ * that embeds lotse may have no such file at all.
  */
 
 export type AgentChoiceSource = 'host' | 'bundled';

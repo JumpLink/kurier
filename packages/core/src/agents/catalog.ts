@@ -195,7 +195,7 @@ export function parseBundledCatalog(value: unknown): BundledCatalog {
   return { checked, agents };
 }
 
-/** The file kurier ships, validated once when this module loads. */
+/** The file lotse ships, validated once when this module loads. */
 export const BUNDLED_CATALOG: BundledCatalog = parseBundledCatalog(raw);
 
 export const BUNDLED_AGENTS: readonly BundledAgent[] = BUNDLED_CATALOG.agents;

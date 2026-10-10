@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=Kurier
+Name=Lotse
 Comment=Start coding agents as subprocesses and drive their sessions
 Exec=lotse-app
 Icon=eu.jumplink.Lotse

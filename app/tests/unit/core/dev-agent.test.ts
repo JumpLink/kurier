@@ -93,7 +93,7 @@ export default async () => {
     await it('resolves the stand-in and says where it came from', async () => {
       const choice = chooseAgent(STAND_IN_AGENT_ID);
       expect(choice.command.id).toBe(STAND_IN_AGENT_ID);
-      // The note is what stops a screenshot of a fixture run from looking like a screenshot of kurier.
+      // The note is what stops a screenshot of a fixture run from looking like a screenshot of lotse.
       expect(choice.note).toContain('scripts/stand-in-agent.mjs');
     });
 

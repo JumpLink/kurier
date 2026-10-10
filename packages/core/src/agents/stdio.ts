@@ -47,12 +47,12 @@ export interface AgentCommand {
    */
   readonly cwd?: string;
   /**
-   * Extra environment for the agent. Never credentials — kurier has nowhere safe to put them in
+   * Extra environment for the agent. Never credentials — lotse has nowhere safe to put them in
    * Scheibe 1, and a token in here would land in a session record's process listing.
    */
   readonly env?: Record<string, string>;
   /**
-   * This is the copy shipped inside the build, under `/app/extra`. It runs where kurier runs — the
+   * This is the copy shipped inside the build, under `/app/extra`. It runs where lotse runs — the
    * sandbox — so `toHostCommand` leaves it alone: the host cannot see that path.
    */
   readonly bundled?: true;
@@ -60,7 +60,7 @@ export interface AgentCommand {
 
 export interface StdioChannelOptions {
   command: AgentCommand;
-  /** Lines the agent writes to stderr. ACP says stderr is for logs; kurier never parses it. */
+  /** Lines the agent writes to stderr. ACP says stderr is for logs; lotse never parses it. */
   /** One line at a time, from the agent's stderr. Delivered, never interpreted. */
   onStderr?: (line: string) => void;
   /** How long the process gets between `SIGTERM` and `SIGKILL`. */
@@ -266,7 +266,7 @@ export class StdioChannel implements RawChannel {
    * Its own session also means the terminal's signals stop reaching the agent. For Ctrl-C that is
    * the point: `interrupt.ts` decides between `session/cancel` and a close, and a SIGINT that also
    * hit the agent's group killed it mid-turn before the cancel could land. A closed terminal's
-   * SIGHUP no longer reaches it either; kurier dies of it, the agent's stdin hits EOF, and an ACP
+   * SIGHUP no longer reaches it either; lotse dies of it, the agent's stdin hits EOF, and an ACP
    * agent ends on that.
    */
   #signal(signal: NodeJS.Signals): void {
@@ -379,7 +379,7 @@ export function needsWindowsShell(program: string, platform: NodeJS.Platform = p
  *
  * **Three answers, in order, and the order is the point.** A program named by path is the person's
  * own answer and is only ever checked here. Failing that, the sandbox's own PATH is walked (pure,
- * fast, and right for a desktop install). Only if that finds nothing AND kurier is inside a Flatpak
+ * fast, and right for a desktop install). Only if that finds nothing AND lotse is inside a Flatpak
  * is the host asked, because then the sandbox's PATH is the wrong PATH: the agent is a host program
  * and the host's shell is the only thing that can say where it is. See `sandbox.ts`.
  *
@@ -523,7 +523,7 @@ export function parseHostProbeOutput(stdout: string): string | null {
     .pop();
   // **Only an absolute path counts.** `command -v` also answers for an alias, a function, a keyword
   // and a builtin — and those print their own name, e.g. bare `opencode` for an alias, which is
-  // emphatically not something `spawn` can execute. kurier spawns a program, so anything that is not
+  // emphatically not something `spawn` can execute. lotse spawns a program, so anything that is not
   // a path is "not installed" as far as this table is concerned.
   return found !== undefined && probeAccepts(found) ? found : null;
 }
@@ -533,7 +533,7 @@ export function parseHostProbeOutput(stdout: string): string | null {
  *
  * **Only an absolute path.** `command -v` also answers for an alias, a function, a keyword and a
  * builtin, and each of those prints its own NAME — bare `opencode` for an alias, which is not
- * something `spawn` can execute. kurier spawns a *program*, so anything that is not a path is "not
+ * something `spawn` can execute. lotse spawns a *program*, so anything that is not a path is "not
  * installed" as far as this table is concerned; reporting it otherwise would put a name in a
  * `lotse agents` STATE column that would fail the moment somebody acted on it.
  *

@@ -96,7 +96,7 @@ export default async function failure(): Promise<void> {
 
     await it('does not classify by wording — an agent’s own text cannot claim to be a failure kind', async () => {
       // The whole reason the rule is "match the type": an agent is free to put any words in an error,
-      // including the words kurier uses for its own sentences.
+      // including the words lotse uses for its own sentences.
       expect(failureKind(new Error('session/load failed: run `lotse auth`'), { promptSent: false })).toBe(
         'start',
       );
@@ -111,9 +111,9 @@ export default async function failure(): Promise<void> {
     });
   });
 
-  // Issue #2: https://github.com/JumpLink/kurier/issues/2 — `opencode/fledge-alpha-free` is geo-blocked
+  // Issue #2: https://github.com/JumpLink/lotse/issues/2 — `opencode/fledge-alpha-free` is geo-blocked
   // from Germany, and opencode answers a provider 403 on `session/prompt` with the *same* -32000 it
-  // answers the real login trap with. kurier used to show the auth dialog on that path, naming
+  // answers the real login trap with. lotse used to show the auth dialog on that path, naming
   // `lotse auth`, which does not help anybody. What separates them is that a prompt had gone out.
   await describe('failure — the same -32000 after a prompt was sent', async () => {
     await it('is the model, not the login trap, when a prompt has gone out', async () => {
@@ -213,7 +213,7 @@ export default async function failure(): Promise<void> {
       }
     });
 
-    await it('carries no agent text and no markup — the copy is kurier’s own', async () => {
+    await it('carries no agent text and no markup — the copy is lotse’s own', async () => {
       for (const kind of ['auth', 'model', 'unsupported'] as const) {
         const notice = failureNotice(kind);
         expect(notice?.heading).not.toContain('<');
