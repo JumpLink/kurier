@@ -354,7 +354,9 @@ export class Composer {
     // **On screen, not only on hover.** A reason nobody can see is a reason the surface has not given.
     // The reason wins over the status: they never both have anything to say (`composerView` returns a
     // reason only where the button is off), and a disabled control is the more urgent of the two.
-    this.#status.label = view.reason || view.status;
+    // The exception is a reason the page above already states (`reasonOnPage`): the tooltip and the
+    // accessible name keep it, the line stays silent.
+    this.#status.label = (view.reasonOnPage ? '' : view.reason) || view.status;
     // With nothing to explain, the line takes no height: an empty caption under the composer is a gap
     // that reads as a layout bug.
     this.#status.visible = this.#status.label !== '';

@@ -193,6 +193,13 @@ export default async () => {
         expect(view.reason.length).toBeGreaterThan(0);
       });
 
+      await it('keeps the reason for tooltips but leaves it off the page, which already says it', async () => {
+        const view = composerView(at('idle', ATTACHED, null));
+        expect(view.reason.length).toBeGreaterThan(0);
+        expect(view.reasonOnPage).toBe(true);
+        expect(composerView(at('idle', NOTHING)).reasonOnPage).toBe(undefined);
+      });
+
       await it('lets a person type anyway — the text is kept for when a session is chosen', async () => {
         expect(composerView(at('idle', ATTACHED, null)).entryEditable).toBe(true);
       });

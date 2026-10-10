@@ -68,6 +68,11 @@ export interface ComposerView {
   readonly entryEditable: boolean;
   /** Why the button is off, or why the entry is off. Shown on screen, not only as a tooltip. */
   readonly reason: string;
+  /**
+   * `reason` stays in tooltips and the accessible name but is not drawn under the entry. Set where the
+   * page above the composer already says the same thing, so the sentence is not shown twice.
+   */
+  readonly reasonOnPage?: true;
   /** What is happening, when `reason` has nothing to say. Empty where there is nothing to report. */
   readonly status: string;
 }
@@ -146,6 +151,8 @@ export function composerView(input: ComposerInput): ComposerView {
       buttonEnabled: false,
       entryEditable: true,
       reason: NO_SESSION_OPEN,
+      // The empty state above the composer already says to pick or start a chat.
+      reasonOnPage: true,
       status: '',
     };
   }
