@@ -15,7 +15,7 @@
 > stderr buffer is not flushed on exit", and the flush was there. The real defect is one level up: the
 > channel ended as soon as **stdout** closed, so a last stderr line still in flight arrived *after*
 > the end — measured `stdout, END, late-err` on gjs and node alike. Fixed in
-> [fix/stdio-stderr-gate](../../pull/1) with a test that fails without it.
+> [fix/stdio-stderr-gate](../../pull/6) with a test that fails without it.
 >
 > **And one defect this review did not look for, found while fixing that one.** `StdioChannel
 > .terminate()` cannot end the channel when the agent leaves a child process holding its pipes:
@@ -29,6 +29,33 @@
 > Three comment claims about `@gjsify/child_process`'s `close`/`exit` ordering were also stale: they
 > described 0.53.x, and 0.54.0 waits for the pipes. That wrong claim is what made the end-gating look
 > unfixable, and it is what the abandoned `wip/stdio-close-gate` branch was built on.
+>
+> **Per finding, re-checked against `main` on 2026-10-10.** "Core" marks what blocks or shapes the
+> `@kurier/core` extraction.
+>
+> | #   | Finding                                          | Status                                                     | Core |
+> | --- | ------------------------------------------------ | ---------------------------------------------------------- | ---- |
+> | 1   | `send` ignores stdin backpressure                | open — no `drain` anywhere                                 | yes  |
+> | 2   | stderr not flushed on exit                       | fixed (really end-gating, PR #6)                           |      |
+> | 3   | `resume` appends by spread                       | fixed — uses `store.append`                                |      |
+> | 4   | overflow loses the excerpt                       | fixed                                                      |      |
+> | 5   | gate throw becomes "cancelled"                   | fixed — fail-closed, reported via `#reportError`           |      |
+> | 6   | `runTurn` SIGINT on a non-TTY                    | fixed — moved to `core/interrupt.ts`                       |      |
+> | 7   | `runInteractively` spawn failure vs exit code    | mostly mitigated — `which` precheck, no ENOENT branch      |      |
+> | 8   | duplicated gate construction                     | fixed                                                      |      |
+> | 9   | `AuthCapabilities`/`LogoutCapabilities` unused   | partly — logout now used by `client.logout`                |      |
+> | 10  | transcript drops two `session/update` kinds      | by design — commented                                      |      |
+> | 11  | auth classification in `run.ts`                  | open — `describeAuth` still app-side                       | yes  |
+> | 12  | auth flow duplicated in the CLI                  | open                                                       | yes  |
+> | 13  | check-schema misses auth/capability shapes       | partly — `AuthMethodInfo`, `SessionCapabilities` checked   |      |
+> | 14  | `session/update` variants unchecked              | fixed                                                      |      |
+> | 15  | TS-stricter fields only noted                    | open                                                       |      |
+> | 16  | "kurier never parses" stderr comment             | partly — new line added, old one still duplicated above it |      |
+> | 17  | `AuthMethodInfo.kind` "a guess"                  | open                                                       |      |
+> | 18  | `#send` throws, `#write` closes                  | open — asymmetry undocumented                              | yes  |
+> | 19  | `ClosedTransport.onClose` fires in a microtask   | open                                                       | yes  |
+> | —   | `terminate()` with a grandchild holding the pipe | open — no `setsid`/group kill                              | yes  |
+> | —   | check-schema in CI                               | fixed — `ci.yml` runs it                                   |      |
 
 Most severe first. Each finding follows the requested format.
 
