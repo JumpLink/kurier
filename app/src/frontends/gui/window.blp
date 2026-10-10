@@ -79,10 +79,11 @@ template $KurierMainWindow: Adw.ApplicationWindow {
         // whether the bar reads as part of the pane or as a floating panel: `FLAT` (the default,
         // and what the sidebar's own `Adw.ToolbarView` uses) draws nothing under it, so the
         // composer's rounded frame would sit directly on the transcript's own background with no
-        // separation at all. `RAISED_BORDER` gives an opaque background plus a persistent border,
-        // which is the one shape that reads correctly in both light and dark without a shadow that
-        // then has to be explained.
-        bottom-bar-style: raised-border;
+        // separation at all. `RAISED` gives an opaque background plus a persistent border, the one
+        // shape that reads correctly in both light and dark without a shadow that then has to be
+        // explained. (`RAISED_BORDER` was that shape's name until a newer libadwaita dropped the
+        // member; `raised` is what its typelibs still understand.)
+        bottom-bar-style: raised;
         [top]
         // `show-title: false`, and **that is not cosmetic.** An `Adw.HeaderBar` inside an
         // `Adw.NavigationPage` shows that page's title, so naming this page up front printed the
