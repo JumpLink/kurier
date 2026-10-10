@@ -313,35 +313,12 @@ question. Both runtimes, as in postbote and beifahrer:
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.
 
-> **A green `gjsify test` meant "the last build is green", not "the source is green" — on every gjsify
-> before 0.53.0.** Measured here: editing `packages/session/src/model.ts` and re-running left
-> `app/dist/test.*.mjs` untouched (mtime unchanged) and printed **136 tests passed** for code that no
-> longer existed. Touching the entry, `app/tests/test.mts`, forced the rebuild. The cause was scope,
-> not staleness arithmetic: `packageBuildInputs` walks the package directory, and a workspace sibling
-> is reached only through a `node_modules` symlink pointing **outside** it. CI never saw it — a fresh
-> container has no `dist/`, so it always built, which is why the trap survived the whole 0.5x series
-> and then needed an `rm -rf` here after every source edit.
->
-> **0.53.0 carries the fix** (gjsify [#1896](https://github.com/gjsify/gjsify/pull/1896),
-> [#1905](https://github.com/gjsify/gjsify/issues/1905)): the build records what it actually READ into
-> `<outfile>.inputs.json` beside the bundle, from the bundler's own module graph. Re-verified here on
-> the release rather than on a checkout — `app/dist/test.gjs.mjs.inputs.json` lists
-> `packages/acp/src/*.ts` and `packages/session/src/*.ts` by exact path, and appending a line to
-> `packages/session/src/model.ts` moved the bundle's mtime with no `rm -rf`. **The failure mode is a
-> green run, which is the one thing a test suite cannot report about itself**, so that measurement is
-> worth repeating whenever the toolchain moves; treat a suspiciously fast green as this, not as a win.
->
-> **The same family, one level over: a regression test that passes on the code it was meant to fix.**
-> A test that cannot fail without its fix is decoration, not a guard — and the most expensive green,
-> because it reads as one. **Run a fix's new test against the unfixed code first**; the failure is the
-> only evidence it is testing. Worked example, and the test shape that exposed it:
-> [the 2026-09-30 review](docs/reviews/2026-09-30-code-review-findings.md).
->
-> One trap survives, and it is the same family: **the `gjsify` on `PATH` is the one that decides.** A
-> global install in `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`,
-> so a run that looks like it used the pinned toolchain was a released CLI — and it happily reports a
-> test result for a bundle from an earlier run. `./node_modules/.bin/gjsify …` whenever the version
-> matters, which under the freshness rule means always.
+**Freshness: a green run can be the wrong bundle.** Before gjsify 0.53.0 a green `gjsify test` tested
+the last build, not the source; 0.53.0 fixed it with `<outfile>.inputs.json`, and the measurement is
+worth repeating whenever the toolchain moves — treat a suspiciously fast green as this, not as a win.
+**Run a fix's new test against the unfixed code first**: a test that cannot fail without its fix is
+decoration. And **the `gjsify` on `PATH` decides**: a global install wins over
+`node_modules/.bin/gjsify`. The incidents: [docs/toolchain-traps.md](docs/toolchain-traps.md).
 
 `refs/acp/schema.v1.json` is the normative artifact `packages/acp`'s types are written against,
 refreshed by `./scripts/update-acp-schema`. `scripts/check-schema.mjs` fails the build when the
@@ -406,23 +383,15 @@ Full details, including the placeholder icons and the build inputs: [data/README
 
 > **In a gjsify project you import `node:child_process` — not `@gjsify/child_process`.**
 
-Measuring the GJS chain failed twice: under Node `ERR_UNSUPPORTED_ESM_URL_SCHEME: gi:`, under GJS
-`Module not found`. Both were the same error — the **package** specifier instead of the **module**
-specifier. The bundler is the resolution path: `gjsify build` → `gjsify run` is the chain. **Not a
-gjsify bug**: `@gjsify/child_process` carries `runtimes.node: "none"` because there would be
-nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite against the real
-`node:child_process`, not a Node port.
+Not a gjsify bug: the package specifier bypasses the bundler's resolution. The two failures that
+looked like two bugs: [docs/toolchain-traps.md](docs/toolchain-traps.md#nodechild_process-not-gjsifychild_process).
 
 ## Conventions
 
 - `gjsify install` — never `npm install`, it prunes gjsify deps.
 - All `@gjsify/*` packages pinned to the **same exact version** (0.54.0 here). gjsify ships as one
-  release train; a CLI ↔ libs skew produces silently broken bundles. One is absent: `@gjsify/napi`,
-  which nothing in kurier imports — its rewrite only fires for a compiled `.node` addon inside a
-  bundle, and every addon in this tree is build-time tooling that runs under Node. It was also
-  unpublishable through 0.53.0 (`packages/napi/**` is not a workspace member — its release leg builds
-  a meson prebuild per platform first, and the 0.53.0 tarball never landed); 0.54.0 publishes it
-  again, so the pin can come back if a build ever does carry an addon.
+  release train; a CLI ↔ libs skew produces silently broken bundles. `@gjsify/napi` is absent on
+  purpose: [docs/toolchain-traps.md](docs/toolchain-traps.md#why-gjsifynapi-is-not-pinned).
 - `gjsify foreach -A check` (the `-A` includes `private: true` workspaces), `gjsify workspace
   <name> <script>` for one — **no `run` keyword**.
 - **`./node_modules/.bin/gjsify`, not the `gjsify` on `PATH`**, whenever the toolchain version
