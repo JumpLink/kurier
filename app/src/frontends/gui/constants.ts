@@ -88,20 +88,9 @@ export const WINDOW_MIN_WIDTH_PX = 360;
 export const COLLAPSE_WIDTH_PX = 720;
 
 /**
- * The content's maximum line width, in logical pixels — the conversation's measure.
- *
- * **One number, shared by the transcript and the composer, and that is the whole reason it lives
- * here.** Plan §3 asks for "maximum line width" as a property of the content pane, and the composer is
- * the same column seen from the other end: the entry you type in and the answer above it are one
- * measure, and a cursor at 720 px under a paragraph that wraps at 700 px reads as two different
- * surfaces. Two constants that happen to be equal is a coincidence that survives exactly until
- * somebody changes one of them, so there is one.
- *
- * The plan's number (720) coincides with `COLLAPSE_WIDTH_PX` and **that is a coincidence**: one caps
- * a measure, the other collapses a sidebar. They are separate constants for that reason.
- *
- * Delivered by `Adw.Clamp`, which troedler measured as the only thing in this toolkit that caps a
- * natural width *without* also ellipsizing (`Adw.Clamp`'s own docs put it in the middle of the
- * family: a plain `max-width` is not a GTK4 CSS property at all and the stylesheet still loads).
+ * The conversation's measure is `CONTENT_MAX_WIDTH_PX` in `@kurier/widget`, not a constant of this
+ * file: it caps the transcript and the composer, which are the widget's, while the 720 above
+ * collapses this window's sidebar. The two were always separate decisions that happened to be equal
+ * — now they are also in separate packages, which is what keeps a host from changing one and getting
+ * the other.
  */
-export const CONTENT_MAX_WIDTH_PX = 720;

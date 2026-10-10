@@ -2,7 +2,6 @@
 // Regenerate with `gjsify blueprint types`; `scripts/check-blueprint-sidecars.mjs` holds it.
 
 import type Adw from 'gi://Adw?version=1';
-import type Gtk from 'gi://Gtk?version=4.0';
 
 /** The GtkBuilder XML this `.blp` compiles to. */
 declare const xml: string;
@@ -27,19 +26,9 @@ export declare const InternalChildren: [
     'sidebarHost',
     'sidebarTitle',
     'contentPage',
-    'contentStack',
-    'noAgentPage',
-    'noAgentBody',
-    'noAgentCommands',
-    'noAgentCommand',
-    'noAgentCopy',
-    'noAgentDocs',
-    'noAgentPreferences',
-    'transcriptHost',
+    'chatHost',
     'contentHeader',
     'noticeBanner',
-    'composerHost',
-    'cwdCaption',
 ];
 
 /** The `_`-prefixed members GJS installs for them. Merge it into the class interface. */
@@ -49,17 +38,7 @@ export interface Children {
     _sidebarHost: Adw.Bin;
     _sidebarTitle: Adw.WindowTitle;
     _contentPage: Adw.NavigationPage;
-    _contentStack: Gtk.Stack;
-    _noAgentPage: Adw.StatusPage;
-    _noAgentBody: Gtk.Label;
-    _noAgentCommands: Gtk.Box;
-    _noAgentCommand: Gtk.Label;
-    _noAgentCopy: Gtk.Button;
-    _noAgentDocs: Gtk.LinkButton;
-    _noAgentPreferences: Gtk.Button;
-    _transcriptHost: Adw.Bin;
+    _chatHost: Adw.Bin;
     _contentHeader: Adw.HeaderBar;
     _noticeBanner: Adw.Banner;
-    _composerHost: Adw.Bin;
-    _cwdCaption: Gtk.Label;
 }
