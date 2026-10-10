@@ -11,8 +11,9 @@ export default async () => {
       expect(line.status?.label).toBe('Done');
       expect(line.status?.tone).toBe('done');
     });
-    await it('gives a status-only line a generic title', async () => {
-      expect(parseToolLine('— failed').title).toBe('Tool call');
+    await it('leaves a status-only line untitled', async () => {
+      // No title rather than an invented one: the caller draws a status caption instead of a card.
+      expect(parseToolLine('— failed').title).toBe('');
       expect(parseToolLine('— failed').status?.tone).toBe('failed');
     });
     await it('leaves a line without a known status whole', async () => {

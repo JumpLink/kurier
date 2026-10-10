@@ -59,7 +59,7 @@ import {
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
-import { parseToolLine, toolIcon } from './tool-line.ts';
+import { parseToolLine, toolIcon, type ToolLine } from './tool-line.ts';
 
 /**
  * The conversation's measure is `CONTENT_MAX_WIDTH_PX`, not a constant of this file.
@@ -532,8 +532,12 @@ function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
       // Proportional and dim: the body of a thought is commentary on the answer, and a command is
       // not prose. See `.kurier-thought` and the `monospace` name class.
       return buildDisclosure('dialog-information-symbolic', item, CSS.thought);
-    case 'tool':
-      return item.detail === null ? buildToolCard(item.summary) : buildDisclosure('system-run-symbolic', item, CSS.mono);
+    case 'tool': {
+      // A payload is what the disclosure opens onto, so a line without one is not a disclosure.
+      if (item.detail !== null) return buildDisclosure('system-run-symbolic', item, CSS.mono);
+      const line = parseToolLine(item.summary);
+      return line.title === '' ? buildToolStatus(line.status) : buildToolCard(line);
+    }
     case 'system':
       return buildNote(item.text);
   }
@@ -582,8 +586,7 @@ function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Wid
  *
  * A line with no recognisable status gets no capsule rather than an invented one.
  */
-function buildToolCard(summary: string): Gtk.Widget {
-  const line = parseToolLine(summary);
+function buildToolCard(line: ToolLine): Gtk.Widget {
   const card = new Gtk.Box({
     orientation: Gtk.Orientation.HORIZONTAL,
     spacing: 8,
@@ -593,18 +596,36 @@ function buildToolCard(summary: string): Gtk.Widget {
   const title = buildLabel({ text: line.title, xalign: 0, cssClasses: ['heading'] });
   title.set_hexpand(true);
   card.append(title);
-  if (line.status !== null) {
-    const tone = { running: 'accent', done: 'success', failed: 'error' }[line.status.tone];
-    card.append(
-      new Gtk.Label({
-        label: line.status.label,
-        useMarkup: false,
-        valign: Gtk.Align.CENTER,
-        cssClasses: [CSS.pill, tone],
-      }),
-    );
-  }
+  if (line.status !== null) card.append(buildTonePill(line.status));
   return card;
+}
+
+/**
+ * A tool line that carries a status and no title — the second half of one call.
+ *
+ * It is a caption rather than a card because there is nothing to name: a card here would need a
+ * heading the agent never sent, and the line belongs to the call above it anyway.
+ */
+function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
+  const row = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
+  row.append(new Gtk.Image({ iconName: 'system-run-symbolic', pixelSize: 14, cssClasses: [CSS.dim] }));
+  row.append(
+    status === null
+      ? buildLabel({ text: 'Tool call', xalign: 0, cssClasses: [CSS.dim, 'caption'] })
+      : buildTonePill(status),
+  );
+  return row;
+}
+
+/** A status word in its tone's capsule, on a label (Adwaita's `pill` is a button shape). */
+function buildTonePill(status: NonNullable<ToolLine['status']>): Gtk.Label {
+  const tone = { running: 'accent', done: 'success', failed: 'error' }[status.tone];
+  return new Gtk.Label({
+    label: status.label,
+    useMarkup: false,
+    valign: Gtk.Align.CENTER,
+    cssClasses: [CSS.pill, tone],
+  });
 }
 
 /**

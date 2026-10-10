@@ -10,6 +10,13 @@
 export type ToolStatus = 'running' | 'done' | 'failed';
 
 export interface ToolLine {
+  /**
+   * The title the agent sent, or `''` when this line carries only a status.
+   *
+   * A `tool_call_update` may arrive with a status and no title (`core/transcript.ts` writes
+   * `"— completed"`), and that is a real shape rather than a malformed line. It stays empty here: a
+   * heading invented here ("Tool call") would put a name on the agent that the agent never sent.
+   */
   readonly title: string;
   readonly status: { readonly label: string; readonly tone: ToolStatus } | null;
 }
@@ -21,14 +28,11 @@ const STATUSES: Record<string, { label: string; tone: ToolStatus }> = {
   failed: { label: 'Failed', tone: 'failed' },
 };
 
-/** A status-only update has no title; the card still needs a heading. */
-const UNTITLED = 'Tool call';
-
 export function parseToolLine(summary: string): ToolLine {
   const match = /^(.*?)\s*— (\w+)$/su.exec(summary.trim());
   const status = match?.[2] ? STATUSES[match[2]] : undefined;
-  if (!match || !status) return { title: summary.trim() || UNTITLED, status: null };
-  return { title: match[1]?.trim() || UNTITLED, status };
+  if (!match || !status) return { title: summary.trim(), status: null };
+  return { title: match[1]?.trim() ?? '', status };
 }
 
 /** Icon names checked against the Adwaita theme with `scripts/probes/icon-names.mjs`. */
