@@ -89,6 +89,9 @@ one widget and passing which agent, which directory and which MCP servers to use
 between them is drawn in [ADR 0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) and studied in
 [docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
 
+To embed the chat in your own app, start with the [host guide](docs/embedding.md); the API is documented in
+[`@kurier/widget`](packages/widget/README.md) and [`@kurier/core`](packages/core/README.md).
+
 Design decisions are in [docs/adr/](docs/adr/README.md). The GUI's look and screenshots of every
 state are in [docs/design/](docs/design/README.md).
 
