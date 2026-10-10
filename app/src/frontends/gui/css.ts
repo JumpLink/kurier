@@ -155,17 +155,22 @@ export const APP_CSS = `
   opacity: 0.72;
 }
 
-/* The composer's frame. The same three properties \`.kurier-bubble\` already proves — background,
-   radius, padding — and for the same reason: it is an inset surface for text, and the toolkit has no
-   name for one. Deliberately NOT \`.kurier-bubble-agent\`'s alpha: the entry is not a message anybody
-   said yet, so it gets the agent bubble's step-away-from-the-window treatment rather than the accent,
-   which belongs to what the person actually said.
-   No \`border\` here — a border on a box that already differs from the window in lightness is the
-   Adwaita-1 \`frame\`-style double edge, and at a 480 px window it reads as a rule across the pane. */
+/* The composer's card, and this rule is deliberately only the two things Adwaita's \`card\` does not
+   decide. The background, the shadow and both colour schemes come from \`card\` itself (the widget
+   carries both classes, see \`composer.ts\`), where the first version of this rule wrote out an
+   \`alpha(@window_fg_color, …)\` of its own — a second opinion about a surface the theme already
+   names, and one that went flat against the raised bottom bar it sat on.
+
+   The radius is wider than \`card\`'s 12 px because this card is the composer's whole footprint, and a
+   tall surface at a small radius reads as a dialog. It matches \`.kurier-bubble\`, which is the other
+   thing in this window shaped like a message.
+
+   The margin is what makes it *float*: the bottom bar is \`flat\` now (\`window.blp\`), so nothing is
+   drawn behind this and the gap is the window's own background. Bottom larger than top, because
+   below it there is only the window edge while above it there is the transcript's own margin. */
 .kurier-composer-frame {
-  background-color: alpha(@window_fg_color, 0.07);
-  border-radius: 12px;
-  margin: 6px 12px;
+  border-radius: 18px;
+  margin: 6px 12px 12px 12px;
 }
 
 /* The entry itself. Nothing visual: the frame is the surface and the text needs no class of its own,
@@ -193,8 +198,11 @@ export const APP_CSS = `
      logical margins in CSS, and the parser rejects them with "No property named …" **while still
      loading the rest of the stylesheet** — so the sheet works and the warning is easy to miss. Both
      logical names were measured as a warning on GTK 4.22.5. */
-  margin-left: 18px;
-  margin-right: 18px;
+  /* 14px lines the caption up with the entry's first character: the composer's row is inset 6 px
+     inside the card and the \`Gtk.TextView\` adds 8 px of its own text margin. A number that does not
+     add up to those two is a caption that hangs under nothing. */
+  margin-left: 14px;
+  margin-right: 14px;
 }
 /* The config row's control. Nothing visual either — this is a marker like \`.kurier-composer-entry\`,
    so the row's dropdowns can be found by class rather than by walking the tree. It exists because a

@@ -74,16 +74,19 @@ template $KurierMainWindow: Adw.ApplicationWindow {
     content: Adw.NavigationPage contentPage {
       child: Adw.ToolbarView {
         vexpand: true;
-        // **The composer is the bottom bar, and `RAISED_BORDER` is a measured choice.** Plan §7
-        // step 4 puts it here and §3 draws it under the conversation. The style is what decides
-        // whether the bar reads as part of the pane or as a floating panel: `FLAT` (the default,
-        // and what the sidebar's own `Adw.ToolbarView` uses) draws nothing under it, so the
-        // composer's rounded frame would sit directly on the transcript's own background with no
-        // separation at all. `RAISED` gives an opaque background plus a persistent border, the one
-        // shape that reads correctly in both light and dark without a shadow that then has to be
-        // explained. (`RAISED_BORDER` was that shape's name until a newer libadwaita dropped the
-        // member; `raised` is what its typelibs still understand.)
-        bottom-bar-style: raised;
+        // **The composer is the bottom bar, and `flat` is what lets it float.** Plan §7 step 4 puts
+        // it here and §3 draws it under the conversation. The style decides whether the bar reads as
+        // a strip welded to the window or as one object sitting in the pane, and the answer changed
+        // when the composer's frame became an Adwaita `card`: `raised` draws its own opaque
+        // background plus a persistent border *behind* that card, so there were two surfaces — a
+        // full-width band with a rounded box floating inside it, and a rule across the pane marking
+        // the band's top edge. `flat` draws nothing, so the card's own shadow is the only separation
+        // and the gap around it is the window's background, in both colour schemes.
+        //
+        // What `raised` was solving is still real and is solved in `css.ts` instead: a frame with no
+        // surface of its own would sit invisibly on the transcript's background. `card` is that
+        // surface, named by the theme rather than by us.
+        bottom-bar-style: flat;
         [top]
         // `show-title: false`, and **that is not cosmetic.** An `Adw.HeaderBar` inside an
         // `Adw.NavigationPage` shows that page's title, so naming this page up front printed the

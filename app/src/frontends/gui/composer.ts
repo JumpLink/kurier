@@ -15,10 +15,13 @@
  * unconstrained box asks for its whole natural height — a hundred-line paste would push the transcript
  * and the header bar off the window.
  *
- * **The rounded frame is a `Gtk.Box` with a class, not a `Gtk.Frame`.** `GtkFrame` draws a border and a
- * title gap and nothing in Adwaita turns it into the rounded surface this needs; a box with
- * `background-color` + `border-radius` is what `.kurier-bubble` already is in this window, so the
- * composer reads as the same kind of object as a message instead of a form field.
+ * **The rounded frame is a `Gtk.Box` with Adwaita's `card` plus one class of our own, not a
+ * `Gtk.Frame`.** `GtkFrame` draws a border and a title gap and nothing in Adwaita turns it into the
+ * rounded surface this needs. `card` is the toolkit's own name for an inset surface and brings the
+ * background, the shadow and both colour schemes with it; `.kurier-composer-frame` only widens the
+ * radius and sets the margins that lift the card off the window's edges. Together with the bottom
+ * bar's `flat` style (`window.blp`) that is what makes the composer read as one object floating in
+ * the pane rather than as a strip welded to the bottom of the window.
  *
  * **Nothing here is markup, and that is structural rather than a flag.** The Send button's label is
  * our own word. The entry is a `Gtk.TextView`, which has no markup rendering at all — there is no
@@ -36,8 +39,12 @@
  *
  * **The button is one widget whose content is swapped, never two widgets shown and hidden.** Two
  * buttons in one spot means two tab stops, two tooltips and a `Gtk.Stack` to keep in step with the
- * turn state. `composerView` returns one action and `Adw.ButtonContent` is re-filled with that one's
- * icon and label.
+ * turn state. `composerView` returns one action and the button's own `iconName` is set from it.
+ *
+ * **It is icon-only and circular, so the word it dropped lives in the tooltip and the accessible
+ * name.** Those two were always set from `composerView`'s reason; what changed is that they are now
+ * the *only* place the action is named, which is why `#render` falls back to `SEND_LABEL`/`STOP_LABEL`
+ * rather than ever assigning an empty string to either.
  *
  * **Two lines under the entry, and only one of them is ever visible at a time.** `ComposerView.reason`
  * explains a *disabled* control and is therefore empty exactly when the button works; `ComposerView.status`
@@ -61,15 +68,21 @@ import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
 /**
- * The Send icon. **`send-symbolic` does not exist** — checked with `Gtk.IconTheme.has_icon` and
- * recorded in `scripts/probes/icon-names.mjs`, alongside the two that do: `mail-send-symbolic` (used
- * here — a paper plane, which is what sending is) and `process-stop-symbolic` (used for Stop).
+ * The Send icon. **`send-symbolic` and `arrow-up-symbolic` do not exist** — both checked with
+ * `Gtk.IconTheme.has_icon` and recorded in `scripts/probes/icon-names.mjs`, alongside the names that
+ * do: `go-up-symbolic` (used here), `mail-send-symbolic` and `process-stop-symbolic` (used for Stop).
+ *
+ * **An arrow rather than the paper plane, because the button is now a circle with nothing else in
+ * it.** `mail-send-symbolic` is an envelope-and-arrow, which at 16 px inside a 34 px disc is a shape
+ * nobody reads as one glyph — and it says *mail*, which this is not. The up arrow is what every
+ * surface this composer is drawn from puts in that circle, and it is the one icon that still means
+ * "send this" with the word removed.
  *
  * The names are constants rather than inline strings for the reason the probe exists: a name the
  * Adwaita theme does not have renders as a broken-image placeholder, which is exactly what a
  * screenshot then shows as an unexplained gap. Verified on GTK 4.22.5 / libadwaita 1.9.3.
  */
-const SEND_ICON = 'mail-send-symbolic';
+const SEND_ICON = 'go-up-symbolic';
 /** The Stop icon. A filled square, which is what stopping a running turn looks like. */
 const STOP_ICON = 'process-stop-symbolic';
 /** Button labels. Fixed English — see `core/session-groups.ts` §2 on why not `Intl`. */
@@ -116,7 +129,6 @@ export class Composer {
 
   readonly #entry: Gtk.TextView;
   readonly #button: Gtk.Button;
-  readonly #buttonContent: Adw.ButtonContent;
   /** The one line under the entry: the reason, or the status, never both. See the file header. */
   readonly #status: Gtk.Label;
   readonly #onSend: ((text: string) => void) | undefined;
@@ -164,12 +176,24 @@ export class Composer {
       propagateNaturalHeight: true,
     });
 
-    this.#buttonContent = new Adw.ButtonContent();
     this.#button = new Gtk.Button({
-      child: this.#buttonContent,
+      // **Icon only, in a circle, and the label is gone from the button rather than hidden.** It is
+      // still the *one* widget whose content is swapped (see the file header) — what changed is that
+      // one `iconName` is now the whole swap, where an `Adw.ButtonContent` existed only to carry a
+      // word next to the icon. Removing the word is what makes the control a disc that fits inside
+      // the card next to the entry instead of a pill that sets the card's height; at the 360 px floor
+      // it is also about 60 px of row width handed back to the text.
+      //
+      // **The word has to survive somewhere, and it does — in `#render`, as the tooltip and as
+      // `AccessibleProperty.LABEL`.** An icon-only button with neither is a control a screen reader
+      // announces as nothing at all, which is a failure that no screenshot shows.
+      iconName: SEND_ICON,
       // END, so the button sits at the bottom of the entry rather than stretching to the scroller's
       // height when the entry has grown to three lines.
       valign: Gtk.Align.END,
+      // `circular` is Adwaita's own name for the shape, so it follows the theme's metrics rather than
+      // a radius this file would then have to keep in step with the button's padding.
+      cssClasses: ['circular'],
     });
     this.#button.connect('clicked', () => this.#activate());
 
@@ -185,11 +209,14 @@ export class Composer {
 
     const row = new Gtk.Box({
       orientation: Gtk.Orientation.HORIZONTAL,
-      spacing: 8,
-      marginTop: 8,
-      marginBottom: 8,
-      marginStart: 12,
-      marginEnd: 12,
+      spacing: 6,
+      // Even on all four sides: the card is the surface now, so the inset is the card's padding and
+      // a wider left margin than top margin would read as a text box inside a card rather than as
+      // one control. The entry's own 8 px text margins sit inside this.
+      marginTop: 6,
+      marginBottom: 6,
+      marginStart: 6,
+      marginEnd: 6,
     });
     row.append(scroller);
     row.append(this.#button);
@@ -203,7 +230,7 @@ export class Composer {
     // same way.
     const frame = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
-      cssClasses: [CSS.composerFrame],
+      cssClasses: ['card', CSS.composerFrame],
     });
     frame.append(column);
 
@@ -318,8 +345,7 @@ export class Composer {
     const view = composerView(this.#input);
     const isStop = view.action === 'stop';
 
-    this.#buttonContent.iconName = isStop ? STOP_ICON : SEND_ICON;
-    this.#buttonContent.label = isStop ? STOP_LABEL : SEND_LABEL;
+    this.#button.iconName = isStop ? STOP_ICON : SEND_ICON;
     // Swapped, not stacked: `.suggested-action` on Stop would accent "end this turn", and
     // `.destructive-action` on Send would scare a person about posting a message. A `session/cancel`
     // deletes nothing — `AGENTS.md` calls it "the protocol's cancellation, not a kill" — so Stop is
