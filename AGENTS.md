@@ -130,7 +130,12 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
    holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
    `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
    says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
-   kurier could pick.
+   kurier could pick. **`kurier serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
+   its gate answers `allow_once` only for a question the person answered yes or an area the person
+   released in the task configuration, and that policy only narrows what the owning app allows. It
+   strips every `*_always` option and never selects one; a yes mints one single-use token bound to
+   session, tool and a digest of the call arguments; a question expires to `cancelled`. Guardrail 1
+   stands: a session record never holds a grant.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
    access through that channel at all. File access is a decision, not a default — these two may be
@@ -406,6 +411,7 @@ looked like two bugs: [docs/toolchain-traps.md](docs/toolchain-traps.md#nodechil
 ## What is deliberately not here yet
 
 A web surface (the Adwaita one is in `app/src/frontends/gui/`, being built slice by slice; **not**
-adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot · MCP wiring against
-the real apps · principal policy · troedler integration · a Claude Code adapter (decided,
-not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).
+adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot (becomes a Curlew
+backend) · `kurier serve`, MCP wiring against the real apps and the principal policy (decided in
+[ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md), not built) · troedler integration ·
+a Claude Code adapter (decided, not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).
