@@ -82,6 +82,8 @@ import type { EmptyStateView, NoticeView } from '../../core/empty-state.ts';
 import type { AgentAttachment } from '../../core/turn.ts';
 import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
 import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
+import { LoginController } from '../../core/login/controller.ts';
+import { loginUnavailableReason, openLoginSession } from '../../core/login/session.ts';
 import { failureAction, failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
 import { agentStatus } from '../../core/turn.ts';
 import {
@@ -95,6 +97,7 @@ import type { KurierHooks } from './hooks.ts';
 import { Composer } from './composer.ts';
 import { ConfigRow } from './config-row.ts';
 import { FailureDialog } from './failure-dialog.ts';
+import { LoginDialog } from './login-dialog.ts';
 import { PermissionDialog } from './permission-dialog.ts';
 import { PreferencesDialog, type PreferencesActions } from './preferences.ts';
 import { SessionList } from './session-list.ts';
@@ -269,6 +272,9 @@ export class MainWindow extends Adw.ApplicationWindow {
    * a dialog* and put the sentence up. `start` failures never come here — see `failureNotice`.
    */
   readonly #failures: FailureDialog;
+  readonly #login = new LoginDialog();
+  /** The agent the window starts, which is also the one a login is for. */
+  readonly #loginAgent: AgentCommand;
   /**
    * The failure this window has already put a dialog up for, held by identity.
    *
@@ -372,6 +378,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#sessions = new SessionList({ onOpen: (record) => this.#open(record) });
     this.#permissions = new PermissionDialog(this);
     this.#failures = new FailureDialog();
+    this.#loginAgent = options.agent;
     // **One transcript view for the whole window, refilled — not a stack child per session.**
     // Plan §7 step 4 asks for exactly that, and the review's F5 names the same reason: thirty sessions
     // means thirty `NavigationPage`s, thirty scrollers, and a composer whose entry and scroll position
@@ -469,6 +476,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     if (options.notice) this.#showNotice(options.notice, options.rememberNotice);
     if (options.preferences) this.#installPreferences(app, options.preferences);
     this.#installNewChat(app);
+    this.#installLogin();
     this.#load(options.loadSessions);
     this.#applyDevHooks(options.hooks);
     this.#watchCloseRequest();
@@ -525,6 +533,20 @@ export class MainWindow extends Adw.ApplicationWindow {
     action.connect('activate', () => dialog.show(this));
     app.add_action(action);
     app.set_accels_for_action('app.preferences', ['<Ctrl>comma']);
+  }
+
+  /**
+   * `win.login`: the menu's "Log in to a provider…", reachable with or without a working login — a person
+   * may want a second provider. Disabled where the dialog could only say no (another agent than opencode,
+   * a host opencode outside the sandbox), so the entry is insensitive rather than pointing at nothing.
+   */
+  #installLogin(): void {
+    const action = new Gio.SimpleAction({
+      name: 'login',
+      enabled: loginUnavailableReason(this.#loginAgent) === null,
+    });
+    action.connect('activate', () => this.#openLogin());
+    this.add_action(action);
   }
 
   /**
@@ -635,6 +657,8 @@ export class MainWindow extends Adw.ApplicationWindow {
    * clicks through a list.
    */
   #open(listed: SessionRecord): void {
+    // A login dialog is about the agent as it was; leaving for another session closes it.
+    this.#login.close();
     const record = this.#fresh(listed);
     const label = labelOf(record);
     this.#openRecord = record;
@@ -761,12 +785,14 @@ export class MainWindow extends Adw.ApplicationWindow {
     const notice: FailureNotice | null = failureToShow(attachment, this.#shownFailure);
     if (notice === null) return;
     this.#shownFailure = attachment;
-    const action = failureAction(notice, { modelChoice: this.#config.hasModelControl() });
-    this.#failures.show(
-      notice,
-      this,
-      action === 'choose-model' ? { onChooseModel: () => this.#openModelDropdown() } : {},
-    );
+    const action = failureAction(notice, {
+      modelChoice: this.#config.hasModelControl(),
+      login: loginUnavailableReason(this.#loginAgent) === null,
+    });
+    this.#failures.show(notice, this, {
+      ...(action === 'choose-model' ? { onChooseModel: () => this.#openModelDropdown() } : {}),
+      ...(action === 'login' ? { onLogin: () => this.#openLogin() } : {}),
+    });
   }
 
   /**
@@ -784,6 +810,27 @@ export class MainWindow extends Adw.ApplicationWindow {
    * dropdown or whether there was no model option to open, and "no log line" would not distinguish
    * "worked" from "never ran".
    */
+  /**
+   * Open the login dialog. The controller starts a private server and stops it when the dialog goes away;
+   * after a login the agent is restarted, because it reads its credentials once at start and the process
+   * that hit the login trap would keep saying "log in".
+   */
+  #openLogin(): void {
+    const agent = this.#loginAgent;
+    const controller = new LoginController({
+      openSession: () => openLoginSession(agent),
+      unavailableReason: () => loginUnavailableReason(agent),
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      now: () => Date.now(),
+      onConnected: async () => {
+        // A turn in flight is left alone, so say so instead of claiming a restart that did not happen.
+        if (!(await this.#agent.restartAgent()))
+          throw new Error('a turn is still running — send again once it ends');
+      },
+    });
+    this.#login.show(this, controller);
+  }
+
   #openModelDropdown(): void {
     const opened = this.#config.openModelDropdown();
     console.log(`kurier: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
@@ -853,6 +900,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       // window that cannot be closed. Nothing is waiting on it, so taking it down before the async
       // close path costs nothing.
       this.#failures.close();
+      this.#login.close();
       // The staging timer dies with the window. `source_remove` is only reached for a timer that has
       // not fired yet — the callback clears the field before it returns, so an already-fired id is
       // never removed twice.
@@ -995,6 +1043,10 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#applyNewChatMidTurnHook(hooks);
     this.#applyFailureHooks(hooks);
     this.#applyPreferencesHooks(hooks);
+    if (hooks.login === true) {
+      console.log('kurier: KU_APP_LOGIN — opening the login dialog');
+      this.#openLogin();
+    }
   }
 
   /**

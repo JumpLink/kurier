@@ -40,8 +40,9 @@ kurier start [prompt..] --agent opencode   # new session, one prompt turn
 kurier sessions [--all] [--long]           # kurier's own records, one principal
 kurier resume <id> [prompt..]              # reattach, then optionally one turn
 kurier cancel <id>                         # session/cancel
-kurier auth [--agent opencode]             # trap 1's escape hatch
-kurier agents                              # launchers, SOURCE (host/bundled/not found), what kurier would use
+kurier auth [--agent opencode]             # trap 1's way out
+kurier login [provider] [--method id]       # login, no terminal (docs/login.md)
+kurier agents                              # launchers, SOURCE, what kurier would use
 ```
 
 **Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
@@ -61,7 +62,7 @@ The GUI writes it from Preferences (`<Ctrl>comma`; `core/settings-view.ts` decid
 An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
-`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `XDG_*` under
+`toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `HOME` and `XDG_*` under
 `<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real
 `~/.config/opencode` in reach and its login must not be shared; `kurier auth` logs in there too.
 The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
@@ -86,6 +87,12 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
   as `denyAll` or `deny-all` depending on version, and a gate that silently stopped firing is the
   worst failure a flag whose whole job is stopping things can have.
 
+## Licence
+
+Apps (`app/`, the repo root) are AGPL-3.0-or-later; the reusable packages under `packages/*` are
+LGPL-3.0-or-later (own `LICENSE` + `COPYING`). A LGPL package never depends on an AGPL one; new
+packages under `packages/*` follow the same split. No SPDX headers in sources.
+
 ## Privacy — this repo is PUBLIC
 
 - The session file holds **the text of a person's conversations with an agent**. It lives at
@@ -93,8 +100,8 @@ there. `kurier start` with no prompt opens a session and stops, which is how you
   repository. `.gitignore` is the second line of defence; not writing there is the first, and it
   lives in `app/src/core/paths.ts`. Backup tier: `state` — declared in `.werkstatt-state.json`.
 - There is **no `secret` tier, and adding one needs a reason.** kurier stores no credential:
-  `kurier auth` runs the agent's own login with inherited stdio and keeps nothing. The agent's
-  credentials live wherever the agent keeps them and kurier neither reads nor copies them. Do not
+  `kurier auth` runs the agent's own login. The agent keeps its credentials and kurier never reads them
+  back; a pasted API key (`kurier login`, login dialog) is held in memory for one call, never written. Do not
   put a token in a session record, in a launcher `env`, or in any file here — there is no file here
   with a safe place for it.
 - Test fixtures are **synthetic only**. A real session id, a real prompt or a real model reply from
@@ -188,7 +195,7 @@ gjsify run app/dist/kurier.gjs.mjs <command>
 gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
 ```
 
-**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions. Probes print numbers the comment quotes.
+**GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions.
 
 ### Watching a turn without a model
 
@@ -261,12 +268,11 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-**The auth refusal is deliberately *not* fixable from the window; the model refusal is.** kurier stores no
-credential (§ Privacy), so for `auth` the only remedy it can name is the command a person runs in a
-terminal — the dialog says so and offers nothing else, because a button that could only copy a string would
-be a control pointing at nothing. The `'model'` dialog is the other half: **Choose another model** opens
-the row's model dropdown and picks nothing, and `failureAction` withholds the button when the agent
-reported no model option — a button that opens nothing is the same defect pointed the other way.
+**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `core/login/`, [docs/login.md](docs/login.md)): the
+agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
+stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
+a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it
+opens the row's dropdown and picks nothing, and `failureAction` withholds either button when the window cannot do it.
 
 **The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
@@ -325,6 +331,12 @@ entire point of the `packages/acp` ↔ `app` split.
 > green run, which is the one thing a test suite cannot report about itself**, so that measurement is
 > worth repeating whenever the toolchain moves; treat a suspiciously fast green as this, not as a win.
 >
+> **The same family, one level over: a regression test that passes on the code it was meant to fix.**
+> A test that cannot fail without its fix is decoration, not a guard — and the most expensive green,
+> because it reads as one. **Run a fix's new test against the unfixed code first**; the failure is the
+> only evidence it is testing. Worked example, and the test shape that exposed it:
+> [the 2026-09-30 review](docs/reviews/2026-09-30-code-review-findings.md).
+>
 > One trap survives, and it is the same family: **the `gjsify` on `PATH` is the one that decides.** A
 > global install in `~/.local/share/gjsify/global/` wins over this repo's `node_modules/.bin/gjsify`,
 > so a run that looks like it used the pinned toolchain was a released CLI — and it happily reports a
@@ -359,10 +371,11 @@ a green run of it says nothing. The two real validators are `desktop-file-valida
 the same way. `packaging:install` installs metadata only: `bin/kurier-app` is produced by
 `gjsify ship`, not by this script.
 
-**Two finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
+**Three finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
 reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
 cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
 this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
+`--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).
 
 `app/src/core/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
 it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
@@ -424,7 +437,5 @@ nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite agains
 
 A web surface (the Adwaita one is in `app/src/frontends/gui/`, being built slice by slice; **not**
 adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot · MCP wiring against
-the real apps · principal policy · troedler integration · a Claude adapter (parked on a
-non-technical question: per `docs/concepts/ai-document-workflow.md` the Claude Agent SDK has drawn
-its own monthly quota since 2026-06-15, separate from the interactive subscription — verify before
-building against it, never assume).
+the real apps · principal policy · troedler integration · a Claude Code adapter (decided,
+not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).
