@@ -36,6 +36,15 @@ const NAMES = [
   'go-next-symbolic',
   'process-stop-symbolic',
   'media-playback-stop-symbolic',
+  // tool-line.ts — the icon a tool card and the approval dialog's header pick from the tool's kind.
+  'document-open-symbolic',
+  'document-edit-symbolic',
+  'edit-delete-symbolic',
+  'folder-symbolic',
+  'edit-find-symbolic',
+  'network-workgroup-symbolic',
+  // window.blp — the no-agent page's copy button.
+  'edit-copy-symbolic',
 ];
 
 Adw.init();

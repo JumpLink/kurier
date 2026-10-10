@@ -34,27 +34,35 @@ template $KurierPermissionBody: Gtk.Box {
   margin-start: 6;
   margin-end: 6;
 
-  // The tool title: the strongest line in the dialog, not the loudest one in the app. `title-4`
-  // rather than `CSS.title`, because that constant is `title-1` — the size of a *window* title, see
-  // `window.ts` on why the sidebar bar does not use it. A literal, so unlike the `CSS.*` names it
-  // can live here.
-  Gtk.Label titleLabel {
-    use-markup: false;
-    wrap: true;
-    selectable: true;
-    xalign: 0;
-    styles [
-      "title-4",
-    ]
-  }
+  // The header row: the kind's icon, the tool title (the strongest line in the dialog, not the loudest
+  // one in the app), and the kind as a capsule at the end. The kind is metadata about the tool, and a
+  // capsule gives it a place without the weight of a heading. `title-4` rather than `CSS.title`,
+  // because that constant is `title-1` — the size of a *window* title, see `window.ts` on why the
+  // sidebar bar does not use it. Literals, so unlike the `CSS.*` names they can live here.
+  Gtk.Box {
+    orientation: horizontal;
+    spacing: 8;
 
-  // The kind, as a small dimmed line rather than as a heading: it is metadata about the tool, and a
-  // `read`/`edit`/`execute` word in a heading font would give it the weight of the question itself.
-  Gtk.Label kindLabel {
-    use-markup: false;
-    wrap: true;
-    selectable: true;
-    xalign: 0;
+    Gtk.Image kindIcon {
+      pixel-size: 20;
+      valign: center;
+    }
+
+    Gtk.Label titleLabel {
+      use-markup: false;
+      wrap: true;
+      selectable: true;
+      xalign: 0;
+      hexpand: true;
+      styles [
+        "title-4",
+      ]
+    }
+
+    Gtk.Label kindLabel {
+      use-markup: false;
+      valign: center;
+    }
   }
 
   // One row for every path, newline-separated, so several locations read as one list instead of N

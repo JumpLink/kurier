@@ -58,6 +58,7 @@ import {
   type PermissionView,
 } from '../../core/permission.ts';
 import { CSS } from './css.ts';
+import { toolIcon } from './tool-line.ts';
 import BodyTemplate from './permission-body.blp';
 
 /** What kurier says when the agent reported no raw input at all. */
@@ -104,12 +105,13 @@ const PermissionBody = GObject.registerClass(
   {
     GTypeName: 'KurierPermissionBody',
     Template: BodyTemplate,
-    InternalChildren: ['titleLabel', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'],
+    InternalChildren: ['titleLabel', 'kindIcon', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'],
   },
   class extends Gtk.Box {
     // Not `private`: `buildDialog` is a module function, not a method, so a private member would not
     // be reachable from the only place that fills it.
     declare readonly _titleLabel: Gtk.Label;
+    declare readonly _kindIcon: Gtk.Image;
     declare readonly _kindLabel: Gtk.Label;
     declare readonly _locationsLabel: Gtk.Label;
     declare readonly _namesLabel: Gtk.Label;
@@ -118,7 +120,7 @@ const PermissionBody = GObject.registerClass(
     constructor() {
       super();
       // The stylesheet's names, applied through the widget rather than written into the markup.
-      this._kindLabel.add_css_class(CSS.dim);
+      this._kindLabel.add_css_class(CSS.pill);
       this._locationsLabel.add_css_class(CSS.mono);
       this._locationsLabel.add_css_class(CSS.dim);
       this._namesLabel.add_css_class(CSS.dim);
@@ -297,6 +299,7 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   // — `GtkLabel`'s default is the opposite, which is why the template says so on all four.
   body._titleLabel.label = view.tool;
   body._kindLabel.label = view.kind;
+  body._kindIcon.iconName = toolIcon(view.kind);
   body._locationsLabel.label = view.locations.length > 0 ? view.locations.join('\n') : NO_LOCATIONS;
   // "The agent did not say where" rather than an empty row. An empty box reads as *there is nothing
   // here*, which is a different claim from *the agent did not say*, and the difference is the whole
@@ -347,7 +350,8 @@ function buildDialog(view: PermissionView): { dialog: Adw.AlertDialog; rawInput:
   // widget by `app/tests/probes/permission-focus.ts`.
   for (const option of view.options) {
     dialog.add_response(option.optionId, optionLabel(option));
-    if (option.kind.startsWith('allow')) {
+    // Only `allow_once` is emphasised: with two allowing buttons both suggested, neither is.
+    if (option.kind === 'allow_once') {
       dialog.set_response_appearance(option.optionId, Adw.ResponseAppearance.SUGGESTED);
     }
   }
