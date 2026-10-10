@@ -12,6 +12,7 @@ import type { AgentCommand } from '../agents/stdio.ts';
 
 import { createLoginApi } from './api.ts';
 import type { LoginSession } from './controller.ts';
+import { connectionFacts, type ConnectionFacts } from '../onboarding.ts';
 
 /** Only opencode has the HTTP login API kurier drives; another adapter keeps the terminal hint. */
 export function loginUnavailableReason(agent: AgentCommand): string | null {
@@ -34,4 +35,30 @@ export async function openLoginSession(agent: AgentCommand): Promise<LoginSessio
     cancel: (providerId, attemptId) => api.cancel(providerId, attemptId),
     close: () => server.close(),
   };
+}
+
+export interface ProbeDeps {
+  readonly reason?: (agent: AgentCommand) => string | null;
+  readonly open?: (agent: AgentCommand) => Promise<LoginSession>;
+}
+
+/**
+ * Which providers the agent has connected, asked of a private login server that is closed again at once.
+ * Any failure is `unknown`: the caller then shows the ordinary chat and a failing turn still offers the login.
+ */
+export async function probeConnections(agent: AgentCommand, deps: ProbeDeps = {}): Promise<ConnectionFacts> {
+  if ((deps.reason ?? loginUnavailableReason)(agent) !== null) return { kind: 'unknown' };
+  let session: LoginSession;
+  try {
+    session = await (deps.open ?? openLoginSession)(agent);
+  } catch {
+    return { kind: 'unknown' };
+  }
+  try {
+    return connectionFacts(await session.providers());
+  } catch {
+    return { kind: 'unknown' };
+  } finally {
+    await session.close().catch(() => undefined);
+  }
 }
