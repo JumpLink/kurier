@@ -28,7 +28,7 @@ import type {
 } from './types.ts';
 
 /** What kurier calls itself in `initialize.clientInfo`. */
-export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: '0.1.1' };
+export const LOTSE_IMPLEMENTATION: Implementation = { name: 'lotse', version: '0.1.1' };
 
 /**
  * The capabilities kurier announces. Both file-system flags are `false` and `terminal` is
@@ -49,7 +49,7 @@ export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: 
  *   entitled to act on. It goes in when the switch goes in — next to this line, not in a later
  *   commit that leaves no trace of why.
  */
-export const KURIER_CLIENT_CAPABILITIES: ClientCapabilities = {
+export const LOTSE_CLIENT_CAPABILITIES: ClientCapabilities = {
   fs: { readTextFile: false, writeTextFile: false },
   terminal: false,
   auth: { terminal: false },

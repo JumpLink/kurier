@@ -75,7 +75,7 @@ export class FailureDialog {
     const dialog = new Adw.AlertDialog({
       heading: notice.heading,
       body: notice.body,
-      cssClasses: ['kurier-failure-dialog'],
+      cssClasses: ['lotse-failure-dialog'],
     });
     // The command goes in the body rather than as a button, because it is not an action this window
     // can take: `lotse auth` runs an interactive login in a terminal, and a button here that only

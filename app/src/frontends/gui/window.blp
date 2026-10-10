@@ -18,7 +18,7 @@ using Adw 1;
  * for; the titles themselves are applied from `constants.ts` in the constructor, so there is one
  * place that spells the app's name.
  */
-template $KurierMainWindow: Adw.ApplicationWindow {
+template $LotseMainWindow: Adw.ApplicationWindow {
   content: Adw.NavigationSplitView split {
     min-sidebar-width: 260;
     max-sidebar-width: 340;
@@ -129,7 +129,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
 /**
  * The two idle pages, declared OUTSIDE the template — and that placement is the point.
  *
- * `KurierChat`'s `closed` and `no-agent` states are `Adw.Bin` slots, because the copy on them can
+ * `LotseChat`'s `closed` and `no-agent` states are `Adw.Bin` slots, because the copy on them can
  * only be written by something that knows what surrounds the chat: "pick a session from the list"
  * names this window's sidebar, and the remedy for a missing agent names kurier's own installer and
  * its Preferences dialog. So these two pages are the app's, they live here as markup like every
@@ -154,7 +154,7 @@ Adw.StatusPage closedPage {
 
   styles [
     "compact",
-    "kurier-calm",
+    "lotse-calm",
   ]
 
   // The one action of the page. `win.new-chat` is the same action as the sidebar's `+` and
@@ -179,7 +179,7 @@ Adw.StatusPage noAgentPage {
 
   styles [
     "compact",
-    "kurier-calm",
+    "lotse-calm",
   ]
 
   child: Gtk.Box {

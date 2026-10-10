@@ -278,7 +278,7 @@ export default async () => {
 
   await describe('gatherAgentFacts — the version spawn is optional', async () => {
     await it('reads --version by default and never spawns it with readVersions false', async () => {
-      const dir = mkdtempSync(join(tmpdir(), 'kurier-probe-'));
+      const dir = mkdtempSync(join(tmpdir(), 'lotse-probe-'));
       try {
         const program = join(dir, 'synthetic-agent');
         // Leaves a marker file when run, so "never spawned" is observable rather than inferred.

@@ -19,7 +19,7 @@ async function withProgram(
   body: string,
   run: (program: string, dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-server-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-server-'));
   try {
     const program = join(dir, 'fake-opencode');
     writeFileSync(program, `#!/bin/sh\n${body}\n`);

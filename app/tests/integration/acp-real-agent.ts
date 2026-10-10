@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { AcpClient } from '@lotse/acp/client';
-import { KURIER_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
+import { LOTSE_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
 import { channelTransport } from '@lotse/acp/transport';
 
 import { OPENCODE_COMMAND, StdioChannel, which } from '@lotse/core';
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   }
   console.log(`PASS: opencode found on PATH at ${program}`);
 
-  const cwd = mkdtempSync(join(tmpdir(), 'kurier-real-agent-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'lotse-real-agent-'));
   let channel: StdioChannel | undefined;
   let client: AcpClient | undefined;
 
@@ -86,11 +86,11 @@ async function main(): Promise<void> {
 
     // The advertised capability, not a live fs/read_text_file round trip — see the file header.
     check(
-      KURIER_CLIENT_CAPABILITIES.fs?.readTextFile === false,
+      LOTSE_CLIENT_CAPABILITIES.fs?.readTextFile === false,
       'kurier advertises clientCapabilities.fs.readTextFile: false',
     );
     check(
-      KURIER_CLIENT_CAPABILITIES.fs?.writeTextFile === false,
+      LOTSE_CLIENT_CAPABILITIES.fs?.writeTextFile === false,
       'kurier advertises clientCapabilities.fs.writeTextFile: false',
     );
 

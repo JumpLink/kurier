@@ -8,13 +8,13 @@
 
 import type { CommandModule } from 'yargs';
 
-import type { KurierPaths } from '@lotse/core';
+import type { LotsePaths } from '@lotse/core';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@lotse/session';
 import type { SessionRecord } from '@lotse/session';
 
 import { err, pickArgv, showSession, showSessionTable } from './output.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'sessions',
   describe: 'list the sessions kurier has recorded',
   builder: (yargs) =>

@@ -10,14 +10,14 @@ import {
   gatherResolveContext,
   isolationDirs,
   isolationEnv,
-  kurierPathsUnder,
+  lotsePathsUnder,
   prepareIsolation,
 } from '@lotse/core';
 import { DEFAULT_NOTICES, writeNotices } from '../../../src/core/notices.ts';
 import { saveSettings } from '../../../src/core/settings.ts';
 import {
   dataDir,
-  kurierPaths,
+  lotsePaths,
   noticesFile,
   sessionsFile,
   settingsFile,
@@ -44,7 +44,7 @@ export default async () => {
 
   await describe('dataDir', async () => {
     await it('honors KURIER_DATA_DIR', async () => {
-      expect(dataDir({ KURIER_DATA_DIR: '/opt/kurier-data' })).toBe('/opt/kurier-data');
+      expect(dataDir({ KURIER_DATA_DIR: '/opt/lotse-data' })).toBe('/opt/lotse-data');
     });
 
     await it('defaults to <xdgDataHome>/kurier', async () => {
@@ -93,9 +93,9 @@ export default async () => {
     });
   });
 
-  await describe('kurierPaths — the defaults', async () => {
+  await describe('lotsePaths — the defaults', async () => {
     await it("reproduces today's paths", async () => {
-      expect(kurierPaths({})).toStrictEqual({
+      expect(lotsePaths({})).toStrictEqual({
         dataDir: join(XDG_DEFAULT, 'kurier'),
         configDir: join(homedir(), '.config', 'kurier'),
         sessionsFile: join(XDG_DEFAULT, 'kurier', 'sessions.json'),
@@ -111,26 +111,26 @@ export default async () => {
         KURIER_SESSIONS_FILE: '/y/s.json',
         KURIER_NOTICES_FILE: '/y/n.json',
       };
-      const paths = kurierPaths(env);
+      const paths = lotsePaths(env);
       expect(paths.dataDir).toBe('/x/data/kurier');
       expect(paths.configDir).toBe('/x/config/kurier');
       expect(paths.settingsFile).toBe('/x/config/kurier/settings.json');
       expect(paths.sessionsFile).toBe('/y/s.json');
       expect(paths.noticesFile).toBe('/y/n.json');
-      expect(kurierPaths({ KURIER_DATA_DIR: '/d' }).noticesFile).toBe('/d/notices.json');
+      expect(lotsePaths({ KURIER_DATA_DIR: '/d' }).noticesFile).toBe('/d/notices.json');
     });
   });
 
-  await describe('kurierPathsUnder — an injected root', async () => {
+  await describe('lotsePathsUnder — an injected root', async () => {
     await it('puts every file under the root', async () => {
-      const paths = kurierPathsUnder('/host/app/kurier');
+      const paths = lotsePathsUnder('/host/app/kurier');
       for (const path of Object.values(paths)) expect(path.startsWith('/host/app/kurier/')).toBe(true);
     });
 
     await it('redirects what core writes: sessions, settings, notices, agent HOME and XDG', async () => {
-      const root = mkdtempSync(join(tmpdir(), 'kurier-paths-'));
+      const root = mkdtempSync(join(tmpdir(), 'lotse-paths-'));
       try {
-        const paths = kurierPathsUnder(root);
+        const paths = lotsePathsUnder(root);
         createSessionStore(paths.sessionsFile).create(
           newSession({ id: 'a', agent: 'opencode', cwd: '/tmp', at: '2026-09-30T10:00:00.000Z' }),
         );

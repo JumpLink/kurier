@@ -12,14 +12,14 @@
 
 import type { CommandModule } from 'yargs';
 
-import { openAgent, type KurierPaths } from '@lotse/core';
+import { openAgent, type LotsePaths } from '@lotse/core';
 import { createSessionStore } from '@lotse/session';
 
 import { agentForRecorded } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'cancel <id>',
   describe: 'send session/cancel for a session (Ctrl-C does the same inside a running turn)',
   builder: (yargs) =>

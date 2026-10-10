@@ -21,13 +21,13 @@
     that makes the pair recognisable as one icon.
   -->
   <defs>
-    <linearGradient id="kurier-base" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="lotse-base" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#62a0ea"/>
       <stop offset="1" stop-color="#1a5fb4"/>
     </linearGradient>
   </defs>
 
-  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#kurier-base)"/>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#lotse-base)"/>
 
   <!-- A transcript: three turns, the last one still streaming (lighter, shorter). -->
   <g fill="#ffffff">

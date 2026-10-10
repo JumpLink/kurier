@@ -8,8 +8,8 @@ import type Gtk from 'gi://Gtk?version=4.0';
 declare const xml: string;
 export default xml;
 
-/** The class `template $KurierChat` defines. */
-export declare const GTypeName: 'KurierChat';
+/** The class `template $LotseChat` defines. */
+export declare const GTypeName: 'LotseChat';
 
 /**
  * Every id inside the template, in source order — what `registerClass` is given.

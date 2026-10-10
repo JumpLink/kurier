@@ -19,7 +19,7 @@ import {
 } from '../../../src/core/notices.ts';
 
 async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-notices-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-notices-'));
   try {
     await run(dir);
   } finally {

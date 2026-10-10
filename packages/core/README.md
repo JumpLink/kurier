@@ -21,7 +21,7 @@ The package is `private` and not yet on a registry. Take it as a workspace depen
 ```
 
 ```ts
-import { kurierPathsUnder, AgentSession } from '@lotse/core';
+import { lotsePathsUnder, AgentSession } from '@lotse/core';
 ```
 
 There is **one entry point**: `.` (`src/index.ts`). Nothing else is importable, so everything below is
@@ -35,9 +35,9 @@ Resolve an agent, start it, run one prompt turn (`denyAll` refuses every permiss
 
 ```ts
 import { denyAll } from '@lotse/acp';
-import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@lotse/core';
+import { gatherResolveContext, lotsePathsUnder, openAgent, resolveDefault, runTurn } from '@lotse/core';
 
-const paths = kurierPathsUnder('/path/to/my-app-data');
+const paths = lotsePathsUnder('/path/to/my-app-data');
 const agent = resolveDefault(gatherResolveContext(paths));
 if (!agent) throw new Error('no agent found');
 
@@ -63,15 +63,15 @@ For a conversation with state — persistence, reattach, permission questions, c
 
 | Export | What it is |
 |---|---|
-| `KurierPaths` | Every place kurier writes, as one value: `dataDir`, `configDir`, `sessionsFile`, `settingsFile`, `noticesFile`. Core never resolves a directory itself. |
-| `kurierPathsUnder(root)` | The layout for a host: `<root>/data/{sessions,notices}.json`, `<root>/config/settings.json`. |
+| `LotsePaths` | Every place kurier writes, as one value: `dataDir`, `configDir`, `sessionsFile`, `settingsFile`, `noticesFile`. Core never resolves a directory itself. |
+| `lotsePathsUnder(root)` | The layout for a host: `<root>/data/{sessions,notices}.json`, `<root>/config/settings.json`. |
 
 A bundled agent's `HOME` and `XDG_*` directories follow `dataDir` (see `isolationDirs` below), so moving
 `dataDir` moves the agent's whole private state with it.
 
-`kurierPaths()` — the XDG and `KURIER_*` resolver — is **not** exported: which directory a command-line
+`lotsePaths()` — the XDG and `KURIER_*` resolver — is **not** exported: which directory a command-line
 tool writes to is that tool's decision, and it lives in the app (`app/src/core/paths.ts`). A host builds
-its own `KurierPaths`, normally with `kurierPathsUnder`.
+its own `LotsePaths`, normally with `lotsePathsUnder`.
 
 ### Which agent
 

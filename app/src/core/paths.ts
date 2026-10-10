@@ -9,7 +9,7 @@
  * Every function takes the environment as an argument, so a test says "with `XDG_DATA_HOME` set to
  * this" instead of mutating the world to find out where the code writes.
  *
- * The `KurierPaths` shape itself, and `kurierPathsUnder(root)` for a host that hands kurier a
+ * The `LotsePaths` shape itself, and `lotsePathsUnder(root)` for a host that hands kurier a
  * directory, are in `@lotse/core`: core takes the paths and never resolves them, and XDG plus the
  * `KURIER_*` overrides are a decision only an app gets to make.
  */
@@ -17,7 +17,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { KurierPaths } from '@lotse/core';
+import type { LotsePaths } from '@lotse/core';
 
 /** `$XDG_DATA_HOME`, or the XDG default. An explicit value must be absolute, per the spec. */
 export function xdgDataHome(env: NodeJS.ProcessEnv = process.env): string {
@@ -64,7 +64,7 @@ export function noticesFile(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /** The app's defaults: XDG, with the `KURIER_*` overrides, exactly as the functions above resolve them. */
-export function kurierPaths(env: NodeJS.ProcessEnv = process.env): KurierPaths {
+export function lotsePaths(env: NodeJS.ProcessEnv = process.env): LotsePaths {
   return {
     dataDir: dataDir(env),
     configDir: join(xdgConfigHome(env), 'kurier'),

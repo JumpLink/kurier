@@ -21,7 +21,7 @@ import {
   resolveAgent,
   type AgentCommand,
   type AgentDetection,
-  type KurierPaths,
+  type LotsePaths,
 } from '@lotse/core';
 import { parseChoiceSpec, readSettings, saveSettings, type Settings } from '../../core/settings.ts';
 
@@ -73,7 +73,7 @@ export function settingsReport(file: string, settings: Settings, problem: string
   return lines;
 }
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'agents',
   describe: 'list the agent launchers kurier knows how to start',
   builder: (yargs) =>

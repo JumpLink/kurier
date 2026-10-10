@@ -26,10 +26,10 @@ import {
   sessionsCommand,
   startCommand,
 } from './frontends/cli/index.ts';
-import { kurierPaths } from './core/paths.ts';
+import { lotsePaths } from './core/paths.ts';
 
 // The one place the process environment becomes paths; everything below is handed them.
-const paths = kurierPaths();
+const paths = lotsePaths();
 
 function reportError(err: unknown): void {
   console.error(err instanceof Error ? err.message : String(err));

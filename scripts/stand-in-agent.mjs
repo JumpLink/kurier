@@ -129,7 +129,7 @@ const AGENT_INFO = {
   // No `authMethods`: this fixture never demands a login, because a turn that just works is the point.
   // The unauthenticated case is `FixtureAgent({ requireAuth: true })` in the unit suite.
   authMethods: [],
-  agentInfo: { name: 'KurierStandIn', version: '0.1.0' },
+  agentInfo: { name: 'LotseStandIn', version: '0.1.0' },
 };
 
 /**
@@ -515,7 +515,7 @@ function modeId() {
  *   unreachable against a real agent and the one the "a refusal does not move the row" rule is about;
  * - an unknown `configId` or a value outside the option's list is an error, as `opencode` 2.0.19 does;
  * - a non-string value is refused, because `opencode` implements no boolean options — which is why
- *   kurier does not announce the capability (see `KURIER_CLIENT_CAPABILITIES`).
+ *   kurier does not announce the capability (see `LOTSE_CLIENT_CAPABILITIES`).
  */
 function setConfigOption(sessionId, params, id) {
   if (CONFIG_REFUSE) {

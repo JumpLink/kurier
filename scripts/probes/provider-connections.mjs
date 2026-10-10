@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const binary = process.argv[2] ?? 'opencode';
-const root = mkdtempSync(join(tmpdir(), 'kurier-probe-'));
+const root = mkdtempSync(join(tmpdir(), 'lotse-probe-'));
 const dirs = {
   HOME: 'h',
   XDG_CONFIG_HOME: 'c',

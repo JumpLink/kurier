@@ -20,7 +20,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import { AcpClient } from '@lotse/acp/client';
-import { KURIER_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
+import { LOTSE_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
 import { CLIENT_METHODS } from '@lotse/acp/methods';
 import { isAuthRequired } from '@lotse/acp/client';
 import type { SessionConfigOption, SessionNotification, SessionUpdate } from '@lotse/acp/types';
@@ -34,14 +34,14 @@ function currentValueOf(options: SessionConfigOption[] | undefined, id: string):
 export default async () => {
   await describe('the capability announcement', async () => {
     await it('announces session.configOptions, because kurier can act on the options', async () => {
-      expect(KURIER_CLIENT_CAPABILITIES.session?.configOptions).toStrictEqual({});
+      expect(LOTSE_CLIENT_CAPABILITIES.session?.configOptions).toStrictEqual({});
     });
 
     await it('does NOT announce boolean options, and the fixture is why', async () => {
       // `opencode acp` 2.0.19 answers `InvalidConfigOptionError` for any value that is not a
       // string, so it implements no boolean options at all. `{}` under `boolean` would be a promise
       // the agent is entitled to break — and one this repository has no surface for yet.
-      const capabilities = KURIER_CLIENT_CAPABILITIES.session?.configOptions as
+      const capabilities = LOTSE_CLIENT_CAPABILITIES.session?.configOptions as
         | { boolean?: unknown }
         | undefined;
       expect(capabilities?.boolean ?? null).toBe(null);
@@ -186,7 +186,7 @@ export default async () => {
     });
 
     await it('a tagged boolean value is refused by an agent that takes no booleans', async () => {
-      // This is why `KURIER_CLIENT_CAPABILITIES` omits `boolean`. The refusal is the measurement.
+      // This is why `LOTSE_CLIENT_CAPABILITIES` omits `boolean`. The refusal is the measurement.
       const fixture = new FixtureAgent();
       const client = new AcpClient({ transport: fixture.transport });
       await client.initialize();

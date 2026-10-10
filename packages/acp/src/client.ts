@@ -12,8 +12,8 @@
 import {
   DENY_EVERYTHING,
   FileSystemRefusedError,
-  KURIER_CLIENT_CAPABILITIES,
-  KURIER_IMPLEMENTATION,
+  LOTSE_CLIENT_CAPABILITIES,
+  LOTSE_IMPLEMENTATION,
   cancelledOutcome,
   selectedOutcome,
   type ClientGate,
@@ -121,7 +121,7 @@ export class AcpClient {
   constructor(options: AcpClientOptions) {
     this.transport = options.transport;
     this.#gate = options.gate ?? DENY_EVERYTHING;
-    this.#clientInfo = options.clientInfo ?? KURIER_IMPLEMENTATION;
+    this.#clientInfo = options.clientInfo ?? LOTSE_IMPLEMENTATION;
     this.#initializeTimeoutMs = options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS;
     this.transport.onMessage((data) => this.#receive(data));
     this.transport.onClose((reason) => this.#failAll(reason));
@@ -140,7 +140,7 @@ export class AcpClient {
   async initialize(request: Partial<InitializeRequest> = {}): Promise<InitializeResponse> {
     const params: InitializeRequest = {
       protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: KURIER_CLIENT_CAPABILITIES,
+      clientCapabilities: LOTSE_CLIENT_CAPABILITIES,
       clientInfo: this.#clientInfo,
       ...request,
     };

@@ -55,7 +55,7 @@ const OPENCODE: AgentCommand = {
 };
 
 function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-sandbox-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-sandbox-'));
   try {
     return Promise.resolve(run(dir)).finally(() => rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
@@ -66,7 +66,7 @@ function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> 
 
 /** The same, for a case whose value is the thing under test. */
 function withTempDirValue<T>(run: (dir: string) => T): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-sandbox-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-sandbox-'));
   try {
     return Promise.resolve(run(dir)).finally(() => rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
@@ -298,7 +298,7 @@ export default async () => {
     });
 
     await it('answers on the protocol fd, through the same wrapper, in the directory it was started in', async () => {
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'kurier-cwd-')));
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'lotse-cwd-')));
       try {
         const home = join(root, 'home');
         const work = join(root, 'work');

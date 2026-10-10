@@ -190,7 +190,7 @@ export interface AgentAuthCapabilities extends Extensible {
   logout?: LogoutCapabilities | null;
 }
 ```
-Breaks when: These types exist but `KURIER_CLIENT_CAPABILITIES` in `gate.ts` only sets `auth: { terminal: false }` and never uses `logout`. The schema defines `auth.logout` but kurier never sends or handles it. Not a bug, but dead code that adds cognitive load.
+Breaks when: These types exist but `LOTSE_CLIENT_CAPABILITIES` in `gate.ts` only sets `auth: { terminal: false }` and never uses `logout`. The schema defines `auth.logout` but kurier never sends or handles it. Not a bug, but dead code that adds cognitive load.
 Fix shape: Remove if not planned for Slice 1, or add a comment linking to the slice where they'll be used.
 
 ### `app/src/core/transcript.ts:57-61` — Two `session/update` kinds explicitly ignored
@@ -343,7 +343,7 @@ Fix shape: Document the microtask timing, or make `onClose` synchronous for `Clo
 - No code path auto-allows
 
 ### Guardrail 3: `fs/read_text_file` and `fs/write_text_file` refused — **HOLDS**
-- `gate.ts:38-40` `KURIER_CLIENT_CAPABILITIES.fs = { readTextFile: false, writeTextFile: false }`
+- `gate.ts:38-40` `LOTSE_CLIENT_CAPABILITIES.fs = { readTextFile: false, writeTextFile: false }`
 - `client.ts:471-477` `#onAgentRequest` responds with `METHOD_NOT_FOUND` + `FileSystemRefusedError` for both
 
 ### Guardrail 4: `_meta` passed through, never parsed — **HOLDS**

@@ -20,7 +20,7 @@ import {
   runTurn,
   toTranscript,
   withAuthHint,
-  type KurierPaths,
+  type LotsePaths,
 } from '@lotse/core';
 import { createSessionStore } from '@lotse/session';
 import type { TranscriptEntry } from '@lotse/session';
@@ -30,7 +30,7 @@ import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'start [prompt..]',
   describe: 'open a session with an agent and run one prompt turn',
   builder: (yargs) =>

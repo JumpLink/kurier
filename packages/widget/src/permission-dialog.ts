@@ -103,7 +103,7 @@ const DISMISSAL_ID = 'close';
  */
 const PermissionBody = GObject.registerClass(
   {
-    GTypeName: 'KurierPermissionBody',
+    GTypeName: 'LotsePermissionBody',
     Template: BodyTemplate,
     InternalChildren: ['titleLabel', 'kindIcon', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'],
   },
@@ -145,7 +145,7 @@ export class PermissionDialog {
    * What the dialog is presented over.
    *
    * **A `Gtk.Widget`, not the window** — `Adw.Dialog.present` takes any widget and walks up to the
-   * root itself, and a widget a host embeds does not know what window it will end up in. `KurierChat`
+   * root itself, and a widget a host embeds does not know what window it will end up in. `LotseChat`
    * passes `this`, which is also correct before the chat has been added to anything: the lookup
    * happens at `present()` time, not here.
    */

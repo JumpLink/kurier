@@ -26,7 +26,7 @@ import { hookFlag, hookList, hookValue } from './hook-value.ts';
 export type FrameworkHooks = AppDevHooks;
 
 /** What this surface adds on top, and why each one exists. */
-export interface KurierHooks extends FrameworkHooks {
+export interface LotseHooks extends FrameworkHooks {
   /**
    * `KU_APP_SESSION` — open this session id at startup.
    *
@@ -210,7 +210,7 @@ export interface KurierHooks extends FrameworkHooks {
 
   /**
    * `KU_APP_ONBOARDING` — show the provider onboarding page as if no provider were connected and a
-   * login could run (`KurierChat.stageOnboarding`). A flag. The stand-in agent has no login API, so the
+   * login could run (`LotseChat.stageOnboarding`). A flag. The stand-in agent has no login API, so the
    * real probe could never reach this state against it.
    */
   onboarding?: boolean;
@@ -263,7 +263,7 @@ export interface KurierHooks extends FrameworkHooks {
  * A dev hook that is read two ways is a hook whose screenshots depend on which reader ran. The rule
  * and its test live in `hook-value.ts`; this function only wires the keys to it.
  */
-export function readHooks(env: Record<string, string | undefined> = process.env): KurierHooks {
+export function readHooks(env: Record<string, string | undefined> = process.env): LotseHooks {
   const framework = readAppDevHooks({ prefix: DEV_HOOK_PREFIX, env });
   return {
     ...framework,

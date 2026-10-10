@@ -4,7 +4,7 @@
   "license": "LGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "The chat surface, as a widget a host embeds: KurierChat renders one conversation — transcript, composer, model and mode controls, the tool and thought cards, the permission dialog — over @lotse/core's AgentSession. GTK/Adw, no app shell: the host passes the agent choice, the paths, the cwd, its mcpServers and its own permission gate.",
+  "description": "The chat surface, as a widget a host embeds: LotseChat renders one conversation — transcript, composer, model and mode controls, the tool and thought cards, the permission dialog — over @lotse/core's AgentSession. GTK/Adw, no app shell: the host passes the agent choice, the paths, the cwd, its mcpServers and its own permission gate.",
   "exports": {
     ".": "./src/index.ts",
     "./tool-line": "./src/tool-line.ts",

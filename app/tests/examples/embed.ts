@@ -8,18 +8,18 @@ import {
   DEFAULT_AGENT,
   emptyStateView,
   gatherResolveContext,
-  kurierPathsUnder,
+  lotsePathsUnder,
   requireLauncher,
   resolveDefault,
   resolveRecorded,
   type McpServer,
 } from '@lotse/core';
 import { createSessionStore } from '@lotse/session';
-import { KurierChat } from '@lotse/widget';
+import { LotseChat } from '@lotse/widget';
 
-export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): KurierChat {
+export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): LotseChat {
   // Everything kurier writes goes under `dataRoot`, in the host's own data directory.
-  const paths = kurierPathsUnder(dataRoot);
+  const paths = lotsePathsUnder(dataRoot);
   const store = createSessionStore(paths.sessionsFile);
 
   // The agent: the person's own install, else a bundled copy. `null` means none was found.
@@ -30,7 +30,7 @@ export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, proje
     { name: 'my-tools', command: '/usr/bin/my-mcp-server', args: [], env: [] },
   ];
 
-  const chat = new KurierChat({
+  const chat = new LotseChat({
     // A command is required even when nothing was found; `noAgent` then switches Send off.
     agent: found?.command ?? requireLauncher(DEFAULT_AGENT),
     agentSource: found?.source ?? 'host',

@@ -29,7 +29,7 @@ using Pango 1.0;
  * never shows those pages — `closed` is the stack's first page and therefore the state the widget
  * starts in, so a host with no session list calls `newChat()` and never comes back to it.
  */
-template $KurierChat: Adw.Bin {
+template $LotseChat: Adw.Bin {
   child: Adw.ToolbarView {
     vexpand: true;
     bottom-bar-style: flat;
@@ -62,7 +62,7 @@ template $KurierChat: Adw.Bin {
           vexpand: true;
           styles [
             "compact",
-            "kurier-calm",
+            "lotse-calm",
           ]
         };
       }
@@ -78,7 +78,7 @@ template $KurierChat: Adw.Bin {
         name: "no-agent";
         // The host's nothing-found page. A slot rather than markup: what to do about a missing agent
         // is "install this, or pick another in Preferences", and both halves of that sentence are the
-        // app's. The widget only decides *when* the page is shown — `KurierChatOptions.noAgent`.
+        // app's. The widget only decides *when* the page is shown — `LotseChatOptions.noAgent`.
         child: Adw.Bin noAgentHost {};
       }
 
@@ -100,7 +100,7 @@ template $KurierChat: Adw.Bin {
           vexpand: true;
           styles [
             "compact",
-            "kurier-calm",
+            "lotse-calm",
           ]
         };
       }

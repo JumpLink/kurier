@@ -1,6 +1,6 @@
 # @lotse/widget
 
-The chat surface, as a widget another GTK4 / libadwaita app embeds. `KurierChat` is an `Adw.Bin` that
+The chat surface, as a widget another GTK4 / libadwaita app embeds. `LotseChat` is an `Adw.Bin` that
 shows **one conversation**: the transcript, the composer with its model, effort and mode controls, the
 tool and thought cards, the approval dialog, failure notices and the provider login. It owns one agent
 subprocess and renders what `@lotse/core` reports.
@@ -24,7 +24,7 @@ The packages are `private` and not yet on a registry; depend on them as a worksp
 ```
 
 ```ts
-import { KurierChat } from '@lotse/widget';
+import { LotseChat } from '@lotse/widget';
 ```
 
 `.` is the public entry. Two further sub-paths exist for kurier's own tests (`@lotse/widget/tool-line`,
@@ -41,17 +41,17 @@ import {
   DEFAULT_AGENT,
   emptyStateView,
   gatherResolveContext,
-  kurierPathsUnder,
+  lotsePathsUnder,
   requireLauncher,
   resolveDefault,
   resolveRecorded,
   type McpServer,
 } from '@lotse/core';
 import { createSessionStore } from '@lotse/session';
-import { KurierChat } from '@lotse/widget';
+import { LotseChat } from '@lotse/widget';
 
-export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): KurierChat {
-  const paths = kurierPathsUnder(dataRoot);
+export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): LotseChat {
+  const paths = lotsePathsUnder(dataRoot);
   const store = createSessionStore(paths.sessionsFile);
 
   const found = resolveDefault(gatherResolveContext(paths, false));
@@ -61,7 +61,7 @@ export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, proje
     { name: 'my-tools', command: '/usr/bin/my-mcp-server', args: [], env: [] },
   ];
 
-  const chat = new KurierChat({
+  const chat = new LotseChat({
     agent: found?.command ?? requireLauncher(DEFAULT_AGENT),
     agentSource: found?.source ?? 'host',
     newChat: { cwd: projectDir, home: homedir() },
@@ -89,9 +89,9 @@ export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, proje
 This is `app/tests/examples/embed.ts`, which is type-checked with the app. Each line is explained in the
 [host guide](../../docs/embedding.md).
 
-## `KurierChatOptions`
+## `LotseChatOptions`
 
-`new KurierChat(options)`. Only `agent` and `newChat` are required.
+`new LotseChat(options)`. Only `agent` and `newChat` are required.
 
 | Option | Type | Meaning |
 |---|---|---|
@@ -135,7 +135,7 @@ the hosting provider. An unreadable state shows the ordinary chat: the page is a
 After a successful login the agent restarts. Nothing here reads or keeps a credential. Core's
 `probeConnections` and `onboardingView` are the pieces, if you want the signal elsewhere.
 
-## `KurierChat` members
+## `LotseChat` members
 
 | Member | Use |
 |---|---|
@@ -162,8 +162,8 @@ terminates only afterwards. Terminating first would lose the work of the turn in
 | Export | What it is |
 |---|---|
 | `HostGateAnswer` | `'ask' \| 'decline'`. |
-| `KurierChatOptions` | The options above. |
-| `CSS` | The widget's class-name map, for a host that styles its own widgets next to the chat. The stylesheet itself is installed by `KurierChat`; a host needs no CSS of its own. |
+| `LotseChatOptions` | The options above. |
+| `CSS` | The widget's class-name map, for a host that styles its own widgets next to the chat. The stylesheet itself is installed by `LotseChat`; a host needs no CSS of its own. |
 
 ## Related
 

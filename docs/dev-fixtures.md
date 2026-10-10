@@ -268,7 +268,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 
 ## Provider onboarding
 
-`KU_APP_ONBOARDING=1` (a flag) stages the page as if the probe had found no connected provider and a login could run (`KurierChat.stageOnboarding`): the stand-in agent has no login API, so the real probe can never reach this state against it. Counts on the page are the 2.0.22 catalog's (10 browser logins, 228 keys). **Connect a provider…** then opens the real login dialog, which says it is unavailable for the stand-in. Shot with `shot.sh onboarding` (`docs/design/screenshots/onboarding.png`). The real path is `providerOnboarding: true` on `KurierChat` against opencode v2 with an empty store; `node scripts/probes/provider-connections.mjs` measures the signal it reads.
+`KU_APP_ONBOARDING=1` (a flag) stages the page as if the probe had found no connected provider and a login could run (`LotseChat.stageOnboarding`): the stand-in agent has no login API, so the real probe can never reach this state against it. Counts on the page are the 2.0.22 catalog's (10 browser logins, 228 keys). **Connect a provider…** then opens the real login dialog, which says it is unavailable for the stand-in. Shot with `shot.sh onboarding` (`docs/design/screenshots/onboarding.png`). The real path is `providerOnboarding: true` on `LotseChat` against opencode v2 with an empty store; `node scripts/probes/provider-connections.mjs` measures the signal it reads.
 
 ## First run and New chat
 

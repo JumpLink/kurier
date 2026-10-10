@@ -3,8 +3,8 @@ import { describe, expect, it } from '@gjsify/unit';
 import { AcpClient } from '@lotse/acp/client';
 import {
   FileSystemRefusedError,
-  KURIER_CLIENT_CAPABILITIES,
-  KURIER_IMPLEMENTATION,
+  LOTSE_CLIENT_CAPABILITIES,
+  LOTSE_IMPLEMENTATION,
   assertScopeIsNotAuthority,
   classifyAuthMethods,
   denyAll,
@@ -255,12 +255,12 @@ export default async () => {
     });
   });
 
-  await describe('KURIER_CLIENT_CAPABILITIES and KURIER_IMPLEMENTATION', async () => {
+  await describe('LOTSE_CLIENT_CAPABILITIES and LOTSE_IMPLEMENTATION', async () => {
     await it('match what the plan requires', async () => {
-      expect(KURIER_CLIENT_CAPABILITIES.fs).toStrictEqual({ readTextFile: false, writeTextFile: false });
-      expect(KURIER_CLIENT_CAPABILITIES.terminal).toBe(false);
-      expect(KURIER_IMPLEMENTATION.name).toBe('kurier');
-      expect(typeof KURIER_IMPLEMENTATION.version).toBe('string');
+      expect(LOTSE_CLIENT_CAPABILITIES.fs).toStrictEqual({ readTextFile: false, writeTextFile: false });
+      expect(LOTSE_CLIENT_CAPABILITIES.terminal).toBe(false);
+      expect(LOTSE_IMPLEMENTATION.name).toBe('lotse');
+      expect(typeof LOTSE_IMPLEMENTATION.version).toBe('string');
     });
   });
 

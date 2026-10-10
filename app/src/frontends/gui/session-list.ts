@@ -251,7 +251,7 @@ function buildRow(record: SessionRecord, now: Date): Gtk.ListBoxRow {
   const title = new Gtk.Label({
     label: labelOf(record),
     xalign: 0,
-    // Ellipsized, not wrapped — see `.kurier-session-title`.
+    // Ellipsized, not wrapped — see `.lotse-session-title`.
     ellipsize: Pango.EllipsizeMode.END,
     cssClasses: [CSS.sessionTitle],
   });

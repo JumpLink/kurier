@@ -8,7 +8,7 @@
  * [ADR 0001](../../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
  *
  * **Nothing here knows a toolkit.** No `gi://`, no yargs, no widget: the pieces that need a
- * decision take it as an argument. Paths arrive as a `KurierPaths`, the agent choice as an
+ * decision take it as an argument. Paths arrive as a `LotsePaths`, the agent choice as an
  * `AgentChoice`, the permission answer as a `ClientGate`. That is what lets a host put kurier's
  * conversation in its own data directory, and what keeps every file in here testable on Node as
  * well as on GJS.
@@ -20,7 +20,7 @@
 
 // ── Where kurier keeps things ────────────────────────────────────────────────────────────────────
 // The shape, and the layout a host gets. The app's own XDG/`KURIER_*` resolver stays in the app.
-export { kurierPathsUnder, type KurierPaths } from './paths.ts';
+export { lotsePathsUnder, type LotsePaths } from './paths.ts';
 
 // ── Which agent, and where its private HOME goes ─────────────────────────────────────────────────
 export { describeChoice, type AgentChoice, type AgentChoiceSource } from './agents/choice.ts';

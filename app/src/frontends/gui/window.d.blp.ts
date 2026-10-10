@@ -7,8 +7,8 @@ import type Adw from 'gi://Adw?version=1';
 declare const xml: string;
 export default xml;
 
-/** The class `template $KurierMainWindow` defines. */
-export declare const GTypeName: 'KurierMainWindow';
+/** The class `template $LotseMainWindow` defines. */
+export declare const GTypeName: 'LotseMainWindow';
 
 /**
  * Every id inside the template, in source order — what `registerClass` is given.

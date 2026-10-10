@@ -26,7 +26,7 @@
  * `config_option_update`, and from the answer to a set. Nothing is remembered between sessions and
  * nothing is persisted: kurier keeping a preferred model would be kurier holding configuration
  * authority over the agent, which is the "always allow" mistake in different clothes (see
- * `KURIER_CLIENT_CAPABILITIES`).
+ * `LOTSE_CLIENT_CAPABILITIES`).
  *
  * **A `boolean` option is skipped, and that is not an oversight.** kurier announces
  * `session.configOptions: {}` without the `boolean` capability (`gate.ts`), so an agent entitled to
@@ -228,7 +228,7 @@ export function configSelection(
  * list, a dev hook, a bug) gets `null` here rather than a request the agent will refuse.
  *
  * A `boolean` control is `null` too, and for the same reason `projectSelects` does not put one on the
- * row: nothing may send a tagged boolean while `KURIER_CLIENT_CAPABILITIES` does not announce it.
+ * row: nothing may send a tagged boolean while `LOTSE_CLIENT_CAPABILITIES` does not announce it.
  */
 export function configRequest(
   control: ConfigControl,

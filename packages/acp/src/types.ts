@@ -72,7 +72,7 @@ export interface AgentAuthCapabilities extends Extensible {
 /**
  * "I can render a boolean config option." An empty object is the whole signal — the schema says
  * supplying `{}` means the agent may include `type: "boolean"` options, and omitting it means the
- * client does not advertise support. See `KURIER_CLIENT_CAPABILITIES`.
+ * client does not advertise support. See `LOTSE_CLIENT_CAPABILITIES`.
  */
 export interface BooleanConfigOptionCapabilities extends Extensible {}
 
@@ -97,7 +97,7 @@ export interface ElicitationCapabilities extends Extensible {}
 
 /**
  * What *we* can do, announced in `initialize`. kurier answers `false` to both file-system
- * capabilities on purpose — see `KURIER_CLIENT_CAPABILITIES` and the reasoning in
+ * capabilities on purpose — see `LOTSE_CLIENT_CAPABILITIES` and the reasoning in
  * `packages/acp/src/gate.ts`.
  */
 export interface ClientCapabilities extends Extensible {
@@ -256,7 +256,7 @@ export interface SessionConfigSelect extends Extensible {
  *
  * The counterpart to `SessionConfigSelect`, and it exists for the same reason — the two arms of the
  * `oneOf` disagree about `currentValue`, so they cannot be one type. It is also the whole reason
- * `KURIER_CLIENT_CAPABILITIES` omits `session.configOptions.boolean`: `opencode acp` 2.0.19 refuses
+ * `LOTSE_CLIENT_CAPABILITIES` omits `session.configOptions.boolean`: `opencode acp` 2.0.19 refuses
  * any value that is not a string, so this shape is defined by the schema and unimplemented by the
  * one agent measured.
  */

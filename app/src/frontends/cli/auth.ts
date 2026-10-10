@@ -20,14 +20,14 @@ import {
   toHostCommand,
   which,
   type AgentCommand,
-  type KurierPaths,
+  type LotsePaths,
 } from '@lotse/core';
 
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'auth',
   describe: 'arrange the login an agent asked for, so a session does not die on -32000',
   builder: (yargs) =>

@@ -15,7 +15,7 @@ Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Fa
 | `core/agents/*` (`catalog`, `detect`, `resolve`, `probe`, `sandbox`, `isolation`, `stdio`, `launcher`, `opencode`, `server`) | `@lotse/core` or `@lotse/agents` | `stdio.ts` spawns child processes, so it must not go into `@lotse/acp` (that package knows no subprocesses). `catalog.ts` imports `app/data/bundled-agents.json`; the data file must move with it, or be injected. |
 | `core/login/*` (`api`, `controller`, `flow`, `providers`, `session`) + `app/data/login-providers.json` | `@lotse/core` | No widget code; already shared by CLI and window. |
 | `frontends/gui/*` widgets: `composer`, `transcript-view`, `config-row`, `permission-dialog` (+ `.blp`), `failure-dialog`, `login-dialog`, `css`, `constants` (parts) | `@lotse/widget` (GTK/Adw) | |
-| `frontends/gui/window.ts` (1356 lines) | **Split.** Extract a `KurierChat` widget (transcript + composer + config row + dialogs + `AgentSession` wiring). The window shell stays. | Biggest cost: `MainWindow` currently mixes shell (NavigationSplitView, session list, actions, preferences) with chat logic. |
+| `frontends/gui/window.ts` (1356 lines) | **Split.** Extract a `LotseChat` widget (transcript + composer + config row + dialogs + `AgentSession` wiring). The window shell stays. | Biggest cost: `MainWindow` currently mixes shell (NavigationSplitView, session list, actions, preferences) with chat logic. |
 
 ### Stays app-only (AGPL)
 
@@ -39,7 +39,7 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
   and a private `describeAuth` in `run.ts`, so a window would have had to re-derive both — the exact
   shape of problem this package exists to end. `packages/core/src/auth.ts` now holds the plan, the
   sentences and the two-handshake flow, with `runLogin` and `open` injected per surface.
-- **Three files on the "stays" list were split, not kept whole.** The `KurierPaths` *shape* is core and
+- **Three files on the "stays" list were split, not kept whole.** The `LotsePaths` *shape* is core and
   the XDG/`KURIER_*` resolver is the app's (`paths.ts` both sides); `AgentChoice` and `describeChoice`
   are core and the settings file is the app's; `NOTICE_IDS` and `noticeDue` are core and the notices file
   is the app's. In each case the decision is shared and the file handling is one app's.
@@ -55,7 +55,7 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
 split of `window.ts` came out with five deltas worth recording.
 
 - **`css.ts` and `constants.ts` were split rather than moved**, which is what made the move commit
-  edit-free. The widget owns `WIDGET_CSS` and `CONTENT_MAX_WIDTH_PX`; `KurierChat`
+  edit-free. The widget owns `WIDGET_CSS` and `CONTENT_MAX_WIDTH_PX`; `LotseChat`
   installs it itself (`installWidgetCss`, once per display) and the app's `APP_CSS` keeps only its
   three sidebar rules, so a host that embeds the widget alone is styled and no rule is in both sheets. The app's `constants.ts` kept what
   only an app has: the app id, name and version, the window geometry, `COLLAPSE_WIDTH_PX` and the
@@ -79,11 +79,11 @@ split of `window.ts` came out with five deltas worth recording.
 ## 2. Embedding API sketch
 
 ```ts
-class KurierChat extends Gtk.Widget {            // or Adw.Bin
-  constructor(opts: KurierChatOptions)
+class LotseChat extends Gtk.Widget {            // or Adw.Bin
+  constructor(opts: LotseChatOptions)
   start(): void; stop(): void; newChat(): void; send(text: string): void
 }
-interface KurierChatOptions {
+interface LotseChatOptions {
   agent: { source: 'bundled' | 'host' | 'auto'; id?: 'opencode' }   // default: bundled, id opencode
   cwd: string                                    // absolute; host decides the workspace
   mcpServers?: McpServer[]                       // opaque ACP objects, forwarded to session/new
@@ -110,7 +110,7 @@ shared with the user's `~/.config/opencode` or with the kurier app.
 
 ### What the options became (step 5, 2026-10-10)
 
-The sketch above is what was asked for; `KurierChatOptions` in `packages/widget/src/chat.ts` is what
+The sketch above is what was asked for; `LotseChatOptions` in `packages/widget/src/chat.ts` is what
 shipped, and the differences are all in the same direction — fewer things the widget decides.
 
 | Sketch | Shipped | Why |
@@ -158,7 +158,7 @@ shipped, and the differences are all in the same direction — fewer things the 
   3. finish-args: `--share=network` (provider calls, OAuth), `--filesystem=host` is what kurier uses; a host should prefer
      narrower access (the workspace dir only) and avoid the `--talk-name=org.freedesktop.Flatpak` unless it launches host agents.
 - Both the version pin and the checksum live in two places (manifest and JSON). A host should generate the module from the
-  JSON, e.g. a `kurier-flatpak-module` script in the widget package, or drift will occur.
+  JSON, e.g. a `lotse-flatpak-module` script in the widget package, or drift will occur.
 - Extra-data downloads at install time, so there is no offline first run. A host needs an empty state for "agent not yet unpacked".
 
 ## 5. Provider onboarding
@@ -191,14 +191,14 @@ Widget needs:
 | # | Step | Size |
 |---|---|---|
 | 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? (yes, measured) | S |
-| 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
+| 2 | **Done** (`LotsePaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `LotseChatOptions` | M |
 | 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@lotse/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | **Done** (`AgentSessionOptions.mcpServers`). Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
-| 5 | **Done** (`packages/widget`, see above for the deltas). Create `@lotse/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
+| 5 | **Done** (`packages/widget`, see above for the deltas). Create `@lotse/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `LotseChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
 | 6 | **Done** (`onboarding.ts` in core, `onboarding-page.ts` in the widget; see the ADR). Inline provider onboarding page; the connected-state signal was left out | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |
 | 8 | Flatpak module generator from `bundled-agents.json`; make `BUNDLED_PREFIX` configurable | M |
-| 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `KurierChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless kurier API is added. | M |
+| 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `LotseChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless kurier API is added. | M |
 
 **Risks**
 - ~~`window.ts` is a 1356-line god-class; splitting it is the real cost and the likeliest source of regressions

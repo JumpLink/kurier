@@ -1,12 +1,12 @@
 /**
- * The window: the app around a conversation, and the wiring between the shell and `KurierChat`.
+ * The window: the app around a conversation, and the wiring between the shell and `LotseChat`.
  *
  * **The tree is in `window.blp`; this file is what happens to it.** Every pane, header bar and
  * status page that does not depend on a running agent is declared once, in the template, and read
  * back here as an internal child. What stays in TypeScript is the session list — whose content is a
  * running agent's — the chat widget, and every decision the window makes about the two.
  *
- * **The conversation is no longer this file's.** `@lotse/widget`'s `KurierChat` owns the
+ * **The conversation is no longer this file's.** `@lotse/widget`'s `LotseChat` owns the
  * transcript, the composer, the config row, the three dialogs and the agent behind them;
  * `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws the line and this window is now one host
  * among possible others. What is left here is what names *kurier*: the sidebar and its list, the
@@ -61,7 +61,7 @@
  * property on `AdwNavigationSplitView` to hide the separator at all — only `collapsed`, `content`,
  * `min_/max_sidebar_width`.
  *
- * **One agent subprocess for this whole window, and it is the widget's.** `KurierChat` owns the
+ * **One agent subprocess for this whole window, and it is the widget's.** `LotseChat` owns the
  * process and the turns; this file asks it questions and never reaches past it. It is the reason a
  * person can click through thirty sessions without spawning thirty `opencode`s, and the reason the
  * close path below is the only place the window has an opinion about a running turn at all.
@@ -87,7 +87,7 @@ import {
   type NoticeView,
   type RecordedResolution,
 } from '@lotse/core';
-import { KurierChat } from '@lotse/widget';
+import { LotseChat } from '@lotse/widget';
 import {
   APP_NAME,
   COLLAPSE_WIDTH_PX,
@@ -95,7 +95,7 @@ import {
   WINDOW_MIN_WIDTH_PX,
   WINDOW_WIDTH,
 } from './constants.ts';
-import type { KurierHooks } from './hooks.ts';
+import type { LotseHooks } from './hooks.ts';
 import { PreferencesDialog, type PreferencesActions } from './preferences.ts';
 import { SessionList } from './session-list.ts';
 import Template from './window.blp';
@@ -142,10 +142,10 @@ const MIDTURN_HOOK_STEP_MS = 50;
  * What the window needs in order to host a conversation.
  *
  * **Flat, and it stays flat on purpose.** Most of these fields are the widget's — the agent, the
- * callbacks, the no-agent view — and the window could have taken a `KurierChatOptions` whole and
+ * callbacks, the no-agent view — and the window could have taken a `LotseChatOptions` whole and
  * passed it through. It does not, because `main.ts` is what fills this in and a nested shape would
  * make the app's one composition root know the widget's option names in order to pass them along. The
- * window assembles `KurierChatOptions` itself, in its constructor, which is the one place that knows
+ * window assembles `LotseChatOptions` itself, in its constructor, which is the one place that knows
  * both halves.
  *
  * **`appendTurns` is a separate argument from `loadSessions` rather than one store passed whole**,
@@ -155,7 +155,7 @@ const MIDTURN_HOOK_STEP_MS = 50;
  */
 export interface MainWindowOptions {
   /** Read once at startup. See `hooks.ts` — a state only a click can reach is a state untested. */
-  readonly hooks: KurierHooks;
+  readonly hooks: LotseHooks;
   /**
    * The records to list, already filtered to the principal this window is for. A function rather
    * than an array so a failure to read is the window's to *show* — thrown here, it lands on the
@@ -201,9 +201,9 @@ export interface MainWindowOptions {
 }
 
 export class MainWindow extends Adw.ApplicationWindow {
-  // The GType name is also the template's `template $KurierMainWindow` — the two must agree, and
+  // The GType name is also the template's `template $LotseMainWindow` — the two must agree, and
   // `window.blp` is where the tree is.
-  static readonly GTypeName = 'KurierMainWindow';
+  static readonly GTypeName = 'LotseMainWindow';
 
   /** The split view, and the breakpoint target. `window.blp` owns the widths. */
   declare readonly _split: Adw.NavigationSplitView;
@@ -222,12 +222,12 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** Retitled when a session opens — which is also what turns the content header's title on. */
   declare readonly _contentPage: Adw.NavigationPage;
   declare readonly _contentHeader: Adw.HeaderBar;
-  /** Holds `KurierChat`, and is the whole of the window's side of the split. */
+  /** Holds `LotseChat`, and is the whole of the window's side of the split. */
   declare readonly _chatHost: Adw.Bin;
   declare readonly _noticeBanner: Adw.Banner;
   /**
    * The two idle pages, declared beside the template and handed to the widget as its `closed` and
-   * `no-agent` slots. `window.blp` says why the app writes them; `KurierChat` decides when they show.
+   * `no-agent` slots. `window.blp` says why the app writes them; `LotseChat` decides when they show.
    */
   declare readonly _closedPage: Adw.StatusPage;
   declare readonly _noAgentPage: Adw.StatusPage;
@@ -244,11 +244,11 @@ export class MainWindow extends Adw.ApplicationWindow {
    *
    * **One field where there were nine.** The transcript, the composer, the config row, the
    * permission, failure and login dialogs, the shown-failure memory, the streamed count and the
-   * `AgentSession` itself are all `KurierChat`'s now (ADR 0001 step 5). What this window keeps is the
+   * `AgentSession` itself are all `LotseChat`'s now (ADR 0001 step 5). What this window keeps is the
    * questions it has to ask that widget — `turnRunning` to hold a close, `hasChat` before a hook
    * sends, `failureShown` before a hook dismisses — and nothing it could answer differently.
    */
-  readonly #chat: KurierChat;
+  readonly #chat: LotseChat;
   /**
    * The session on screen, or `null` while none is. The window's own copy, because what it needs is
    * the *record* (`labelOf` for the content page's title), while the widget exposes the id.
@@ -328,7 +328,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     // copy names this window's sidebar and kurier's own installer, and the widget parents them into
     // its stack. `onConversation` is the host half of a new chat: the row, the selection and the
     // title, run *before* the widget shows the conversation, which is the order a person reads in.
-    this.#chat = new KurierChat({
+    this.#chat = new LotseChat({
       agent: options.agent,
       newChat: options.newChat,
       closedPage: this._closedPage,
@@ -430,7 +430,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    *
    * **Whether it could say yes is the widget's answer, not this file's.** The login is the
    * conversation's — it is the agent behind the transcript that gets the credential — so
-   * `loginUnavailableReason` is read inside `KurierChat` and reaches here as one boolean. The menu
+   * `loginUnavailableReason` is read inside `LotseChat` and reaches here as one boolean. The menu
    * entry stays the app's, because the primary menu is.
    */
   #installLogin(): void {
@@ -460,7 +460,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * sidebar's own header.
    *
    * **The order is the window's half first, the widget's second, and it is the order a person reads
-   * in.** Clearing the selection is what the sidebar shows; `KurierChat.newChat()` is what the
+   * in.** Clearing the selection is what the sidebar shows; `LotseChat.newChat()` is what the
    * conversation shows — including the dialogs it takes down and the turn it stops. Both halves
    * together are one event, and the guard is the widget's `hasNewChat` so the two cannot disagree
    * about whether there is a directory to run in.
@@ -480,7 +480,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * person is still in that chat, marks it open — the transcript already shows what they sent, so this
    * does not go through `#open`, which would replace it with the (empty) stored copy.
    *
-   * **This runs before the widget shows the conversation.** `KurierChat` calls it from its own
+   * **This runs before the widget shows the conversation.** `LotseChat` calls it from its own
    * `onConversation` handler and then switches its stack, so the row, the selection and the title
    * are in place by the time the transcript is what fills the pane.
    */
@@ -531,7 +531,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * **The freshness read stays here and the showing goes to the widget.** `#fresh` is the *store's*
    * question — this window is the half that read the list at startup and therefore the half that knows
    * its copy may be stale — while binding the agent, loading the transcript and choosing between
-   * `open` and `empty` are all the conversation's. `KurierChat.open` is handed the record this file
+   * `open` and `empty` are all the conversation's. `LotseChat.open` is handed the record this file
    * decided on, which is why the title below and the transcript beside it cannot name two different
    * sessions.
    */
@@ -580,7 +580,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * running at all, so the common case — a window somebody opened, read and closed — does not go
    * through an async path.
    *
-   * **The dialogs and the shutdown are the widget's; the timers are this file's.** `KurierChat` owns
+   * **The dialogs and the shutdown are the widget's; the timers are this file's.** `LotseChat` owns
    * the permission, failure and login dialogs and the agent behind them, so the ordering that matters
    * — name the reason, then take the dialog down — lives there as `dismissPermission` followed by
    * `closePermission`. What is left here is the hook timers, which are armed by this file and must die
@@ -654,7 +654,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * `KU_APP_SESSION` is the first one acted on: it opens the session exactly as a click would, so
    * the collapsed content pane and its back button are reachable without a pointer.
    */
-  #applyDevHooks(hooks: KurierHooks): void {
+  #applyDevHooks(hooks: LotseHooks): void {
     if (hooks.session !== undefined) {
       const record = this.#sessions.select(hooks.session);
       if (record) this.#open(record);
@@ -766,7 +766,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * the empty composer *after* a chat exists, and a New chat in the middle of the first answer would
    * photograph a half-streamed one. Nothing running: it fires at once.
    */
-  #applyNewChatHook(hooks: KurierHooks): void {
+  #applyNewChatHook(hooks: LotseHooks): void {
     if (hooks.newChat !== true) return;
     const press = (): void => {
       console.log('kurier: KU_APP_NEW_CHAT — activating win.new-chat');
@@ -795,7 +795,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * going — the one-keystroke path that used to leave the old answer streaming into the empty pane.
    * Through the same action as the button. Polls, because the turn starts a moment after the hook runs.
    */
-  #applyNewChatMidTurnHook(hooks: KurierHooks): void {
+  #applyNewChatMidTurnHook(hooks: LotseHooks): void {
     if (hooks.newChatMidTurn !== true) return;
     this.#midTurnSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MIDTURN_HOOK_STEP_MS, () => {
       if (!this.#chat.turnRunning || this.#chat.streamed === 0) return GLib.SOURCE_CONTINUE;
@@ -809,7 +809,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /** `KU_APP_PREFERENCES` opens the dialog through its action; `KU_APP_PREFERENCES_AGENT` also chooses a row. */
-  #applyPreferencesHooks(hooks: KurierHooks): void {
+  #applyPreferencesHooks(hooks: LotseHooks): void {
     if (hooks.preferences !== true && hooks.preferencesAgent === undefined) return;
     const dialog = this.#preferences;
     const app = this.application;
@@ -850,7 +850,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * startup, so a run that sets these hooks and never fails is a run that did what it was asked and
    * said nothing, rather than a run that switched sessions for no reason.
    */
-  #applyFailureHooks(hooks: KurierHooks): void {
+  #applyFailureHooks(hooks: LotseHooks): void {
     const switchTo = hooks.switchTo ?? [];
     if (hooks.dismissFailure !== true && hooks.chooseModel !== true && switchTo.length === 0) return;
     this.#failureHooks.dismiss = hooks.dismissFailure === true;
@@ -948,10 +948,10 @@ export class MainWindow extends Adw.ApplicationWindow {
    *
    * **Through the composer's handler, not the controller.** See `hooks.ts`: the ordering the screenshot
    * has to show — the permission dialog dismissed with `turn-cancelled` first, then the cancel sent — is
-   * the *surface's* contribution, and bypassing it would photograph the controller. `KurierChat.stop()`
+   * the *surface's* contribution, and bypassing it would photograph the controller. `LotseChat.stop()`
    * is the composer's own Stop, which is why this is still a press rather than a cancel.
    */
-  #applyStopHook(hooks: KurierHooks): void {
+  #applyStopHook(hooks: LotseHooks): void {
     if (hooks.stop !== true && hooks.stopEscape !== true) return;
     if (!this.#chat.hasChat) {
       console.log('kurier: KU_APP_STOP — no session is open, so there is no turn to stop');
@@ -1017,7 +1017,7 @@ GObject.registerClass(
     GTypeName: MainWindow.GTypeName,
     Template,
     // **The children the constructor fills and the methods that act on the shell.** The two `*Host`
-    // bins are where the TypeScript-built widgets go — the session list and `KurierChat` — and the
+    // bins are where the TypeScript-built widgets go — the session list and `LotseChat` — and the
     // rest is the shell itself, named here so a method can reach it without searching the markup for
     // the right nesting.
     //

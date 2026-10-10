@@ -79,7 +79,7 @@ import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './to
  * Gap between two items in the column, in logical pixels.
  *
  * **Larger than any item's own internal padding, and it is the only gap there is.** It was 4 px
- * against a 10 px `margin-bottom` on `.kurier-bubble`, which made the rhythm the sum of two numbers
+ * against a 10 px `margin-bottom` on `.lotse-bubble`, which made the rhythm the sum of two numbers
  * in two files — and only bubbles paid the margin, so the space under an answer and the space under
  * a tool card were different for no reason anybody chose. The margin is gone (`css.ts`) and this is
  * the whole measure: one turn should read as one block with air around it, which at this text size
@@ -536,7 +536,7 @@ export class TranscriptView {
 /**
  * The kind icon in front of a tool or thought row — one size for all of them, including the
  * status-only row, which used to be a step smaller. The three row shapes share an icon column
- * (`.kurier-tool-status` pads to the card's own inset), and a column only reads as one if the things
+ * (`.lotse-tool-status` pads to the card's own inset), and a column only reads as one if the things
  * in it are the same width.
  */
 const ROW_ICON_PX = 16;
@@ -554,7 +554,7 @@ function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
     // `Gtk.IconTheme.has_icon`, like every icon name in this repo.
     case 'thought':
       // Proportional and dim: the body of a thought is commentary on the answer, and a command is
-      // not prose. See `.kurier-thought` and the `monospace` name class.
+      // not prose. See `.lotse-thought` and the `monospace` name class.
       return buildThoughtCard(buildDisclosure('dialog-information-symbolic', item, CSS.thought));
     case 'tool': {
       // A payload is what the disclosure opens onto, so a line without one is not a disclosure.
@@ -594,7 +594,7 @@ function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widge
  * **Unboxed, at the column's full width, and that is the asymmetry the surface is built on.** A
  * bubble is right for a line somebody typed and wrong for the thing the person came here to read: an
  * answer is this window's body text, and a box around it costs the measure its two side paddings
- * while adding an edge the eye crosses on every paragraph. `.kurier-agent-text` is therefore line
+ * while adding an edge the eye crosses on every paragraph. `.lotse-agent-text` is therefore line
  * spacing and nothing else (`css.ts`), and `halign` stays at `buildLabel`'s `FILL` — the label takes
  * the column, so one answer wraps at one width however long it gets.
  *
@@ -620,7 +620,7 @@ function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Wid
 /**
  * A tool call as a card: icon, title, status capsule.
  *
- * The title is `.kurier-tool-title`, not Adwaita's `heading`, and `css.ts` says why: a tool's name
+ * The title is `.lotse-tool-title`, not Adwaita's `heading`, and `css.ts` says why: a tool's name
  * at full size and full weight outranked the answer it belongs to.
  *
  * A line with no recognisable status gets no capsule rather than an invented one.
@@ -646,7 +646,7 @@ function buildToolCard(line: ToolLine): Gtk.Widget {
  * heading the agent never sent, and the line belongs to the call above it anyway.
  */
 function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
-  // No card, but the card's geometry: `.kurier-tool-status` carries the same horizontal inset and
+  // No card, but the card's geometry: `.lotse-tool-status` carries the same horizontal inset and
   // the spacing matches `buildToolCard`'s, so the icon and the pill sit in the columns the calls
   // above and below put theirs in.
   const row = new Gtk.Box({
@@ -691,7 +691,7 @@ function buildNote(text: string): Gtk.Widget {
  * the same head is returned as a plain row and no chevron is drawn at all — a disclosure that opens
  * onto nothing is a control that points at nothing, and this file's own header forbids those.
  */
-/** A thought in the tool cards' frame, one step quieter (`.kurier-thought-card`); still the same disclosure. */
+/** A thought in the tool cards' frame, one step quieter (`.lotse-thought-card`); still the same disclosure. */
 function buildThoughtCard(disclosure: Gtk.Widget): Gtk.Widget {
   const card = new Gtk.Box({
     orientation: Gtk.Orientation.VERTICAL,
@@ -719,7 +719,7 @@ function buildDisclosure(iconName: string, item: DisclosureItem, bodyClass: stri
 
   // The class goes on the row here and on the expander below, never on both: `font-size` multiplies
   // down the tree rather than being inherited as a computed value, so a head inside an expander that
-  // already carries `.kurier-disclosure` would render the summary at 0.81em. See `css.ts`.
+  // already carries `.lotse-disclosure` would render the summary at 0.81em. See `css.ts`.
   if (item.detail === null) {
     head.add_css_class(CSS.disclosure);
     return head;

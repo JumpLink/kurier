@@ -144,7 +144,7 @@ export default async () => {
     });
 
     await it('skips a boolean option — kurier announces no booleans', async () => {
-      // `KURIER_CLIENT_CAPABILITIES` sends `session.configOptions: {}` with no `boolean`, so an agent is
+      // `LOTSE_CLIENT_CAPABILITIES` sends `session.configOptions: {}` with no `boolean`, so an agent is
       // not entitled to send one and opencode refuses a tagged value outright. The projection still
       // carries booleans (`core/config.ts` checks the protocol boundary); the ROW does not draw them.
       const onlyBoolean = configRowInput({

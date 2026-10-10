@@ -753,7 +753,7 @@ export class FixtureAgent {
    *
    * - **A non-string value is refused outright.** opencode 2.0.19 answers
    *   `InvalidConfigOptionError` for `typeof value !== "string"`, so it implements no boolean
-   *   options at all. That is the measurement behind `KURIER_CLIENT_CAPABILITIES` omitting
+   *   options at all. That is the measurement behind `LOTSE_CLIENT_CAPABILITIES` omitting
    *   `session.configOptions.boolean`: announcing a shape the agent refuses is a promise the agent
    *   is entitled to break.
    * - **The answer is the full list, and it is the truth.** An unknown `configId` or a value outside

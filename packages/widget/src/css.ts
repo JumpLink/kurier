@@ -7,9 +7,9 @@
  * here would be a way of fighting it. What is left is the handful of things the toolkit has no name
  * for.
  *
- * **The widget installs this itself, once per display.** `KurierChat` calls `installWidgetCss()` from
+ * **The widget installs this itself, once per display.** `LotseChat` calls `installWidgetCss()` from
  * its constructor, so a host that embeds it alone gets a styled chat without knowing a stylesheet
- * exists. The provider sits at application priority and carries only `kurier-*` selectors plus the
+ * exists. The provider sits at application priority and carries only `lotse-*` selectors plus the
  * few Adwaita name classes below, so it cannot disagree with a host's own sheet about a rule; the
  * host must therefore *not* load `WIDGET_CSS` as well (it is not exported for that reason).
  *
@@ -54,14 +54,14 @@ export const WIDGET_CSS = `
    natural width, so the transcript's measure is a property of its text: 76 characters is about where
    a sentence stops being readable as one line and starts being a wall. The *pane* is capped by an
    Adw.Clamp; this keeps the text inside it from stretching. */
-.kurier-transcript-text {
+.lotse-transcript-text {
   font-size: 1em;
 }
 
 /* Tool and thought rows. A single line that expands, not a boxed list: one frame per tool group in a
    long transcript is a wall of borders, and a wall of borders is the opposite of the calm this
    surface is after. */
-.kurier-disclosure {
+.lotse-disclosure {
   font-size: 0.9em;
   padding: 2px 0;
 }
@@ -76,7 +76,7 @@ export const WIDGET_CSS = `
    \`ITEM_SPACING\` between its children (\`transcript-view.ts\`), so a margin here was a second gap —
    and two gaps that only one file knows about is how the spacing between a bubble and the caption
    above it came out different from the spacing between two bubbles. */
-.kurier-bubble {
+.lotse-bubble {
   border-radius: 18px;
   padding: 10px 14px;
 }
@@ -84,7 +84,7 @@ export const WIDGET_CSS = `
 /* The person's own messages, in the accent colour. \`@accent_bg_color\` is a libadwaita named colour,
    so this follows the system light/dark setting for free — the reason this file is not a palette.
    Alpha, not solid: a solid accent block is a header, and a transcript of ten of them is a wall. */
-.kurier-bubble-user {
+.lotse-bubble-user {
   background-color: alpha(@accent_bg_color, 0.15);
 }
 
@@ -97,7 +97,7 @@ export const WIDGET_CSS = `
    So what is left is line spacing. \`line-height\` parses on GTK 4.22 **and applies** — measured, a
    four-line label grows 71 px → 103 px with this value, which is the check \`css.ts\` demands of every
    property in it: the parser accepting one proves nothing about it doing anything. */
-.kurier-agent-text {
+.lotse-agent-text {
   line-height: 1.45;
 }
 
@@ -105,7 +105,7 @@ export const WIDGET_CSS = `
    a bubble because it is neither speaker: the conversation's own bookkeeping should not be the most
    prominent thing on screen. \`opacity\` rather than a lighter colour, so it composites over whatever
    the surface behind it is. */
-.kurier-note {
+.lotse-note {
   font-size: 0.9em;
   opacity: 0.66;
 }
@@ -117,12 +117,12 @@ export const WIDGET_CSS = `
    number in this file coupled to a theme's arrow width: a theme that draws a different arrow moves
    the summary and leaves this behind.
    NO \`font-size\` here, and that is a measurement: \`font-size\` is not inherited as a computed value,
-   it multiplies down the tree, so a second \`0.9em\` on a descendant of \`.kurier-disclosure\` rendered
+   it multiplies down the tree, so a second \`0.9em\` on a descendant of \`.lotse-disclosure\` rendered
    it at 0.81em — measured, 20 'i's came out 197 px wide at the intended size and 181 px inside the
    expander. It inherits the expander's \`0.9em\`, which is the size that was wanted.
    No \`font-family\` either, so the two bodies below can differ: a command is monospace and a
    thought is prose. */
-.kurier-disclosure-body {
+.lotse-disclosure-body {
   margin-left: 38px;
   margin-top: 4px;
   margin-bottom: 8px;
@@ -131,7 +131,7 @@ export const WIDGET_CSS = `
 /* A thought's body. Proportional and dimmed, where a tool's output is monospace at full weight: a
    model's reasoning is commentary on the answer, and at the answer's own weight it competes with it.
    \`opacity\` rather than a lighter colour, so it composites over whatever surface is behind it. */
-.kurier-thought {
+.lotse-thought {
   opacity: 0.72;
 }
 
@@ -142,13 +142,13 @@ export const WIDGET_CSS = `
    names, and one that went flat against the raised bottom bar it sat on.
 
    The radius is wider than \`card\`'s 12 px because this card is the composer's whole footprint, and a
-   tall surface at a small radius reads as a dialog. It matches \`.kurier-bubble\`, which is the other
+   tall surface at a small radius reads as a dialog. It matches \`.lotse-bubble\`, which is the other
    thing in this window shaped like a message.
 
    The margin is what makes it *float*: the bottom bar is \`flat\` now (\`chat.blp\`), so nothing is
    drawn behind this and the gap is the window's own background. Bottom larger than top, because
    below it there is only the window edge while above it there is the transcript's own margin. */
-.kurier-composer-frame {
+.lotse-composer-frame {
   border-radius: 18px;
   margin: 6px 12px 12px 12px;
 }
@@ -157,7 +157,7 @@ export const WIDGET_CSS = `
    which is why this rule is a marker rather than a style. It exists so the two are independently
    targetable — the frame's background belongs to the window, the entry's text does not — and so a
    future monospace mode has one place to land. */
-.kurier-composer-entry {
+.lotse-composer-entry {
   background-color: transparent;
 }
 
@@ -165,13 +165,13 @@ export const WIDGET_CSS = `
    because it is the quietest thing in the bottom bar — \`margin-top\` is 0 because the vertical box
    already has \`spacing: 2\`; a second gap is two gaps.
 
-   NO \`opacity\` here, and that is deliberate rather than an oversight. \`.kurier-composer-reason\` was
+   NO \`opacity\` here, and that is deliberate rather than an oversight. \`.lotse-composer-reason\` was
    dimmed as a rule (\`composerReason\`), which was right when the line only ever said "here is what is
    wrong". A *running* turn is not that: "Working — the agent is answering" at 55% opacity reads as a
    disabled caption rather than as the window telling them to wait, and the whole job of the line is to
    distinguish the two. The dimming now happens per-render instead, where the surface knows which of the
    two it is drawing — see \`Composer.#render\`. */
-.kurier-composer-status {
+.lotse-composer-status {
   margin-top: 0;
   margin-bottom: 6px;
   /* \`margin-left\`/\`margin-right\`, not the GTK 3 names \`margin-start\`/\`margin-end\`: GTK 4 has no
@@ -184,11 +184,11 @@ export const WIDGET_CSS = `
   margin-left: 14px;
   margin-right: 14px;
 }
-/* The config row's control. Nothing visual either — this is a marker like \`.kurier-composer-entry\`,
+/* The config row's control. Nothing visual either — this is a marker like \`.lotse-composer-entry\`,
    so the row's dropdowns can be found by class rather than by walking the tree. It exists because a
    probe (and a screenshot script) has to be able to name "the dropdowns of the config row" without
    knowing how the box below them was assembled. */
-.kurier-config-control {
+.lotse-config-control {
   background-color: transparent;
 }
 
@@ -196,41 +196,41 @@ export const WIDGET_CSS = `
    dialog). Adwaita's \`pill\` is a button shape and does nothing on a label, so the shape lives here;
    the colour comes from Adwaita's own \`accent\`/\`success\`/\`error\` text classes, tinted behind.
 
-   600 rather than \`bold\`, and 2px rather than 1px: the capsule sits beside \`.kurier-tool-title\` at
+   600 rather than \`bold\`, and 2px rather than 1px: the capsule sits beside \`.lotse-tool-title\` at
    500, and a full bold next to it made the *status* of a call louder than the call. The weight is
-   numeric for the same reason \`.kurier-session-title\` is — the two are one scale, and \`bold\` is a
+   numeric for the same reason \`.lotse-session-title\` is — the two are one scale, and \`bold\` is a
    step off it. */
-.kurier-pill {
+.lotse-pill {
   padding: 2px 10px;
   border-radius: 999px;
   font-size: 0.8em;
   font-weight: 600;
   background-color: alpha(@window_fg_color, 0.08);
 }
-.kurier-pill.accent {
+.lotse-pill.accent {
   background-color: alpha(@accent_bg_color, 0.18);
 }
-.kurier-pill.success {
+.lotse-pill.success {
   background-color: alpha(@success_bg_color, 0.18);
 }
-.kurier-pill.error {
+.lotse-pill.error {
   background-color: alpha(@error_bg_color, 0.18);
 }
 
 /* A tool call in the transcript, and the weight is what this rule is about. \`card\` supplies the
    surface — Adwaita sets no padding on it, and a row of icon, title and pill touching the edge reads
    as a table cell — but \`card\`'s *raised* surface was the loudest thing in a column whose answer is
-   unboxed (\`.kurier-agent-text\`), so the machinery outranked the thing the person came to read. What
+   unboxed (\`.lotse-agent-text\`), so the machinery outranked the thing the person came to read. What
    is kept of the card is its shape: the shadow goes and the fill becomes a tint of the foreground,
-   which is the trick \`.kurier-thought-card\` already used — the two now differ by one step on one
+   which is the trick \`.lotse-thought-card\` already used — the two now differ by one step on one
    scale instead of by kind.
 
    NO \`border-radius\`, deliberately. \`card\`'s own 12 px is right for a one-line row, and the 18 px of
-   \`.kurier-bubble\` and \`.kurier-composer-frame\` belongs to the two surfaces that are a whole message
+   \`.lotse-bubble\` and \`.lotse-composer-frame\` belongs to the two surfaces that are a whole message
    tall. Writing the theme's number out here would be a second opinion that drifts from it.
 
    The padding is one step under the bubble's 10/14, which puts this window's insets on one scale. */
-.kurier-tool-card {
+.lotse-tool-card {
   padding: 10px 12px;
   box-shadow: none;
   background-color: alpha(@window_fg_color, 0.05);
@@ -243,23 +243,23 @@ export const WIDGET_CSS = `
    This one is the widget's and the host's at once — the widget's own \`new\` and \`empty\` pages carry the
    class, and so does every idle page an app fills a chat slot with (kurier's \`window.blp\`). It stays
    here because the rule belongs to the surface whose empty states it sizes. */
-.kurier-calm image.icon {
+.lotse-calm image.icon {
   -gtk-icon-size: 64px;
 }
 
 /* A thought in the same frame as a tool card, one step quieter again, so the answer stays the loudest
    thing in the column. Only the fill: the widget carries both classes and the rule above has already
-   taken the shadow off. The body's own dimming is \`.kurier-thought\`. */
-.kurier-thought-card {
+   taken the shadow off. The body's own dimming is \`.lotse-thought\`. */
+.lotse-thought-card {
   background-color: alpha(@window_fg_color, 0.03);
 }
 
-/* The title on a tool card. 0.9em is the size \`.kurier-disclosure\` gives a tool line that *expands*,
+/* The title on a tool card. 0.9em is the size \`.lotse-disclosure\` gives a tool line that *expands*,
    and the same call rendered as a card and as a row should not be two type sizes. It was \`heading\` —
    bold at full size — which made a tool's name louder than the agent's sentence under it; the weight
    that is left is the sidebar title's 500, enough to scan a column of them by. The icon is what marks
    the row as machinery. */
-.kurier-tool-title {
+.lotse-tool-title {
   font-size: 0.9em;
   font-weight: 500;
 }
@@ -268,32 +268,32 @@ export const WIDGET_CSS = `
    inset lives here instead: the same 12 px the cards around it pad with, which is what puts its icon
    in their icon column. Without it the row hangs to the left of everything it belongs to, which is
    what made the lone "Done" read as orphaned rather than as the end of the call above it. */
-.kurier-tool-status {
+.lotse-tool-status {
   padding: 2px 12px;
 }
 `.trim();
 
 /** Class names the widget's files use, exported so a typo is a compile error rather than plain text. */
 export const CSS = {
-  transcriptText: 'kurier-transcript-text',
+  transcriptText: 'lotse-transcript-text',
   gateInput: 'gate-input',
-  disclosure: 'kurier-disclosure',
-  bubble: 'kurier-bubble',
-  bubbleUser: 'kurier-bubble-user',
-  agentText: 'kurier-agent-text',
-  note: 'kurier-note',
-  disclosureBody: 'kurier-disclosure-body',
-  thought: 'kurier-thought',
-  composerFrame: 'kurier-composer-frame',
-  composerEntry: 'kurier-composer-entry',
-  composerStatus: 'kurier-composer-status',
-  configControl: 'kurier-config-control',
-  pill: 'kurier-pill',
-  toolCard: 'kurier-tool-card',
-  toolTitle: 'kurier-tool-title',
-  toolStatus: 'kurier-tool-status',
-  calm: 'kurier-calm',
-  thoughtCard: 'kurier-thought-card',
+  disclosure: 'lotse-disclosure',
+  bubble: 'lotse-bubble',
+  bubbleUser: 'lotse-bubble-user',
+  agentText: 'lotse-agent-text',
+  note: 'lotse-note',
+  disclosureBody: 'lotse-disclosure-body',
+  thought: 'lotse-thought',
+  composerFrame: 'lotse-composer-frame',
+  composerEntry: 'lotse-composer-entry',
+  composerStatus: 'lotse-composer-status',
+  configControl: 'lotse-config-control',
+  pill: 'lotse-pill',
+  toolCard: 'lotse-tool-card',
+  toolTitle: 'lotse-tool-title',
+  toolStatus: 'lotse-tool-status',
+  calm: 'lotse-calm',
+  thoughtCard: 'lotse-thought-card',
   dim: DIM,
   title: TITLE,
   mono: MONO,
@@ -301,7 +301,7 @@ export const CSS = {
 
 const installedOn = new WeakSet<Gdk.Display>();
 
-/** Load the widget's sheet on the default display, once. Called by `KurierChat`; idempotent. */
+/** Load the widget's sheet on the default display, once. Called by `LotseChat`; idempotent. */
 export function installWidgetCss(): void {
   const display = Gdk.Display.get_default();
   if (!display || installedOn.has(display)) return;

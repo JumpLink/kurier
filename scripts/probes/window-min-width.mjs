@@ -156,8 +156,8 @@ function bubble(text, speaker) {
     xalign: 0,
     halign: user ? Gtk.Align.END : Gtk.Align.FILL,
     cssClasses: user
-      ? ['kurier-bubble', 'kurier-bubble-user', 'kurier-transcript-text']
-      : ['kurier-agent-text', 'kurier-transcript-text'],
+      ? ['lotse-bubble', 'lotse-bubble-user', 'lotse-transcript-text']
+      : ['lotse-agent-text', 'lotse-transcript-text'],
   });
 }
 
@@ -216,7 +216,7 @@ function configRow() {
       selected: 0,
       tooltipText: name,
       valign: Gtk.Align.CENTER,
-      cssClasses: ['flat', 'kurier-config-control'],
+      cssClasses: ['flat', 'lotse-config-control'],
     });
     flow.append(
       new Adw.Clamp({ child: dropdown, maximumSize: 160, tighteningThreshold: 160, halign: Gtk.Align.START }),
@@ -251,7 +251,7 @@ function composer() {
     rightMargin: 8,
     topMargin: 8,
     bottomMargin: 8,
-    cssClasses: ['kurier-composer-entry'],
+    cssClasses: ['lotse-composer-entry'],
   });
   const scroller = new Gtk.ScrolledWindow({
     child: entry,
@@ -308,7 +308,7 @@ function composer() {
     xalign: 0,
     wrap: true,
     label: 'Working — the agent is answering.',
-    cssClasses: ['kurier-composer-status', 'caption'],
+    cssClasses: ['lotse-composer-status', 'caption'],
   });
 
   const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
@@ -316,10 +316,10 @@ function composer() {
   column.append(status);
 
   // Both classes, as the widget carries them: `card` is where the surface and its 12 px radius come
-  // from, and the margins that lift it off the window's edges are in `.kurier-composer-frame`.
+  // from, and the margins that lift it off the window's edges are in `.lotse-composer-frame`.
   const frame = new Gtk.Box({
     orientation: Gtk.Orientation.VERTICAL,
-    cssClasses: ['card', 'kurier-composer-frame'],
+    cssClasses: ['card', 'lotse-composer-frame'],
   });
   frame.append(column);
 

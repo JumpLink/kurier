@@ -80,7 +80,7 @@ for (const [arch, suffix] of Object.entries(TARGETS)) {
   const actual = createHash(algorithm).update(bytes).digest('base64');
   if (actual !== expected) fail(`${platform}@${version}: ${algorithm} integrity mismatch`);
 
-  const scratch = mkdtempSync(join(tmpdir(), 'kurier-refresh-'));
+  const scratch = mkdtempSync(join(tmpdir(), 'lotse-refresh-'));
   let listing;
   try {
     const file = join(scratch, 'archive.tgz');

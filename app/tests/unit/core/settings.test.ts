@@ -23,7 +23,7 @@ import {
 } from '../../../src/core/settings.ts';
 
 async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-settings-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-settings-'));
   try {
     await run(dir);
   } finally {

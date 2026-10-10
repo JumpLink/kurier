@@ -33,7 +33,7 @@ import {
   startServer,
   which,
   whyNoLoginServer,
-  type KurierPaths,
+  type LotsePaths,
   type LoginHooks,
   type LoginMethod,
   type LoginProvider,
@@ -114,7 +114,7 @@ async function readSecret(prompt: string): Promise<string | null> {
   });
 }
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'login [provider]',
   describe: 'log in to a provider (browser login or API key) through the agent, with no terminal login',
   builder: (yargs) =>

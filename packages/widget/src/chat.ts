@@ -1,5 +1,5 @@
 /**
- * `KurierChat` — one conversation as a widget, with the app around it taken away.
+ * `LotseChat` — one conversation as a widget, with the app around it taken away.
  *
  * **What this is.** Everything a chat surface is: the transcript, the composer with its model and
  * mode controls, the tool and thought cards, the approval dialog, the failure notices, the login,
@@ -87,7 +87,7 @@ import Template from './chat.blp';
 export type HostGateAnswer = 'ask' | 'decline';
 
 /**
- * What `KurierChat` needs from the host around it.
+ * What `LotseChat` needs from the host around it.
  *
  * **`appendTurns` and `createSession` are callbacks rather than a store passed whole**, because the
  * widget's uses of a store have nothing to do with each other: one writes a record once, the other
@@ -95,7 +95,7 @@ export type HostGateAnswer = 'ask' | 'decline';
  * them. A host that reads the same file for a list of its own (kurier's window does) keeps its own
  * handle on it, and the widget never becomes a second opinion about where sessions live.
  */
-export interface KurierChatOptions {
+export interface LotseChatOptions {
   /** Which agent to start on the first prompt, and the one a login is for. */
   readonly agent: AgentCommand;
   /** Which copy `agent` is — what a new conversation's record names. */
@@ -159,10 +159,10 @@ export interface KurierChatOptions {
   readonly now?: () => string;
 }
 
-export class KurierChat extends Adw.Bin {
-  // The GType name is also the template's `template $KurierChat` — the two must agree, and
+export class LotseChat extends Adw.Bin {
+  // The GType name is also the template's `template $LotseChat` — the two must agree, and
   // `chat.blp` is where the tree is.
-  static readonly GTypeName = 'KurierChat';
+  static readonly GTypeName = 'LotseChat';
 
   /** The five states of a conversation. `chat.blp` names them; this is the only field that switches. */
   declare readonly _stack: Gtk.Stack;
@@ -220,7 +220,7 @@ export class KurierChat extends Adw.Bin {
   readonly #agent: AgentSession;
   /** The session on screen, or `null` while none is. */
   #openRecord: SessionRecord | null = null;
-  readonly #newChat: KurierChatOptions['newChat'];
+  readonly #newChat: LotseChatOptions['newChat'];
   /** Lines from the agent (not the person's own) drawn so far; a host's mid-turn hook waits for one. */
   #streamed = 0;
   /**
@@ -234,11 +234,11 @@ export class KurierChat extends Adw.Bin {
   readonly #notices: string[] = [];
   /** Why no prompt can be sent at all (no agent found), or `undefined`. Feeds the composer. */
   readonly #unavailable: string | undefined;
-  readonly #gate: KurierChatOptions['gate'];
-  readonly #hostConversation: KurierChatOptions['onConversation'];
-  readonly #hostNotice: KurierChatOptions['onNotice'];
+  readonly #gate: LotseChatOptions['gate'];
+  readonly #hostConversation: LotseChatOptions['onConversation'];
+  readonly #hostNotice: LotseChatOptions['onNotice'];
 
-  constructor(options: KurierChatOptions) {
+  constructor(options: LotseChatOptions) {
     super();
     installWidgetCss();
 
@@ -774,7 +774,7 @@ export class KurierChat extends Adw.Bin {
     return this.#openRecord?.id ?? null;
   }
 
-  /** Why no prompt can be sent at all, or `undefined`. `KurierChatOptions.noAgent`'s own sentence. */
+  /** Why no prompt can be sent at all, or `undefined`. `LotseChatOptions.noAgent`'s own sentence. */
   get sendReason(): string | undefined {
     return this.#unavailable;
   }
@@ -816,7 +816,7 @@ function composerInput(snapshot: AgentSnapshot, unavailable?: string): ComposerI
 
 GObject.registerClass(
   {
-    GTypeName: KurierChat.GTypeName,
+    GTypeName: LotseChat.GTypeName,
     Template,
     // **The six ids `chat.blp` declares, written out.** The generated `chat.d.blp.ts` sidecar names
     // them too, but nothing in this repo imports a `.blp` by name: `tsc` would need
@@ -827,5 +827,5 @@ GObject.registerClass(
     // above as the typed half.
     InternalChildren: ['stack', 'closedHost', 'noAgentHost', 'transcriptHost', 'composerHost', 'cwdCaption'],
   },
-  KurierChat,
+  LotseChat,
 );

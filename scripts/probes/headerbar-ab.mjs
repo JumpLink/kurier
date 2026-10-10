@@ -78,7 +78,7 @@ function sample(win, name) {
   const node = snapshot.to_node();
   if (!node) throw new Error(`${name}: nothing rendered`);
   // Through a PNG because it is the one texture → pixel path both GTK and GdkPixbuf agree on.
-  const file = GLib.build_filenamev([GLib.get_tmp_dir(), `kurier-probe-${name}.png`]);
+  const file = GLib.build_filenamev([GLib.get_tmp_dir(), `lotse-probe-${name}.png`]);
   win.get_native().get_renderer().render_texture(node, null).save_to_png(file);
   const pixbuf = GdkPixbuf.Pixbuf.new_from_file(file);
   const px = pixbuf.get_pixels();

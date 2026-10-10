@@ -2,7 +2,7 @@
 
 A step-by-step guide for a host application written in GJS (TypeScript or JavaScript) with GTK 4 and
 libadwaita that wants an agent chat inside its own window. You get a transcript, a composer, tool cards,
-an approval dialog and a provider login as **one widget**, `KurierChat`. You bring the window, the
+an approval dialog and a provider login as **one widget**, `LotseChat`. You bring the window, the
 data directory, the agent choice and your own permission policy.
 
 Both packages are LGPL-3.0-or-later, so you may link them into an application under another licence;
@@ -25,13 +25,13 @@ only needs two callbacks (step 4). `@lotse/acp` (the protocol layer) comes in tr
 ## 2. Give kurier its own data directory
 
 Kurier writes inside **one directory you choose**. It never reads `HOME`, `XDG_*` or `KURIER_*` for this:
-the directory arrives as a `KurierPaths` value.
+the directory arrives as a `LotsePaths` value.
 
 ```ts
-const paths = kurierPathsUnder(dataRoot); // <dataRoot>/data/…, <dataRoot>/config/…
+const paths = lotsePathsUnder(dataRoot); // <dataRoot>/data/…, <dataRoot>/config/…
 ```
 
-| Field | Layout under `kurierPathsUnder(root)` |
+| Field | Layout under `lotsePathsUnder(root)` |
 |---|---|
 | `dataDir` | `<root>/data` |
 | `sessionsFile` | `<root>/data/sessions.json` — conversations, with their full text |
@@ -43,7 +43,7 @@ its whole private state under `<dataDir>/agents/<id>/{home,config,data,state,cac
 `XDG_*` point there, so it never reads or writes the person's own `~/.config`, `~/.claude` or login.
 Moving `dataDir` moves all of it.
 
-`kurierPaths()` (XDG plus `KURIER_*` overrides) belongs to kurier's app, not to the packages — build your
+`lotsePaths()` (XDG plus `KURIER_*` overrides) belongs to kurier's app, not to the packages — build your
 own value.
 
 ## 3. Choose the agent
@@ -85,7 +85,7 @@ regenerating. Then point `agentSource` at `'bundled'`, as above.
 ## 4. Create the widget
 
 ```ts
-const chat = new KurierChat({
+const chat = new LotseChat({
   agent: found?.command ?? requireLauncher(DEFAULT_AGENT),
   agentSource: found?.source ?? 'host',
   newChat: { cwd: projectDir, home: homedir() },

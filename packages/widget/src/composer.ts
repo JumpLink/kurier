@@ -18,7 +18,7 @@
  * **The rounded frame is a `Gtk.Box` with Adwaita's `card` plus one class of our own, not a
  * `Gtk.Frame`.** `GtkFrame` draws a border and a title gap and nothing in Adwaita turns it into the
  * rounded surface this needs. `card` is the toolkit's own name for an inset surface and brings the
- * background, the shadow and both colour schemes with it; `.kurier-composer-frame` only widens the
+ * background, the shadow and both colour schemes with it; `.lotse-composer-frame` only widens the
  * radius and sets the margins that lift the card off the window's edges. Together with the bottom
  * bar's `flat` style (`window.blp`) that is what makes the composer read as one object floating in
  * the pane rather than as a strip welded to the bottom of the window.

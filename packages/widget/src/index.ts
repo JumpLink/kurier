@@ -1,7 +1,7 @@
 /**
  * `@lotse/widget` — the chat surface, as a widget a host embeds.
  *
- * Layer 3, above `@lotse/core` and below any application: `KurierChat` is one conversation — the
+ * Layer 3, above `@lotse/core` and below any application: `LotseChat` is one conversation — the
  * transcript, the composer with its model and mode controls, the tool and thought cards, the
  * approval dialog, the failure notices, the login — and nothing around one. The host brings the
  * window, the session list, the menu and the preferences; see
@@ -23,11 +23,11 @@
  * - `@lotse/widget/permission-dialog` — `app/tests/probes/permission-focus.ts` measures where GTK
  *   puts the keyboard focus **on this very widget**, which a look-alike built from `Adw.AlertDialog`
  *   cannot answer (the probe's own header records the time the two disagreed). A host has no use for
- *   the dialog on its own: `KurierChat` raises it, and a host's say over it is `gate`.
+ *   the dialog on its own: `LotseChat` raises it, and a host's say over it is `gate`.
  */
 
-export { KurierChat, type HostGateAnswer, type KurierChatOptions } from './chat.ts';
+export { LotseChat, type HostGateAnswer, type LotseChatOptions } from './chat.ts';
 
-// The stylesheet is installed by `KurierChat` itself; only the class-name map is public, for a host
+// The stylesheet is installed by `LotseChat` itself; only the class-name map is public, for a host
 // that styles its own widgets next to the chat (kurier's app reuses `calm`).
 export { CSS } from './css.ts';

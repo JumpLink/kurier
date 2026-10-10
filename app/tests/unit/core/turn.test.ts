@@ -221,7 +221,7 @@ export default async () => {
       // While attaching there is a process but no session to prompt, so a Send enabled then would
       // accept a message that cannot be delivered.
       expect(agentStatus({ status: 'attaching' }).attached).toBe(false);
-      expect(agentStatus({ status: 'attached', name: 'KurierStandIn 0.1.0' }).attached).toBe(true);
+      expect(agentStatus({ status: 'attached', name: 'LotseStandIn 0.1.0' }).attached).toBe(true);
     });
 
     await it('carries the auth hint through verbatim — it is the remedy', async () => {

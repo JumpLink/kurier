@@ -12,7 +12,7 @@
  * somewhere else to live — beside the editor, in its own TUI. In kurier the agent *is* the window,
  * so "elsewhere" is a terminal the person has to leave to open. Showing what the agent reported, and
  * setting it through the protocol, is the same boundary from the other side: kurier holds no
- * configuration authority over the agent (see `KURIER_CLIENT_CAPABILITIES` and `setConfigOption`).
+ * configuration authority over the agent (see `LOTSE_CLIENT_CAPABILITIES` and `setConfigOption`).
  *
  * Measured against `opencode acp` 2.0.19, one `session/new` with an empty `mcpServers`:
  *

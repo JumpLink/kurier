@@ -9,7 +9,7 @@ import { createSessionStore, newSession } from '@lotse/session';
 const AT = '2026-09-30T10:00:00.000Z';
 
 async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-store-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-store-'));
   try {
     await run(dir);
   } finally {

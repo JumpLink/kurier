@@ -42,7 +42,7 @@ import {
   resolveRecorded,
 } from '@lotse/core';
 import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
-import { kurierPaths } from '../../core/paths.ts';
+import { lotsePaths } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
 import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
@@ -60,7 +60,7 @@ void Gtk;
  * exist at all, and why a state that only a click can reach is a state nobody has checked.
  */
 const hooks = readHooks();
-const paths = kurierPaths();
+const paths = lotsePaths();
 
 /**
  * What the settings said about themselves: an unreadable file, or a choice that is not available here.

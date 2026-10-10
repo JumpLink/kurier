@@ -82,7 +82,7 @@ your first prompt starts the session. Every dev hook, the stand-in agent that ne
 measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
 
 **The chat is a widget, and this window is one consumer of it.** `@lotse/widget` (`packages/widget`,
-LGPL) holds `KurierChat` — one conversation: the transcript, the composer with its model and mode
+LGPL) holds `LotseChat` — one conversation: the transcript, the composer with its model and mode
 controls, the tool cards, the approval dialog, the login — and another GTK app embeds it by parenting
 one widget and passing which agent, which directory and which MCP servers to use. The window in
 `app/src/frontends/gui/` keeps what only an app has: the sidebar, the menu, Preferences. The line
