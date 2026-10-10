@@ -5,15 +5,16 @@
  * conversation and no credential can be in it; it is `derived` — pressing "Got it" again recreates it.
  * **A bad file never stops startup**: `readNotices` returns "nothing seen" plus a `problem`, so the notice
  * is shown again rather than the window failing.
+ *
+ * The ids and `noticeDue` are in `@kurier/core`, next to the empty state that asks; what is here is the
+ * file around them.
  */
 
 import { readFileSync } from 'node:fs';
 
+import { NOTICE_IDS, type NoticeId } from '@kurier/core';
+
 import { writePrivateFile } from './private-file.ts';
-
-export type NoticeId = 'bundled-agent';
-
-export const NOTICE_IDS: readonly NoticeId[] = ['bundled-agent'];
 
 export interface Notices {
   readonly version: 1;
@@ -25,11 +26,6 @@ export const NOTICES_VERSION = 1;
 export const DEFAULT_NOTICES: Notices = { version: NOTICES_VERSION, seen: [] };
 
 export type ParsedNotices = { readonly notices: Notices } | { readonly problem: string };
-
-/** Whether a notice has not been dismissed yet. */
-export function noticeDue(id: NoticeId, seen: readonly string[]): boolean {
-  return !seen.includes(id);
-}
 
 /** The notices in a file's text. Pure; an id this build does not know is left out, never an error. */
 export function parseNotices(raw: string): ParsedNotices {

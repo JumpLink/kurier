@@ -22,7 +22,7 @@
  *   model that disappears leaves a stale entry that matches nothing.
  *
  * **The data is a JSON file rather than an array in here, because it is a list somebody maintains by
- * reading a web page.** `app/data/free-models.json` carries the ids, the date they were last checked,
+ * reading a web page.** `packages/core/data/free-models.json` carries the ids, the date they were last checked,
  * the criterion they were chosen by and the link they were read from — so "why is this id in here" is
  * answerable without reading this file, and a stale entry can be recognised as stale. The bundler
  * inlines it, so nothing at runtime reads a file or needs one installed.
@@ -33,9 +33,9 @@
 
 // The import attribute is required, not decorative: this file is an ECMAScript module and `module` is
 // `NodeNext` in `tsconfig.json`, so TypeScript demands it (TS1543). The bundler inlines the file's
-// contents at build time — nothing reads `app/data/` at runtime, and no file has to be installed beside
+// contents at build time — nothing reads the data directory at runtime, and no file has to be installed beside
 // the bundle for the hint to work.
-import list from '../../data/free-models.json' with { type: 'json' };
+import list from '../data/free-models.json' with { type: 'json' };
 
 /**
  * The maintainer's list, verbatim: ids, the date it was checked, the criterion and the link.
@@ -48,7 +48,7 @@ export const FREE_MODELS: FreeModelList = list;
 /** The ids themselves, in the order the file lists them. */
 export const FREE_MODEL_IDS: readonly string[] = FREE_MODELS.ids;
 
-/** The shape of `app/data/free-models.json`, written out so a broken file is a type error and not a runtime surprise. */
+/** The shape of `packages/core/data/free-models.json`, written out so a broken file is a type error and not a runtime surprise. */
 export interface FreeModelList {
   /** ISO date the ids were last read off the provider's own page. */
   readonly checked: string;

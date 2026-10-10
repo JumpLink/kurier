@@ -28,21 +28,19 @@ import { join } from 'node:path';
 
 import {
   FLATPAK_SPAWN,
+  StdioChannel,
   currentSandboxFacts,
   hostCwdArgv,
   hostProbeArgv,
   isSandboxed,
-  toHostCommand,
-  type SandboxFacts,
-} from '../../../src/core/agents/sandbox.ts';
-import {
   needsWindowsShell,
   probeAccepts,
   resolveSpawnCommand,
-  StdioChannel,
+  toHostCommand,
   which,
   type AgentCommand,
-} from '../../../src/core/agents/stdio.ts';
+  type SandboxFacts,
+} from '@kurier/core';
 
 /** Sandboxed: the one fact, present. */
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };

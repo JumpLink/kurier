@@ -56,9 +56,11 @@ import {
   isAtBottom,
   resolveFollow,
   shouldRetryFollow,
+  toTranscriptItems,
   type AdjustmentSignal,
-} from '../../core/scroll.ts';
-import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
+  type DisclosureItem,
+  type TranscriptItem,
+} from '@kurier/core';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './tool-line.ts';

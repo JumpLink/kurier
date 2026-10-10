@@ -9,6 +9,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import {
+  PermissionDesk,
   agentNames,
   answerFor,
   decideFromView,
@@ -17,12 +18,11 @@ import {
   isKnownOptionKind,
   optionLabel,
   permissionView,
-  PermissionDesk,
   usableOptions,
   type NotAnsweredReason,
   type PermissionDecision,
   type PermissionQuestion,
-} from '../../../src/core/permission.ts';
+} from '@kurier/core';
 
 import type { PermissionOption, RequestPermissionRequest } from '@kurier/acp/types';
 

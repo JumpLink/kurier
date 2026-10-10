@@ -12,9 +12,14 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { freeModelFirst, FREE_MODEL_IDS, FREE_MODELS } from '../../../src/core/free-models.ts';
-import { configRowInput, modelControl } from '../../../src/core/config-row.ts';
-import type { ConfigValue } from '../../../src/core/config.ts';
+import {
+  FREE_MODELS,
+  FREE_MODEL_IDS,
+  configRowInput,
+  freeModelFirst,
+  modelControl,
+  type ConfigValue,
+} from '@kurier/core';
 import type { SessionConfigOption } from '@kurier/acp/types';
 
 /** The agent's list, in the agent's order, with two of them named by the hint. */

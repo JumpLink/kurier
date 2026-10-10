@@ -8,7 +8,7 @@ import {
   resolveFollow,
   shouldRetryFollow,
   type AdjustmentSignal,
-} from '../../../src/core/scroll.ts';
+} from '@kurier/core';
 
 export default async () => {
   await describe('scroll — was the view at the newest end', async () => {

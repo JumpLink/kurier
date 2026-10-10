@@ -9,21 +9,23 @@ import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { BUNDLED_PREFIX, bundledProgram, parseBundledCatalog } from '../../../src/core/agents/catalog.ts';
-import type { AgentDetection } from '../../../src/core/agents/detect.ts';
-import { isolationDirs } from '../../../src/core/agents/isolation.ts';
 import {
-  bundledCommand,
-  describeResolved,
+  BUNDLED_PREFIX,
   NO_AGENT_MESSAGE,
+  bundledCommand,
+  bundledProgram,
+  describeResolved,
+  gatherAgentFacts,
+  isolationDirs,
+  parseBundledCatalog,
   resolveDefault,
   resolveDefaultWithNote,
   resolveRecorded,
   sameCommand,
+  type AgentCommand,
+  type AgentDetection,
   type ResolveContext,
-} from '../../../src/core/agents/resolve.ts';
-import { gatherAgentFacts } from '../../../src/core/agents/probe.ts';
-import type { AgentCommand } from '../../../src/core/agents/stdio.ts';
+} from '@kurier/core';
 
 const SHA = 'c'.repeat(64);
 const DATA = '/synthetic/data/kurier';

@@ -6,14 +6,15 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { BUNDLED_PREFIX, parseBundledCatalog } from '../../../src/core/agents/catalog.ts';
 import {
+  BUNDLED_PREFIX,
   detectAgents,
+  parseBundledCatalog,
   parseVersionOutput,
   resolveAgent,
   type AgentDetection,
   type AgentFacts,
-} from '../../../src/core/agents/detect.ts';
+} from '@kurier/core';
 
 const SHA = 'b'.repeat(64);
 

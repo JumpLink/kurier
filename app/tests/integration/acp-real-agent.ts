@@ -24,8 +24,7 @@ import { AcpClient } from '@kurier/acp/client';
 import { KURIER_CLIENT_CAPABILITIES } from '@kurier/acp/gate';
 import { channelTransport } from '@kurier/acp/transport';
 
-import { OPENCODE_COMMAND } from '../../src/core/agents/opencode.ts';
-import { StdioChannel, which } from '../../src/core/agents/stdio.ts';
+import { OPENCODE_COMMAND, StdioChannel, which } from '@kurier/core';
 
 let exitCode = 0;
 

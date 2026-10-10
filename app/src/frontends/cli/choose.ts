@@ -7,18 +7,18 @@
  * when it has nothing to return, so a handler only has to stop.
  */
 
-import { requireLauncher } from '../../core/agents/launcher.ts';
-import type { KurierPaths } from '../../core/paths.ts';
-import { readSettings } from '../../core/settings.ts';
-import { gatherResolveContext } from '../../core/agents/probe.ts';
 import {
-  describeResolved,
   NO_AGENT_MESSAGE,
+  describeResolved,
+  gatherResolveContext,
+  requireLauncher,
   resolveDefaultWithNote,
   resolveRecorded,
+  type KurierPaths,
   type ResolvedAgent,
   type ResolvedSource,
-} from '../../core/agents/resolve.ts';
+} from '@kurier/core';
+import { readSettings } from '../../core/settings.ts';
 
 import { err } from './output.ts';
 

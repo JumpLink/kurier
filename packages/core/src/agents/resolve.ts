@@ -14,7 +14,7 @@ import { dirname } from 'node:path';
 import { NO_AGENT_REMEDY } from '../empty-state.ts';
 import { BUNDLED_AGENTS, bundledProgram, type BundledAgent } from './catalog.ts';
 import { resolveAgent, type AgentDetection } from './detect.ts';
-import type { AgentChoice } from '../settings.ts';
+import type { AgentChoice } from './choice.ts';
 import { isolationEnv, type IsolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
 import type { AgentCommand } from './stdio.ts';

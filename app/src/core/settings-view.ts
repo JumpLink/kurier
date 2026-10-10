@@ -22,9 +22,14 @@
  * says why; a file it will first move aside says so too.
  */
 
-import { bundledProgram, type BundledAgent } from './agents/catalog.ts';
-import { resolveAgent, type AgentDetection } from './agents/detect.ts';
-import { saveDecision, type AgentChoice, type Settings, type SettingsProblemKind } from './settings.ts';
+import {
+  bundledProgram,
+  resolveAgent,
+  type AgentChoice,
+  type AgentDetection,
+  type BundledAgent,
+} from '@kurier/core';
+import { saveDecision, type Settings, type SettingsProblemKind } from './settings.ts';
 
 export const AUTOMATIC_KEY = 'auto';
 

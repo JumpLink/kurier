@@ -13,8 +13,7 @@
  */
 
 import type { ClientGate } from '@kurier/acp/gate';
-import type { Terminal } from '../../core/policy.ts';
-import { terminalGate } from '../../core/policy.ts';
+import { terminalGate, type Terminal } from '@kurier/core';
 
 import { err } from './output.ts';
 

@@ -12,7 +12,7 @@
 
 import { createInterface, type Interface } from 'node:readline';
 
-import type { Terminal } from '../../core/policy.ts';
+import type { Terminal } from '@kurier/core';
 
 export function processTerminal(): Terminal {
   const interactive = Boolean((process.stdin as { isTTY?: boolean }).isTTY);

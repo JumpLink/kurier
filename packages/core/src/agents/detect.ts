@@ -11,7 +11,7 @@
  * to prevent. Its `--version` is dropped with it.
  */
 
-import { describeChoice, type AgentChoice } from '../settings.ts';
+import { describeChoice, type AgentChoice } from './choice.ts';
 import { BUNDLED_AGENTS, BUNDLED_PREFIX, bundledProgram, type BundledAgent } from './catalog.ts';
 
 /** What the machine said about one launcher id. */

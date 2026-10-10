@@ -23,16 +23,31 @@ layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `se
 |---|---|---|
 | `@kurier/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
 | `@kurier/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@kurier/acp`, `node:fs` — no `gi://`, no agent adapter |
-| `kurier-cli` (`app/`) | yargs CLI, the stdio child-process adapters, the agent launcher table, the terminal permission gate, XDG paths, and the Adwaita surface in `src/frontends/gui/` (its own bundle) | all of the above; `gi://` only under `frontends/gui/` |
+| `@kurier/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@kurier/acp`, `@kurier/session`, `node:*` — no `gi://`, no yargs, no widget |
+| `kurier-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita surface in `src/frontends/gui/` (its own bundle) | all of the above; `gi://` only under `frontends/gui/` |
 
 **`packages/acp` does not know that subprocesses exist.** No `spawn`, no `node:child_process`, no
 `gi://`, no dependencies at all — the transport is an injected interface (`Transport` in
 `transport.ts`). That is postbote's `store`-knows-no-backend rule one layer up, and it is what lets
 the same protocol code run as the Node unit test and the GJS integration test.
 
+**There are two directories called core, and the difference is the whole point.** `packages/core/src` is
+LGPL and holds what a *host* would need; `app/src/core` is AGPL and holds what is true of **this** app
+only — the XDG resolver (`paths.ts`), the settings file (`settings.ts`, `settings-view.ts`), the notices
+file (`notices.ts`), `session-groups.ts`, `private-file.ts`. Three of those are split on purpose: the
+`KurierPaths` shape, `AgentChoice`/`describeChoice` and `NOTICE_IDS`/`noticeDue` are decisions and live in
+the package, while reading and writing one app's file stays here. Before adding to `app/src/core`, ask
+whether a host would want it; if yes it belongs one level down. [ADR
+0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) records what stayed and why.
+
+**The app imports `@kurier/core`, never a file inside it.** `packages/core/src/index.ts` is a deliberate
+barrel, so what is public is a decision somebody made rather than whatever a consumer reached for; a new
+export is one line there. The unit tests live in `app/tests/unit/core/` and import the barrel like any
+other consumer — one runner (`app/tests/test.mts`) is what keeps the dual GJS + Node run working.
+
 `@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
-`KurierPaths` (`core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)` for a host), a
-test passes a temp dir.
+`KurierPaths` (`app/src/core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)`
+from `@kurier/core` for a host), a test passes a temp dir.
 
 ## The CLI
 
@@ -47,19 +62,19 @@ kurier agents                              # launchers, SOURCE, what kurier woul
 ```
 
 **Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
-`app/data/bundled-agents.json` under `BUNDLED_PREFIX` (`core/agents/catalog.ts`, the one place the
+`packages/core/data/bundled-agents.json` under `BUNDLED_PREFIX` (`agents/catalog.ts` there, the one place the
 prefix is written), never `/app/bin` — there it would shadow the person's own opencode, which carries
 their login. The prefix is `/app/extra/agents`, not `/app/libexec`: the archive is Flatpak `extra-data`,
 fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/README.md).
 `detectAgents` ignores a host hit under the prefix; `resolveAgent` takes the setting, else the first
-host install, else the first bundled copy (`core/agents/detect.ts`, pure over facts gathered by
+host install, else the first bundled copy (`agents/detect.ts`, pure over facts gathered by
 `probe.ts`). The catalog's `env` is flags only, never a credential.
-The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `core/settings.ts`, in
+The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `app/src/core/settings.ts`, in
 `$XDG_CONFIG_HOME/kurier/settings.json` (`KURIER_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
 precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
 `kurier agents --use <id>[:bundled|host]|none` writes it.
-The GUI writes it from Preferences (`<Ctrl>comma`; `core/settings-view.ts` decides the rows, unavailable ones stay listed) and a change applies the next time kurier starts (the window resolves its agent once and keeps it); a settings file kurier could not read is never destroyed by a save (`saveDecision`: a newer `version` refuses, anything else is first moved to `settings.json.bak`); inside a Flatpak the dialog opens before the host answers (`Checking…`, then async). Hooks `KU_APP_PREFERENCES[_AGENT]` are in docs/dev-fixtures.md.
+The GUI writes it from Preferences (`<Ctrl>comma`; `app/src/core/settings-view.ts` decides the rows, unavailable ones stay listed) and a change applies the next time kurier starts (the window resolves its agent once and keeps it); a settings file kurier could not read is never destroyed by a save (`saveDecision`: a newer `version` refuses, anything else is first moved to `settings.json.bak`); inside a Flatpak the dialog opens before the host answers (`Checking…`, then async). Hooks `KU_APP_PREFERENCES[_AGENT]` are in docs/dev-fixtures.md.
 An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
@@ -166,6 +181,14 @@ session dies on an error message instead of on code. `classifyAuthMethods` (`gat
 as the protocol's *agent* auth method: it means the client has to arrange the login itself, which
 is what `kurier auth` runs outside the ACP channel.
 
+**What to do about it is decided once, in `@kurier/core`'s `auth.ts`** — `authPlan` (which of the two
+paths the methods allow), `describeAuthMethods` (the handshake notice), `loginCommandFor` (the program,
+the bundled copy's own) and `arrangeAuth` (ask the agent, run the login, **ask it again** — the second
+handshake is the agent's own yes rather than an exit code read as one). A surface passes in only what
+genuinely differs: `runLogin`, which the CLI runs with inherited stdio because a login that opens a
+browser cannot open one from a pipe, and `open` for a test. It lived in `frontends/cli/auth.ts` once,
+which is why the window had no way to log anyone in.
+
 **Trap 2 — capability negotiation is uneven.** `loadSession`, `sessionCapabilities.{list,resume,
 close,delete,fork}` — not every agent can do everything. **Check the capability, do not assume
 it.** `AcpClient.reattach` tries `session/load` first (the default), falls back to `session/resume`,
@@ -241,7 +264,7 @@ the same call a sidebar row makes) rather than around it, so a screenshot is of 
 re-implementation.
 
 **Three dialogs, and only three failures earn one.** Plan §6 asks for the auth trap and the reattach
-refusal to be *shown*, and `core/failure.ts` is where that is decided: `failureKind` classifies an error
+refusal to be *shown*, and `@kurier/core`'s `failure.ts` is where that is decided: `failureKind` classifies an error
 by its **type and the turn state** (`RpcError` -32000, `UnsupportedCapabilityError`,
 `FailureContext.promptSent`), never by its wording; `failureNotice` returns a dialog for `auth`, `model`
 and `unsupported` and **`null` for `start`** — a bad command or a handshake timeout is already the
@@ -258,7 +281,7 @@ too**, which is why the notice names *both* remedies in provider-neutral words. 
 (`agentStatus` reads `kind === 'model'` as attached) and the config row, whose model dropdown the one
 button opens, and writes no transcript line — the agent answered, so `agentExitedEntry` would be one.
 
-**The free-model hint is order, never a choice.** `app/data/free-models.json` (ids, the date checked, the
+**The free-model hint is order, never a choice.** `packages/core/data/free-models.json` (ids, the date checked, the
 criterion, the [zen link](https://opencode.ai/docs/zen)) is applied by `freeModelFirst` to a **model**
 control's values only, leaving the rest in the agent's order — the one named exception to "the agent's
 order is the order it sent". It never selects, hides or guesses: exact ids, so a model that has gone stops
@@ -274,7 +297,7 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `core/login/`, [docs/login.md](docs/login.md)): the
+**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@kurier/core`'s `login/`, [docs/login.md](docs/login.md)): the
 agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
 stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
 a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it
@@ -290,7 +313,7 @@ waits by polling for the gate to be asked rather than for a fixed delay (`window
 would either beat the agent's question or lose to it. The dialog's behaviour, the two halves and the
 measured GTK facts behind it are in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#the-permission-dialog); what it does and does not do is
-decided in `app/src/core/permission.ts` and tested on both runtimes, while the widget only renders.
+decided in `packages/core/src/permission.ts` and tested on both runtimes, while the widget only renders.
 
 **Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
 measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd).
@@ -360,7 +383,7 @@ cannot start the agent it exists to start, and with them the sandbox is close to
 this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
 `--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).
 
-`app/src/core/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
+`packages/core/src/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
 it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
 same object. Four things about it are measured rather than assumed, and each has a test:
 

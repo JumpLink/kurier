@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "@kurier/acp": "*",
+    "@kurier/core": "*",
     "@kurier/session": "*",
     "yargs": "^18.1.0"
   },

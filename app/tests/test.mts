@@ -14,6 +14,7 @@ import transport from './unit/acp/transport.test.ts';
 import sessionModel from './unit/session/model.test.ts';
 import sessionStore from './unit/session/store.test.ts';
 
+import auth from './unit/core/auth.test.ts';
 import config from './unit/core/config.test.ts';
 import configRow from './unit/core/config-row.test.ts';
 import failure from './unit/core/failure.test.ts';
@@ -64,6 +65,7 @@ run({
   transport,
   sessionModel,
   sessionStore,
+  auth,
   config,
   configRow,
   failure,

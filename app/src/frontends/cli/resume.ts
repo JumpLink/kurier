@@ -11,10 +11,14 @@
 
 import type { CommandModule } from 'yargs';
 
-import { installInterruptHandler } from '../../core/interrupt.ts';
-import type { KurierPaths } from '../../core/paths.ts';
-import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
-import { toTranscript } from '../../core/transcript.ts';
+import {
+  installInterruptHandler,
+  openAgent,
+  runTurn,
+  toTranscript,
+  withAuthHint,
+  type KurierPaths,
+} from '@kurier/core';
 import { createSessionStore } from '@kurier/session';
 import type { TranscriptEntry } from '@kurier/session';
 

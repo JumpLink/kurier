@@ -19,7 +19,7 @@ import {
   findControl,
   projectConfigOptions,
   type ConfigControl,
-} from '../../../src/core/config.ts';
+} from '@kurier/core';
 import type { SessionConfigOption } from '@kurier/acp/types';
 
 import { buildManyModelOptions, opencodeConfigOptions } from '../../support/fixture-agent.ts';

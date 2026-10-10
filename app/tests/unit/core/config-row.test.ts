@@ -15,6 +15,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import {
+  REFUSED,
   applyConfigUpdate,
   configAfterSet,
   configRequest,
@@ -23,11 +24,10 @@ import {
   emptyConfigRow,
   isConfigChange,
   parseConfigOptionSpec,
-  REFUSED,
+  projectConfigOptions,
   type ConfigRowControl,
   type ConfigRowView,
-} from '../../../src/core/config-row.ts';
-import { projectConfigOptions } from '../../../src/core/config.ts';
+} from '@kurier/core';
 import type { SessionConfigOption } from '@kurier/acp/types';
 
 import {

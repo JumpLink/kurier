@@ -21,6 +21,7 @@ import {
 import { classifyAuthMethods } from '@kurier/acp/gate';
 
 import { stdioTransport, type AgentCommand } from './agents/stdio.ts';
+import { describeAuthMethods } from './auth.ts';
 import { AUTH_COMMAND, AuthRequiredError } from './failure.ts';
 
 export interface AgentHandle {
@@ -100,7 +101,7 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
     const result = await client.initialize();
     const auth = classifyAuthMethods(client.authMethods);
     if (!auth.none) {
-      options.onNotice?.(describeAuth(auth.agent, auth.terminal));
+      options.onNotice?.(describeAuthMethods(auth));
     }
     const info = result.agentInfo;
     return {
@@ -137,20 +138,6 @@ export async function withAuthHint<T>(what: string, run: () => Promise<T>): Prom
     }
     throw error;
   }
-}
-
-function describeAuth(
-  agent: { id: string; name: string; description?: string }[],
-  terminal: { id: string; name: string }[],
-): string {
-  const lines = ['this agent advertises authentication:'];
-  for (const method of terminal) lines.push(`  ${method.name} (${method.id}) — the agent can run it itself`);
-  for (const method of agent) {
-    const hint = method.description ? ` — ${method.description}` : '';
-    lines.push(`  ${method.name} (${method.id})${hint}`);
-  }
-  lines.push('  `kurier auth` arranges it; a session started before that will fail with -32000.');
-  return lines.join('\n');
 }
 
 export interface TurnOptions {

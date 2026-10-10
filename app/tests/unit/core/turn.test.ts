@@ -15,7 +15,7 @@ import {
   type CancelledBy,
   type TurnEvent,
   type TurnState,
-} from '../../../src/core/turn.ts';
+} from '@kurier/core';
 
 const ALL: readonly TurnState[] = ['idle', 'thinking', 'waiting-for-you', 'stopped', 'gone'];
 

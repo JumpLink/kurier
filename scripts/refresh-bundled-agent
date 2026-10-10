@@ -2,7 +2,7 @@
 // Refresh the pinned bundled agent from its npm package.
 //
 //   ./scripts/refresh-bundled-agent                 # dry run: print what would change
-//   ./scripts/refresh-bundled-agent --write         # update app/data/bundled-agents.json and package.json
+//   ./scripts/refresh-bundled-agent --write         # update packages/core/data/bundled-agents.json and package.json
 //   ./scripts/refresh-bundled-agent --tag beta      # a dist-tag other than `latest`
 //   ./scripts/refresh-bundled-agent --version 2.0.22
 //
@@ -24,7 +24,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const HERE = new URL('.', import.meta.url).pathname;
-const DATA = join(HERE, '../app/data/bundled-agents.json');
+const DATA = join(HERE, '../packages/core/data/bundled-agents.json');
 const PACKAGE_JSON = join(HERE, '../package.json');
 
 const AGENT_ID = 'opencode';

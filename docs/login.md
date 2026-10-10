@@ -6,7 +6,7 @@ opencode 2.0.22, 2026-10-04.
 
 ## Why this is not the old "no in-window login"
 
-`core/failure.ts` used to say a window cannot log in, because that would store a credential kurier has no
+`@kurier/core`'s `failure.ts` used to say a window cannot log in, because that would store a credential kurier has no
 safe place for. That was right for the only path then available (`opencode auth login` in a terminal) and
 it stays right for an **API key**. It is not true for an **OAuth flow run by opencode**: opencode starts it,
 talks to the provider and keeps the result in its own store. kurier shows a URL and a code and asks whether
@@ -15,7 +15,7 @@ it is finished. Nothing is stored here, so the privacy rule holds unchanged: the
 ## How it works
 
 opencode v2 has an HTTP API for it (`opencode auth login` does not work without a TTY: it answers
-`Cancelled` at once). kurier starts a private `opencode serve --port 0` (`core/agents/server.ts`), bound to
+`Cancelled` at once). kurier starts a private `opencode serve --port 0` (`agents/server.ts` in that package), bound to
 `127.0.0.1`, with a per-start Basic-auth password that exists only in memory and in the child's environment,
 under the same isolation environment as the agent, and closes it when the login is over.
 
@@ -28,8 +28,8 @@ under the same isolation environment as the agent, and closes it when the login 
 | `DELETE …/{attempt}` | cancel |
 
 `mode` is `auto` (the person approves in a browser, kurier polls) or `code` (a code is pasted back).
-`core/login/flow.ts` runs one attempt with no widget and no clock of its own, so the CLI, the window and the
-tests share it; `core/login/providers.ts` reads the catalog; `core/login/api.ts` is the transport-agnostic
+`login/flow.ts` runs one attempt with no widget and no clock of its own, so the CLI, the window and the
+tests share it; `login/providers.ts` reads the catalog; `login/api.ts` is the transport-agnostic
 client. Everything is tested on both runtimes against a scripted API.
 
 ## What is on offer
@@ -44,7 +44,7 @@ The key is held for the length of that one call: not in the controller's `state`
 file. The CLI reads it from stdin (`echo "$KEY" | kurier login scaleway`), never from an argument, which would
 sit in the process list and the shell history.
 
-`app/data/login-providers.json` holds what kurier owns: the providers it does not offer (`xai`, by decision of
+`packages/core/data/login-providers.json` holds what kurier owns: the providers it does not offer (`xai`, by decision of
 2026-10-04, each with a reason), the **featured** order and the **European** providers. The featured list is
 opencode's own "popular" set (`opencode`, `opencode-go`, `openai`, `github-copilot`, `anthropic`, `google`,
 `openrouter`, `vercel`, from its TUI and app pickers) followed by the European ones (Mistral, Scaleway,

@@ -23,14 +23,22 @@ import { Writable } from 'node:stream';
 
 import type { CommandModule } from 'yargs';
 
-import { serverCommand, startServer, whyNoLoginServer } from '../../core/agents/server.ts';
-import { currentSandboxFacts } from '../../core/agents/sandbox.ts';
-import { which } from '../../core/agents/stdio.ts';
-import { createLoginApi, LoginApiError } from '../../core/login/api.ts';
-import { answersFor, runLogin, type LoginHooks } from '../../core/login/flow.ts';
-import type { LoginMethod, LoginProvider } from '../../core/login/providers.ts';
+import {
+  LoginApiError,
+  answersFor,
+  createLoginApi,
+  currentSandboxFacts,
+  runLogin,
+  serverCommand,
+  startServer,
+  which,
+  whyNoLoginServer,
+  type KurierPaths,
+  type LoginHooks,
+  type LoginMethod,
+  type LoginProvider,
+} from '@kurier/core';
 
-import type { KurierPaths } from '../../core/paths.ts';
 import { agentForNew } from './choose.ts';
 import { err, out, pickArgv } from './output.ts';
 

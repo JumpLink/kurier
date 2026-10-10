@@ -57,7 +57,7 @@ deliberate and are the reason to read it before trusting it:
   are **host** programs (`opencode` and its own credentials, model config and git).
   Inside a Flatpak, `node:child_process` spawns *inside the sandbox*, where those do not
   exist. Reaching the host means `flatpak-spawn --host`, and this argument is the bus
-  name that call goes through. `app/src/core/agents/sandbox.ts` builds that command; it is
+  name that call goes through. `packages/core/src/agents/sandbox.ts` builds that command; it is
   a no-op outside a Flatpak (it tests `/.flatpak-info` and nothing else — deliberately
   not `FLATPAK_ID`, which a Flatpak-installed terminal also sets), so a desktop install
   spawns exactly what it always did.
@@ -73,7 +73,7 @@ infer it from the manifest.
 
 ### What it does to start the agent, and what it cannot do
 
-`app/src/core/agents/sandbox.ts` rewrites an agent command into
+`packages/core/src/agents/sandbox.ts` rewrites an agent command into
 `flatpak-spawn --host … /bin/sh -c …`, and it is a **no-op outside a Flatpak** — a
 desktop install spawns exactly what it always did. Two things about the host side are
 worth knowing before filing an issue against "kurier cannot find my agent":
@@ -111,12 +111,12 @@ succeeds.
 ### The bundled agent (opencode, as `extra-data`)
 
 The first module in `package.json#gjsify.flatpak.modules` ships opencode, pinned in
-`app/data/bundled-agents.json` (2.0.22, one url/sha256/size per arch). It is `extra-data`,
+`packages/core/data/bundled-agents.json` (2.0.22, one url/sha256/size per arch). It is `extra-data`,
 not a build source: flatpak-builder only *records* the url, and the client downloads and
 verifies the archive when the app is **installed**. `/app/bin/apply_extra` then runs in a
 sandbox with no network whose only writable path is `/app/extra` — the rest of `/app` is
 the read-only build result — so the archive unpacks to `/app/extra/agents/opencode/`
-(`BUNDLED_PREFIX` in `app/src/core/agents/catalog.ts`). That is off PATH on purpose: in
+(`BUNDLED_PREFIX` in `packages/core/src/agents/catalog.ts`). That is off PATH on purpose: in
 `/app/bin` it would shadow the person's own opencode. `apply_extra` uses the runtime's
 `tar` and `gzip` (both present in `org.gnome.Platform//50`).
 
@@ -136,7 +136,7 @@ re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging. T
 when the module in either `package.json` or the generated `eu.jumplink.Kurier.json` disagrees with
 the catalog, so a forgotten `init --force` is red.
 
-**The bundled copy gets its own `HOME`** (`core/agents/isolation.ts`). opencode v2 reads
+**The bundled copy gets its own `HOME`** (`@kurier/core`'s `agents/isolation.ts`). opencode v2 reads
 `~/.claude/skills` and `~/.agents/skills`, v1's `OPENCODE_DISABLE_CLAUDE_CODE` and
 `OPENCODE_DISABLE_EXTERNAL_SKILLS` are gone, and under `--filesystem=host` the sandbox's `HOME` is
 the person's real home (measured). So the one switch left is `HOME` itself.

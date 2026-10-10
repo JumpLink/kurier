@@ -208,6 +208,14 @@ export interface FixtureAgentOptions {
   /** Refuse every call with `-32_000 auth_required` until `authenticate` arrived. Trap 1's shape. */
   requireAuth?: boolean;
   /**
+   * Refuse `authenticate` itself, instead of accepting it.
+   *
+   * The second handshake in `arrangeAuth` exists for exactly this answer: the agent is asked whether
+   * the login took, rather than a zero exit code being read as yes. A fixture that always accepted
+   * would leave that arm unreachable, and "the login command succeeded" would pass for "logged in".
+   */
+  rejectAuthenticate?: boolean;
+  /**
    * Answer `session/prompt` with `-32_000` and nothing else, while every other call succeeds.
    *
    * **Issue #2's shape, and the only way to reach it from a unit test.** Measured against `opencode acp`
@@ -430,6 +438,16 @@ export class FixtureAgent {
         return;
 
       case CLIENT_METHODS.authenticate:
+        if (this.#options.rejectAuthenticate) {
+          if (id === undefined) return;
+          this.#send(
+            encodeFailure(id, {
+              code: ERROR_CODES.AUTH_REQUIRED,
+              message: 'the login did not reach this agent',
+            }),
+          );
+          return;
+        }
         this.#authenticated = true;
         this.#reply(id, {});
         return;

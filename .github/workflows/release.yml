@@ -279,7 +279,7 @@ jobs:
 
       # What the bundle must contain, asserted against the manifest the build reads: the network
       # (the bundled agent talks to its model provider), the opencode extra-data module, and that
-      # its archive URLs are the ones app/data/bundled-agents.json pins — so the manifest cannot
+      # its archive URLs are the ones packages/core/data/bundled-agents.json pins — so the manifest cannot
       # fall behind a refreshed pin unnoticed.
       - name: Check the manifest carries the bundled opencode
         run: |
@@ -291,9 +291,9 @@ jobs:
             || { echo "::error::$m has no extra-data source"; exit 1; }
           jq -e '[.modules[].sources[]? | select(type == "object" and .type == "script" and .["dest-filename"] == "apply_extra")] | length == 1' "$m" >/dev/null \
             || { echo "::error::$m has no apply_extra script"; exit 1; }
-          want=$(jq -r '.agents[] | select(.id == "opencode") | .dist[].url' app/data/bundled-agents.json | sort)
+          want=$(jq -r '.agents[] | select(.id == "opencode") | .dist[].url' packages/core/data/bundled-agents.json | sort)
           have=$(jq -r '.modules[].sources[]? | select(type == "object" and .type == "extra-data") | .url' "$m" | sort)
-          [ "$want" = "$have" ] || { echo "::error::extra-data URLs differ from app/data/bundled-agents.json"; echo "$want"; echo "$have"; exit 1; }
+          [ "$want" = "$have" ] || { echo "::error::extra-data URLs differ from packages/core/data/bundled-agents.json"; echo "$want"; echo "$have"; exit 1; }
 
       # `--system`, because that is the installation `flatpak-builder` reads when gjsify's
       # `flatpak build` wrapper invokes it (no `--user`). The two SDK extensions are the

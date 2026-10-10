@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { decideInterrupt } from '../../../src/core/interrupt.ts';
+import { decideInterrupt } from '@kurier/core';
 
 export default async () => {
   await describe('decideInterrupt — nothing of ours is running', async () => {

@@ -8,7 +8,7 @@
 
 import type { CommandModule } from 'yargs';
 
-import type { KurierPaths } from '../../core/paths.ts';
+import type { KurierPaths } from '@kurier/core';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 import type { SessionRecord } from '@kurier/session';
 

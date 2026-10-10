@@ -56,7 +56,7 @@ import {
   optionLabel,
   type PermissionQuestion,
   type PermissionView,
-} from '../../core/permission.ts';
+} from '@kurier/core';
 import { CSS } from './css.ts';
 import { toolIcon } from './tool-line.ts';
 import BodyTemplate from './permission-body.blp';

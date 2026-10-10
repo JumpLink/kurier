@@ -2,12 +2,7 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import {
-  createLoginApi,
-  type HttpResponse,
-  type LoginApiError,
-  type Send,
-} from '../../../src/core/login/api.ts';
+import { createLoginApi, type HttpResponse, type LoginApiError, type Send } from '@kurier/core';
 
 function recorder(...responses: HttpResponse[]) {
   const requests: string[] = [];

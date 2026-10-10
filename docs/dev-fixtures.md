@@ -35,7 +35,7 @@ That is the point of the fixture: the two `*_always` kinds used to be filtered o
 and a stand-in that only sent the `*_once` pair would have let that filter pass.
 
 **The order on screen is not the order kurier adds them, and neither is the order the stand-in lists
-them.** Three orders, all measured (`orderOptions` in `app/src/core/permission.ts` has the reasoning;
+them.** Three orders, all measured (`orderOptions` in `packages/core/src/permission.ts` has the reasoning;
 case 9 of `alert-dialog-close.mjs` prints the two GTK facts):
 
 | | order |
@@ -117,7 +117,7 @@ minimum is 293 px with a 32-character model id, which is where "raises no floor"
 from the clamp: a clamp caps a natural width and passes the minimum through
 (`scripts/probes/window-min-width.mjs` prints both, and the sweep).
 
-What the row may show and when is decided in `app/src/core/config-row.ts` and tested on both runtimes;
+What the row may show and when is decided in `packages/core/src/config-row.ts` and tested on both runtimes;
 the widget only renders.
 
 **Two known limits of the row, written down rather than discovered later.**
@@ -268,7 +268,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 
 **First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `kurier start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate that one action.
 
-**The cwd** is `KURIER_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`core/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
+**The cwd** is `KURIER_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
 
 - `KU_APP_NEW_CHAT=1` — press New chat through `win.new-chat`. With a turn running it waits for the turn to end, so `KU_APP_THINKING=1 KU_APP_PROMPT=… KU_APP_NEW_CHAT=1` photographs the empty composer *after* a chat exists. The action is activated with `lookup_action('new-chat').activate(null)`: `this.activate_action('win.new-chat', null)` resolves to `Gio.ActionGroup`'s on a window, takes no prefix, returns nothing and did nothing (measured).
 - `KU_APP_NEW_CHAT_MIDTURN=1` — press New chat **while the turn is streaming**: polls (50 ms) until the agent has said something and the turn is still running, then activates `win.new-chat`. New chat stops the turn the way Stop does (`session/cancel`; an open permission settles `cancelled`, `turn-cancelled`), the turn ends `idle` (never `Stopped.` on the new chat), and anything the old turn still says goes to its own record and never to the visible pane — the same holds for opening another row mid-turn (`bind`). After the agent has exited (`gone`), New chat retires the dead handle (awaiting its `close()`) so the next prompt starts a fresh agent; a record that cannot be written after `session/new` says so (`unsavedMessage`: not saved, why, press New chat).
@@ -296,7 +296,7 @@ Two defects found on the way, both fixed: `agentStatus({status: 'none'})` was `a
 
 The bundled copy exists only inside a Flatpak, so two hooks stand in for it. Both are flags (`0`/`false` = off) and both go through the window's own paths.
 
-- `KU_APP_NOTICE=1` — force the bundled-agent condition: the `Adw.Banner` under the content header shows (fixed English text from `core/empty-state.ts`, one **Got it**). Not shown for a host install, with no agent, or once dismissed. The text is kept to three lines at 360 px: `Adw.Banner` ellipsizes beyond that, which cut the statement itself.
+- `KU_APP_NOTICE=1` — force the bundled-agent condition: the `Adw.Banner` under the content header shows (fixed English text from `packages/core/src/empty-state.ts`, one **Got it**). Not shown for a host install, with no agent, or once dismissed. The text is kept to three lines at 360 px: `Adw.Banner` ellipsizes beyond that, which cut the statement itself.
 - `KU_APP_NOTICE_DISMISS=1` — press **Got it** by emitting the banner's own `button-clicked`; logs one line. The id lands in `$KURIER_NOTICES_FILE` (default `$XDG_DATA_HOME/kurier/notices.json`, 0600 in 0700, atomic write); a corrupt or unreadable file shows the notice again and never stops startup.
 - `KU_APP_NO_AGENT=1` — force the nothing-found resolution (beats `KU_APP_AGENT`): the content pane says "No agent found" with the install command (selectable text, no markup), the docs link and a **Preferences** button (`app.preferences`); Send and the entry are off with the reason under the composer. `kurier start`, `kurier auth` and `kurier agents` print the same remedy (`NO_AGENT_REMEDY`).
 

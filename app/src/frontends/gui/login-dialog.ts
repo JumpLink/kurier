@@ -15,8 +15,7 @@
 import Adw from '@girs/adw-1';
 import Gtk from '@girs/gtk-4.0';
 
-import type { LoginController, LoginState } from '../../core/login/controller.ts';
-import type { LoginField, LoginMethod, LoginProvider } from '../../core/login/providers.ts';
+import type { LoginController, LoginField, LoginMethod, LoginProvider, LoginState } from '@kurier/core';
 
 const CLAMP_PX = 420;
 

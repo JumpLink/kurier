@@ -1,7 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { describe as describeRequest, terminalGate } from '../../../src/core/policy.ts';
-import { permissionView } from '../../../src/core/permission.ts';
+import { describe as describeRequest, permissionView, terminalGate } from '@kurier/core';
 import { scriptedTerminal } from '../../../src/frontends/cli/terminal.ts';
 
 import type { RequestPermissionRequest } from '@kurier/acp/types';
