@@ -46,10 +46,11 @@ const ICONS: readonly (readonly [RegExp, string])[] = [
   [/^(run|exec|execute|bash|shell|\$)/i, 'system-run-symbolic'],
 ];
 
-const FALLBACK_ICON = 'system-run-symbolic';
+/** The icon for a tool nothing above matched, and for a status line that names no tool at all. */
+export const TOOL_FALLBACK_ICON = 'system-run-symbolic';
 
 /** The icon for a tool title, or for an ACP `kind` word — the permission dialog has the real one. */
 export function toolIcon(text: string): string {
   for (const [pattern, icon] of ICONS) if (pattern.test(text.trim())) return icon;
-  return FALLBACK_ICON;
+  return TOOL_FALLBACK_ICON;
 }

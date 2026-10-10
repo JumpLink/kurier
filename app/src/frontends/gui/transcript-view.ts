@@ -59,7 +59,7 @@ import {
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
-import { parseToolLine, toolIcon, type ToolLine } from './tool-line.ts';
+import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './tool-line.ts';
 
 /**
  * The conversation's measure is `CONTENT_MAX_WIDTH_PX`, not a constant of this file.
@@ -517,6 +517,10 @@ export class TranscriptView {
   }
 }
 
+/** The kind icon in front of a tool or thought row; the status-only caption's is a step smaller. */
+const ROW_ICON_PX = 16;
+const CAPTION_ICON_PX = 14;
+
 function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
   switch (item.kind) {
     case 'user':
@@ -534,7 +538,7 @@ function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
       return buildDisclosure('dialog-information-symbolic', item, CSS.thought);
     case 'tool': {
       // A payload is what the disclosure opens onto, so a line without one is not a disclosure.
-      if (item.detail !== null) return buildDisclosure('system-run-symbolic', item, CSS.mono);
+      if (item.detail !== null) return buildDisclosure(TOOL_FALLBACK_ICON, item, CSS.mono);
       const line = parseToolLine(item.summary);
       return line.title === '' ? buildToolStatus(line.status) : buildToolCard(line);
     }
@@ -592,7 +596,7 @@ function buildToolCard(line: ToolLine): Gtk.Widget {
     spacing: 8,
     cssClasses: ['card', CSS.toolCard],
   });
-  card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: 16 }));
+  card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: ROW_ICON_PX }));
   const title = buildLabel({ text: line.title, xalign: 0, cssClasses: ['heading'] });
   title.set_hexpand(true);
   card.append(title);
@@ -608,7 +612,7 @@ function buildToolCard(line: ToolLine): Gtk.Widget {
  */
 function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
   const row = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
-  row.append(new Gtk.Image({ iconName: 'system-run-symbolic', pixelSize: 14, cssClasses: [CSS.dim] }));
+  row.append(new Gtk.Image({ iconName: TOOL_FALLBACK_ICON, pixelSize: CAPTION_ICON_PX, cssClasses: [CSS.dim] }));
   row.append(
     status === null
       ? buildLabel({ text: 'Tool call', xalign: 0, cssClasses: [CSS.dim, 'caption'] })
@@ -658,7 +662,7 @@ function buildDisclosure(iconName: string, item: DisclosureItem, bodyClass: stri
     // wrapped label's natural width is the whole unwrapped line.
     hexpand: true,
   });
-  head.append(new Gtk.Image({ iconName, pixelSize: 16 }));
+  head.append(new Gtk.Image({ iconName, pixelSize: ROW_ICON_PX }));
   head.append(buildLabel({ text: item.summary, xalign: 0, cssClasses: [] }));
 
   // The class goes on the row here and on the expander below, never on both: `font-size` multiplies

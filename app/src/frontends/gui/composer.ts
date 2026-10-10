@@ -27,7 +27,7 @@
  * parses on assignment: `css.ts` and `transcript-view.ts` both record that a later
  * `set_use_markup(false)` is too late.
  *
- * **The status line is the placeholder that matters; `placeholder-text` is only a hint on top.** That property exists on
+ * **The placeholder is a visible line, with `placeholder-text` only as a hint on top.** That property exists on
  * the GTK 4.22.5 this runs against (measured: `scripts/probes/composer-props.mjs`) and does **not**
  * exist in the `@girs/gtk-4.0` 4.6.0 typings this repo compiles against — so writing it would be a
  * type error here and a silently absent placeholder on any older GTK. `#status` carries the same
