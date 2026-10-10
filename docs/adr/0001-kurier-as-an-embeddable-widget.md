@@ -69,3 +69,6 @@ Planned, not implemented, except step 1.
 - The host's data directory holds conversation text, here tax data: mode 0700, declared in the
   host's state manifest.
 - Splitting `window.ts` is the main cost and regression risk.
+- The GUI up to v0.1.1 was a proof of concept. Its look was redone before the split
+  ([docs/design/](../design/README.md)), so the widget starts from the new design rather than
+  carrying the old one along. The redesign changed visuals only, no behaviour.
