@@ -33,8 +33,10 @@
  * advice for a text-heavy surface. 720 px is the plan's number; it happens to equal the sidebar
  * breakpoint, which is a coincidence — one caps the pane, the other is a measure.
  *
- * An agent bubble carries a caption above it — the agent's name and the time the message was recorded —
- * and a tool call is a card (icon, title, status capsule). Both are read from what the record holds; the
+ * **The person's messages are bubbles and the agent's answers are not**, which is `buildAgentMessage`'s
+ * own argument: a bubble suits a line somebody typed, and the answer is the body text of the page. An
+ * answer carries a caption above it — the agent's name and the time the message was recorded — and a
+ * tool call is a card (icon, title, status capsule). Both are read from what the record holds; the
  * tool's kind and input are not recorded, so see `tool-line.ts` for what the icon is a guess from.
  * No copy button, no per-item controls. Everything on screen is
  * something the transcript actually holds; a control that points at nothing is the one thing this
@@ -71,8 +73,17 @@ import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './to
  * also ellipsizing.
  */
 
-/** Gap between two bubbles, in logical pixels. Smaller than the bubble's own internal padding. */
-const ITEM_SPACING = 4;
+/**
+ * Gap between two items in the column, in logical pixels.
+ *
+ * **Larger than any item's own internal padding, and it is the only gap there is.** It was 4 px
+ * against a 10 px `margin-bottom` on `.kurier-bubble`, which made the rhythm the sum of two numbers
+ * in two files — and only bubbles paid the margin, so the space under an answer and the space under
+ * a tool card were different for no reason anybody chose. The margin is gone (`css.ts`) and this is
+ * the whole measure: one turn should read as one block with air around it, which at this text size
+ * is about one blank line.
+ */
+const ITEM_SPACING = 16;
 
 export class TranscriptView {
   /** Pack this where the conversation goes. A `Gtk.ScrolledWindow` around a clamped column. */
@@ -184,10 +195,13 @@ export class TranscriptView {
     this.#column = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
       spacing: ITEM_SPACING,
-      // The clamp caps the *content*; these margins are what stops the first and last bubble from
-      // touching the pane's own edges once it has.
-      marginTop: 12,
-      marginBottom: 12,
+      // The clamp caps the *content*; these margins are what stops the first and last item from
+      // touching the pane's own edges once it has. Taller than wide, because the pane's vertical
+      // neighbours are a header bar and the composer card, while sideways there is only the clamp's
+      // own empty space — at the 360 px floor the clamp hands over the full width and 12 px is all
+      // the inset the text can afford.
+      marginTop: 18,
+      marginBottom: 18,
       marginStart: 12,
       marginEnd: 12,
     });
@@ -548,14 +562,16 @@ function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
 }
 
 /**
- * One message, in the speaker's own colour and on the speaker's own side.
+ * One message the person typed: a bubble, on their own side.
  *
  * `halign` is set on the **bubble**, not on the label inside it, and that is the part that is easy to
  * get backwards: a child of a vertical `Gtk.Box` is given its natural width unless it expands, so
  * the alignment has to be on the widget the box places. A wrapping label's natural width is the
- * *unwrapped* text, so a short answer is a short bubble and a long one is capped by the clamp and
+ * *unwrapped* text, so a short prompt is a short bubble and a long one is capped by the clamp and
  * wraps there — which is what makes the column read as a conversation rather than as full-width
  * paragraphs.
+ *
+ * **Only the person's messages get one**, and `buildAgentMessage` says why the answer does not.
  */
 function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widget {
   return buildLabel({
@@ -567,7 +583,17 @@ function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widge
 }
 
 /**
- * An agent bubble under a dim caption: who said it, and when.
+ * The agent's answer under a dim caption: who said it, and when.
+ *
+ * **Unboxed, at the column's full width, and that is the asymmetry the surface is built on.** A
+ * bubble is right for a line somebody typed and wrong for the thing the person came here to read: an
+ * answer is this window's body text, and a box around it costs the measure its two side paddings
+ * while adding an edge the eye crosses on every paragraph. `.kurier-agent-text` is therefore line
+ * spacing and nothing else (`css.ts`), and `halign` stays at `buildLabel`'s `FILL` — the label takes
+ * the column, so one answer wraps at one width however long it gets.
+ *
+ * The caption stays. It is the only thing on screen that says *which* agent answered, and on a
+ * transcript resumed from another copy (`agentSource`) that is not a detail.
  *
  * The time is the entry's own `at`, formatted in the reader's timezone; an `at` the store carries as
  * garbage drops the time rather than printing it. A merged run of chunks shows the time of its first.
@@ -575,13 +601,13 @@ function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widge
 function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Widget {
   const time = GLib.DateTime.new_from_iso8601(at, null)?.to_local()?.format('%R') ?? null;
   const caption = [agentName, time].filter((part): part is string => !!part).join(' · ');
-  const bubble = buildBubble(text, Gtk.Align.START, CSS.bubbleAgent);
-  if (caption === '') return bubble;
-  const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
+  const body = buildLabel({ text, xalign: 0, cssClasses: [CSS.agentText, CSS.transcriptText] });
+  if (caption === '') return body;
+  const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4 });
   column.append(
     buildLabel({ text: caption, xalign: 0, align: Gtk.Align.START, cssClasses: [CSS.dim, 'caption'] }),
   );
-  column.append(bubble);
+  column.append(body);
   return column;
 }
 

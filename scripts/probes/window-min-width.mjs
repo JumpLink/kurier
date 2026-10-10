@@ -92,16 +92,25 @@ loadRealStylesheet();
 
 // ── the widgets whose minimum width is a candidate for the floor ────────────────────────────
 
-/** One transcript bubble, built exactly as `transcript-view.ts` builds one. */
+/**
+ * One transcript row, built exactly as `transcript-view.ts` builds one.
+ *
+ * The two speakers are different widgets there and so they are here: a prompt is a bubble aligned to
+ * the end, an answer is unboxed body text filling the measure. A probe that drew both as bubbles
+ * would be measuring a surface this app does not have.
+ */
 function bubble(text, speaker) {
+  const user = speaker === 'user';
   return new Gtk.Label({
     label: text,
     useMarkup: false,
     wrap: true,
     selectable: true,
     xalign: 0,
-    halign: speaker === 'user' ? Gtk.Align.END : Gtk.Align.START,
-    cssClasses: ['kurier-bubble', `kurier-bubble-${speaker}`, 'kurier-transcript-text'],
+    halign: user ? Gtk.Align.END : Gtk.Align.FILL,
+    cssClasses: user
+      ? ['kurier-bubble', 'kurier-bubble-user', 'kurier-transcript-text']
+      : ['kurier-agent-text', 'kurier-transcript-text'],
   });
 }
 
@@ -109,9 +118,9 @@ function bubble(text, speaker) {
 function transcript() {
   const column = new Gtk.Box({
     orientation: Gtk.Orientation.VERTICAL,
-    spacing: 4,
-    marginTop: 12,
-    marginBottom: 12,
+    spacing: 16,
+    marginTop: 18,
+    marginBottom: 18,
     marginStart: 12,
     marginEnd: 12,
   });

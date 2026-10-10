@@ -86,31 +86,39 @@ export const APP_CSS = `
   background-color: alpha(currentColor, 0.10);
 }
 
-/* A message bubble. Adwaita has no name for one: \`Adw.StatusPage\`'s icons and \`.card\` are the
-   toolkit's idea of an inset surface, and a card per message is a wall of borders in a long
-   conversation. So the three things a bubble needs are written out. \`border-radius\` and \`padding\`
-   were verified against the GTK 4.22 parser along with the properties above. */
+/* A message bubble — **the person's own messages only**, which is what makes it a bubble rather than
+   a row type. Adwaita has no name for one: \`Adw.StatusPage\`'s icons and \`.card\` are the toolkit's
+   idea of an inset surface, and a card per message is a wall of borders in a long conversation. So
+   the two things a bubble needs are written out; \`border-radius\` and \`padding\` were verified against
+   the GTK 4.22 parser along with the properties above.
+
+   NO \`margin-bottom\`, and that is the rhythm fix rather than a deletion. The column already carries
+   \`ITEM_SPACING\` between its children (\`transcript-view.ts\`), so a margin here was a second gap —
+   and two gaps that only one file knows about is how the spacing between a bubble and the caption
+   above it came out different from the spacing between two bubbles. */
 .kurier-bubble {
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
+  border-radius: 18px;
+  padding: 10px 14px;
 }
 
 /* The person's own messages, in the accent colour. \`@accent_bg_color\` is a libadwaita named colour,
    so this follows the system light/dark setting for free — the reason this file is not a palette.
    Alpha, not solid: a solid accent block is a header, and a transcript of ten of them is a wall. */
 .kurier-bubble-user {
-  background-color: alpha(@accent_bg_color, 0.20);
+  background-color: alpha(@accent_bg_color, 0.15);
 }
 
-/* The agent's, one step off the window background. Alpha over \`@window_fg_color\` and NOT a second
-   named background colour, because a solid \`@window_bg_color\` is by definition invisible against
-   the window — it would be a bubble-shaped hole in a dark theme and a border-shaped nothing in a
-   light one. \`alpha()\` over the foreground darkens a light surface and lightens a dark one, which
-   is the one expression that is a step away from the background in both. Asymmetric on purpose: the
-   accent belongs to what the person said. */
-.kurier-bubble-agent {
-  background-color: alpha(@window_fg_color, 0.07);
+/* The agent's answer, which is **not** in a bubble at all — and that asymmetry is the decision this
+   class carries. A bubble is right for a short line somebody typed and wrong for the thing the
+   person came to read: an answer is the page's body text, and boxing it costs the reading column its
+   two side paddings while adding an edge the eye has to cross on every paragraph. Every chat surface
+   this window is drawn from does the same, and HIG says it about documents generally.
+
+   So what is left is line spacing. \`line-height\` parses on GTK 4.22 **and applies** — measured, a
+   four-line label grows 71 px → 103 px with this value, which is the check \`css.ts\` demands of every
+   property in it: the parser accepting one proves nothing about it doing anything. */
+.kurier-agent-text {
+  line-height: 1.45;
 }
 
 /* A centred system note — a plan, a mode change, an update this client does not know. Quieter than
@@ -120,7 +128,6 @@ export const APP_CSS = `
 .kurier-note {
   font-size: 0.9em;
   opacity: 0.66;
-  margin-bottom: 8px;
 }
 
 /* The body under a disclosure's summary line, and nothing about its type. \`margin-left\` is
@@ -242,7 +249,7 @@ export const CSS = {
   disclosure: 'kurier-disclosure',
   bubble: 'kurier-bubble',
   bubbleUser: 'kurier-bubble-user',
-  bubbleAgent: 'kurier-bubble-agent',
+  agentText: 'kurier-agent-text',
   note: 'kurier-note',
   disclosureBody: 'kurier-disclosure-body',
   thought: 'kurier-thought',
