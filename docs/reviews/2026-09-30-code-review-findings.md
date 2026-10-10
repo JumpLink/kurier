@@ -35,7 +35,7 @@
 >
 > | #   | Finding                                          | Status                                                     | Core |
 > | --- | ------------------------------------------------ | ---------------------------------------------------------- | ---- |
-> | 1   | `send` ignores stdin backpressure                | open — no `drain` anywhere                                 | yes  |
+> | 1   | `send` ignores stdin backpressure                | fixed — page-sized writes, stdin `error` handled           | yes  |
 > | 2   | stderr not flushed on exit                       | fixed (really end-gating, PR #6)                           |      |
 > | 3   | `resume` appends by spread                       | fixed — uses `store.append`                                |      |
 > | 4   | overflow loses the excerpt                       | fixed                                                      |      |
@@ -52,9 +52,9 @@
 > | 15  | TS-stricter fields only noted                    | open                                                       |      |
 > | 16  | "kurier never parses" stderr comment             | partly — new line added, old one still duplicated above it |      |
 > | 17  | `AuthMethodInfo.kind` "a guess"                  | open                                                       |      |
-> | 18  | `#send` throws, `#write` closes                  | open — asymmetry undocumented                              | yes  |
-> | 19  | `ClosedTransport.onClose` fires in a microtask   | open                                                       | yes  |
-> | —   | `terminate()` with a grandchild holding the pipe | open — no `setsid`/group kill                              | yes  |
+> | 18  | `#send` throws, `#write` closes                  | fixed — every failed write closes; split documented        | yes  |
+> | 19  | `ClosedTransport.onClose` fires in a microtask   | fixed — listener called synchronously                      | yes  |
+> | —   | `terminate()` with a grandchild holding the pipe | fixed — `detached` spawn, process-group kill               | yes  |
 > | —   | check-schema in CI                               | fixed — `ci.yml` runs it                                   |      |
 
 Most severe first. Each finding follows the requested format.
