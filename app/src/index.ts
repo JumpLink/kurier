@@ -21,6 +21,7 @@ import {
   agentsCommand,
   authCommand,
   cancelCommand,
+  loginCommand,
   resumeCommand,
   sessionsCommand,
   startCommand,
@@ -38,6 +39,7 @@ const parseArgs = () =>
     .command(resumeCommand)
     .command(cancelCommand)
     .command(authCommand)
+    .command(loginCommand)
     .command(agentsCommand)
     .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
     .strictCommands()
@@ -59,7 +61,8 @@ try {
 
 try {
   await parsed;
-  // fixed upstream in gjsify: natural end of main ignores process.exitCode (PR pending)
+  // fixed upstream in gjsify: natural end of main ignores process.exitCode.
+  // gjsify#2007 merged 2026-10-03 and is not in a release yet; drop this line when the pin carries it.
   if (process.exitCode) process.exit();
 } catch (err) {
   reportError(err);

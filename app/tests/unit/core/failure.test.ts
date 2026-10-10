@@ -14,6 +14,7 @@ import {
   failureKind,
   failureNotice,
   failureToShow,
+  isQuotaExhausted,
   staleDialog,
 } from '../../../src/core/failure.ts';
 import type { AgentAttachment } from '../../../src/core/turn.ts';
@@ -26,7 +27,44 @@ function authRequired(): unknown {
   return new RpcError({ code: -32000, message: 'Authentication required' });
 }
 
+/** opencode 2.0.22 for a logged-in Zen account without balance: `-32603`, with the name in `data`. */
+function quotaExhausted(): unknown {
+  return new RpcError({
+    code: -32603,
+    message: 'Internal error: Upstream request failed: Insufficient account funds',
+    data: { service: 'session', errorName: 'provider.quota' },
+  });
+}
+
 export default async function failure(): Promise<void> {
+  await describe('failure — an account without credit', async () => {
+    await it('is its own kind, read from the error name and not from the sentence', async () => {
+      expect(failureKind(quotaExhausted(), { promptSent: true })).toBe('quota');
+      const reworded = new RpcError({
+        code: -32603,
+        message: 'something else entirely',
+        data: { errorName: 'provider.quota' },
+      });
+      expect(failureKind(reworded, { promptSent: true })).toBe('quota');
+    });
+
+    await it('is not guessed from the wording or from the code alone', async () => {
+      const sameWords = new RpcError({ code: -32603, message: 'Insufficient account funds' });
+      expect(isQuotaExhausted(sameWords)).toBe(false);
+      expect(failureKind(sameWords, { promptSent: true })).toBe('start');
+      expect(isQuotaExhausted(new Error('provider.quota'))).toBe(false);
+    });
+
+    await it('tells a logged-in person not to log in again, and offers the model button', async () => {
+      const notice = failureNotice('quota')!;
+      expect(notice.command).toBe(null);
+      expect(notice.action).toBe('choose-model');
+      expect(notice.body.includes('kurier auth')).toBe(false);
+      expect(failureAction(notice, { modelChoice: true, login: false })).toBe('choose-model');
+      expect(failureAction(notice, { modelChoice: false, login: false })).toBe(null);
+    });
+  });
+
   await describe('failure — which failure this is', async () => {
     await it('reads ACP’s own auth_required as the auth trap when no prompt has gone out', async () => {
       expect(failureKind(authRequired(), { promptSent: false })).toBe('auth');
@@ -113,12 +151,14 @@ export default async function failure(): Promise<void> {
   });
 
   await describe('failure — what the window says', async () => {
-    await it('names `kurier auth` for the auth trap, and says why a window cannot do it', async () => {
+    await it('names `kurier auth` for the auth trap, and offers the login the window can drive', async () => {
       const notice = failureNotice('auth');
       expect(notice).not.toBe(null);
       expect(notice?.command).toBe(AUTH_COMMAND);
       expect(notice?.command).toBe('kurier auth');
-      expect(notice?.body).toContain('no terminal');
+      expect(notice?.action).toBe('login');
+      expect(failureAction(notice!, { modelChoice: false, login: true })).toBe('login');
+      expect(failureAction(notice!, { modelChoice: true, login: false })).toBe(null);
     });
 
     await it('says a reattach refusal is a refusal, and offers no command to run', async () => {
@@ -186,7 +226,7 @@ export default async function failure(): Promise<void> {
     await it('offers the model choice for a provider refusal, when there is a model dropdown', async () => {
       const notice = failureNotice('model');
       expect(notice).not.toBe(null);
-      if (notice) expect(failureAction(notice, { modelChoice: true })).toBe('choose-model');
+      if (notice) expect(failureAction(notice, { modelChoice: true, login: false })).toBe('choose-model');
     });
 
     await it('offers nothing for a provider refusal when the agent reported no model option', async () => {
@@ -195,16 +235,16 @@ export default async function failure(): Promise<void> {
       // this window exists to avoid. The *sentence* is still shown; only the button goes.
       const notice = failureNotice('model');
       expect(notice).not.toBe(null);
-      if (notice) expect(failureAction(notice, { modelChoice: false })).toBe(null);
+      if (notice) expect(failureAction(notice, { modelChoice: false, login: false })).toBe(null);
     });
 
-    await it('offers nothing for the three sentences that owe only words', async () => {
-      for (const kind of ['auth', 'unsupported'] as const) {
+    await it('offers nothing for the sentences that owe only words', async () => {
+      for (const kind of ['unsupported'] as const) {
         const notice = failureNotice(kind);
         expect(notice).not.toBe(null);
         if (notice) {
           expect(notice.action).toBe(null);
-          expect(failureAction(notice, { modelChoice: true })).toBe(null);
+          expect(failureAction(notice, { modelChoice: true, login: false })).toBe(null);
         }
       }
       expect(failureNotice('start')).toBe(null);
@@ -217,8 +257,8 @@ export default async function failure(): Promise<void> {
       const notice = failureNotice('model');
       if (!notice) throw new Error('the model notice is missing');
       expect(notice.action).toBe('choose-model');
-      expect(failureAction(notice, { modelChoice: true })).not.toBe(
-        failureAction(notice, { modelChoice: false }),
+      expect(failureAction(notice, { modelChoice: true, login: false })).not.toBe(
+        failureAction(notice, { modelChoice: false, login: false }),
       );
     });
   });

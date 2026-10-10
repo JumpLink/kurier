@@ -111,25 +111,46 @@ succeeds.
 ### The bundled agent (opencode, as `extra-data`)
 
 The first module in `package.json#gjsify.flatpak.modules` ships opencode, pinned in
-`app/data/bundled-agents.json` (1.18.34, one url/sha256/size per arch). It is `extra-data`,
+`app/data/bundled-agents.json` (2.0.22, one url/sha256/size per arch). It is `extra-data`,
 not a build source: flatpak-builder only *records* the url, and the client downloads and
 verifies the archive when the app is **installed**. `/app/bin/apply_extra` then runs in a
 sandbox with no network whose only writable path is `/app/extra` — the rest of `/app` is
 the read-only build result — so the archive unpacks to `/app/extra/agents/opencode/`
 (`BUNDLED_PREFIX` in `app/src/core/agents/catalog.ts`). That is off PATH on purpose: in
 `/app/bin` it would shadow the person's own opencode. `apply_extra` uses the runtime's
-`tar` and `gzip` (both present in `org.gnome.Platform//50`). The archive holds a single
-file, `opencode`; the catalog's `binary` field says so instead of guessing from the id.
+`tar` and `gzip` (both present in `org.gnome.Platform//50`).
 
-**Refreshing the pin:** update `bundled-agents.json` (version, url, sha256, size; `tar -tzf`
-for `binary`), copy the same values into the module in `package.json`, then re-run the
-`gjsify flatpak init --force …` line from AGENTS.md § Packaging. The catalog tests fail
-when the module in either `package.json` or the generated `eu.jumplink.Kurier.json`
-disagrees with the catalog, so a forgotten `init --force` is red.
+**The archive is an npm tarball, not a GitHub release.** opencode v2 is published as
+`@opencode/cli`, one binary package per platform in the wrapper's `optionalDependencies`
+(`@opencode/cli-linux-x64`, `-linux-arm64`; glibc, because the GNOME runtime is). The tarball
+holds `package/package.json` and `package/bin/opencode`, so the catalog's `binary` is
+`package/bin/opencode`: `apply_extra` keeps its four steps and only its `chmod` path follows. There is no GitHub release for v2 —
+the latest one there is v1.18.34. Resolve the version through the wrapper, never through a
+platform package's own `latest` tag: that one points at an unrelated 1.18.18 with a binary called
+`lildax`. v2 is about 90 MB to download and 204 MB unpacked, against 60 MB for v1.
+
+**Refreshing the pin:** `./scripts/refresh-bundled-agent` (dry run) and `--write`. It resolves the
+version, verifies the registry's sha512, computes the sha256 `extra-data` needs, checks the binary's
+path in the archive, and updates both `bundled-agents.json` and the module in `package.json`. Then
+re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging. The catalog tests fail
+when the module in either `package.json` or the generated `eu.jumplink.Kurier.json` disagrees with
+the catalog, so a forgotten `init --force` is red.
+
+**The bundled copy gets its own `HOME`** (`core/agents/isolation.ts`). opencode v2 reads
+`~/.claude/skills` and `~/.agents/skills`, v1's `OPENCODE_DISABLE_CLAUDE_CODE` and
+`OPENCODE_DISABLE_EXTERNAL_SKILLS` are gone, and under `--filesystem=host` the sandbox's `HOME` is
+the person's real home (measured). So the one switch left is `HOME` itself.
 
 **`gjsify ship` drops it.** `ship` renders exactly one module of its own and reads neither
 `modules` nor `extraModules`, so a Flatpak built with `ship` has no bundled agent. Only the
 manifest above carries it.
+
+**`--share=network` is load-bearing for the bundled agent.** It runs *inside* the sandbox, and a
+sandbox with this app's other grants has no DNS and no route out — measured with `flatpak run
+--filesystem=host --command=sh org.freedesktop.Platform//25.08`: `curl https://registry.npmjs.org`
+fails, and with `--share=network` it answers 200. Without it the bundled agent could not reach one
+model provider, and no login could finish. A host agent is unaffected: it runs on the other side of
+`flatpak-spawn --host`.
 
 **`--filesystem=host` is load-bearing twice now.** Besides what `flatpak-spawn --host`
 needs, the bundled agent runs *inside* the sandbox, and that grant is what lets it read and

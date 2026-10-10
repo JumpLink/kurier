@@ -161,6 +161,16 @@ export default async () => {
         expect(BUNDLED_AGENTS.length > 0).toBe(true);
       });
 
+      await it(`${file} shares the network, because a bundled agent runs inside the sandbox`, async () => {
+        // Measured: a sandbox with this app's other grants has no DNS and no route out, so a bundled
+        // agent could not reach one model provider. A host agent is unaffected (`flatpak-spawn --host`).
+        const finishArgs =
+          file === 'package.json'
+            ? (pkg as { gjsify: { flatpak: { finishArgs: string[] } } }).gjsify.flatpak.finishArgs
+            : (manifest as { 'finish-args': string[] })['finish-args'];
+        expect(finishArgs.includes('--share=network')).toBe(true);
+      });
+
       for (const agent of BUNDLED_AGENTS) {
         await it(`${file} carries ${agent.id}'s pins as extra-data, one per arch`, async () => {
           const module = modules.find((entry) => entry['name'] === agent.id);
@@ -211,10 +221,11 @@ export default async () => {
       expect(bundledProgram(entry)).toBe(`${BUNDLED_PREFIX}/demo/bin/demo-cli`);
     });
 
-    await it('is where the shipped archive puts opencode: the tarball holds one file, `opencode`', async () => {
-      // `tar -tzf opencode-linux-{x64,arm64}.tar.gz` for 1.18.34 lists exactly `opencode`, at the root.
+    await it('is where the shipped archive puts opencode: an npm tarball, `package/bin/opencode`', async () => {
+      // `tar -tzf` of `@opencode/cli-linux-{x64,arm64}@2.0.22` lists `package/package.json` and
+      // `package/bin/opencode`; `scripts/refresh-bundled-agent` checks the second on every refresh.
       const entry = BUNDLED_AGENTS.find((agent) => agent.id === 'opencode')!;
-      expect(bundledProgram(entry)).toBe('/app/extra/agents/opencode/opencode');
+      expect(bundledProgram(entry)).toBe('/app/extra/agents/opencode/package/bin/opencode');
     });
 
     await it('is never on a PATH directory', async () => {

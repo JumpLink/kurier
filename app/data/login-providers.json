@@ -1,0 +1,23 @@
+{
+  "checked": "2026-10-05",
+  "excluded": [{ "id": "xai", "reason": "Not supported, by decision of 2026-10-04." }],
+  "preferred": [
+    "opencode",
+    "opencode-go",
+    "openai",
+    "github-copilot",
+    "anthropic",
+    "google",
+    "openrouter",
+    "vercel",
+    "mistral",
+    "scaleway",
+    "ovhcloud",
+    "stackit",
+    "berget",
+    "infomaniak",
+    "hetzner",
+    "cortecs"
+  ],
+  "europe": ["mistral", "scaleway", "ovhcloud", "stackit", "berget", "infomaniak", "hetzner", "cortecs"]
+}

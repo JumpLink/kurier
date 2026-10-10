@@ -1,5 +1,35 @@
 # kurier — Code Review Findings
 
+> **Status as of 2026-10-03.** The body below is the review **as it was written on 2026-09-30**
+> against `main` and is kept unedited, because a review that gets rewritten is no longer a record of
+> what was found. This header is the only part that moves.
+>
+> Every finding was re-checked against `main` on 2026-10-03. Six were already fixed by other work:
+> #2 (stderr flush on exit), #3 (`resume`'s transcript append), #4 (the buffer-overflow excerpt), #6
+> (`runTurn`'s SIGINT on a non-TTY), #8 (the duplicated gate construction) and #14 (`session/update`
+> variants in the schema check). #13 and #16 are partly fixed. The rest are open, and the top of that
+> list is unchanged: **#1, `StdioChannel.send` ignores backpressure on stdin** — there is no `drain`
+> anywhere in the tree, so a large prompt can still be dropped silently.
+>
+> **One finding here was itself wrong, and the way it was wrong is the point.** #2 is filed as "the
+> stderr buffer is not flushed on exit", and the flush was there. The real defect is one level up: the
+> channel ended as soon as **stdout** closed, so a last stderr line still in flight arrived *after*
+> the end — measured `stdout, END, late-err` on gjs and node alike. Fixed in
+> [fix/stdio-stderr-gate](../../pull/1) with a test that fails without it.
+>
+> **And one defect this review did not look for, found while fixing that one.** `StdioChannel
+> .terminate()` cannot end the channel when the agent leaves a child process holding its pipes:
+> `SIGTERM`/`SIGKILL` reach the direct child, the grandchild keeps the pipe open, and `onEnd` never
+> fires. Measured `PROBE_KILL=NEVER-ENDED` on gjs and on node, **identically before and after** the
+> end-gating fix, so it is pre-existing and not a regression — and it means a GUI Stop can leave an
+> agent attached forever. SIGKILL cannot cross the process group without a deliberate decision
+> (`setsid` at spawn, or a group kill), which is why it is filed here rather than patched. **This is
+> the next thing to work on**, and it wants its own test before its own fix.
+>
+> Three comment claims about `@gjsify/child_process`'s `close`/`exit` ordering were also stale: they
+> described 0.53.x, and 0.54.0 waits for the pipes. That wrong claim is what made the end-gating look
+> unfixable, and it is what the abandoned `wip/stdio-close-gate` branch was built on.
+
 Most severe first. Each finding follows the requested format.
 
 ---

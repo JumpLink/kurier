@@ -247,7 +247,10 @@ export function agentStatus(attachment: AgentAttachment): AgentStatus {
         note: `The agent exited${attachment.reason ? ` (${attachment.reason})` : ''}. Press New chat to send another prompt.`,
       };
     case 'failed':
-      return { attached: attachment.kind === 'model', note: attachment.message };
+      return {
+        attached: attachment.kind === 'model' || attachment.kind === 'quota',
+        note: attachment.message,
+      };
   }
 }
 
