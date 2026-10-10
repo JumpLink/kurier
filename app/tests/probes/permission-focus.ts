@@ -39,7 +39,9 @@ import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
 import { optionLabel, type PermissionQuestion, type PermissionView } from '@kurier/core';
-import { PermissionDialog } from '../../src/frontends/gui/permission-dialog.ts';
+// The dialog is `@kurier/widget`'s now (ADR 0001 step 5), and this probe reaches past the barrel on
+// purpose: the focus rules it measures are the dialog's own, and a host never constructs one.
+import { PermissionDialog } from '@kurier/widget/permission-dialog';
 import type { PermissionOption } from '@kurier/acp/types';
 
 Adw.init();

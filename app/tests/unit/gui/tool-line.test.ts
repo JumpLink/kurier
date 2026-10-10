@@ -1,7 +1,9 @@
-/** `frontends/gui/tool-line.ts` — a recorded tool line read back into a title, a status and an icon. */
+/** `@kurier/widget`'s `tool-line.ts` — a recorded tool line read back into a title, a status and an icon. */
 import { describe, expect, it } from '@gjsify/unit';
 
-import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON } from '../../../src/frontends/gui/tool-line.ts';
+// Past the barrel, which exports the widget and therefore imports `Adw` — this module imports
+// nothing at all, which is what keeps these assertions running on Node as well as on GJS.
+import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON } from '@kurier/widget/tool-line';
 
 export default async () => {
   await describe('parseToolLine', async () => {
