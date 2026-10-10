@@ -175,9 +175,12 @@ Exists today:
 Widget needs:
 - **Inline provider page** instead of only a dialog opened after a failure. First run with no connected provider shows:
   provider list (featured + European first) -> method (browser / key) -> progress -> "ready". A widget property or signal
-  tells the host whether a provider is connected. Needs a "list connected providers" call (**UNVERIFIED** whether
-  opencode's `/api/integration` reports connected state; if not, probe by attempting `session/new` and watching for the
-  `auth` failure, which is what happens now).
+  tells the host whether a provider is connected. **Measured (opencode 2.0.25, `scripts/probes/provider-connections.mjs`):**
+  `GET /api/integration` carries `connections` per provider (empty in a fresh home, one credential-id entry after a
+  connect), so no attempt-and-fail probe is needed. ACP reports nothing of the kind. **Built as step 6:** an offer
+  (`providerOnboarding`), not a wall, because the free hosted models work with no connection; an unreadable state shows
+  the ordinary chat and the auth failure dialog stays the fallback. No signal yet: a host that wants one can read
+  the same `probeConnections`.
 - The login dialog should become a reusable `Adw.NavigationPage` / `Gtk.Widget` content, the dialog being a thin wrapper.
 - Login must run under the host's isolation dir so credentials land in the host app's agent store (already how `server.ts` works).
 - Provider data policy: the `xai` exclusion and featured lists are kurier decisions; make `login-providers.json` injectable.
@@ -187,12 +190,12 @@ Widget needs:
 
 | # | Step | Size |
 |---|---|---|
-| 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? | S |
+| 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? (yes, measured) | S |
 | 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
 | 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | **Done** (`AgentSessionOptions.mcpServers`). Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
 | 5 | **Done** (`packages/widget`, see above for the deltas). Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
-| 6 | Inline provider onboarding page + connected-state signal | M |
+| 6 | **Done** (`onboarding.ts` in core, `onboarding-page.ts` in the widget; see the ADR). Inline provider onboarding page; the connected-state signal was left out | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |
 | 8 | Flatpak module generator from `bundled-agents.json`; make `BUNDLED_PREFIX` configurable | M |
 | 9 | Steuererklärung integration: replace the assistant's `getLLMProvider` chat (`core/actions/assistant/chat.ts`, `engine-status.ts`) with `KurierChat` and the injected `steuer mcp` server. The other three users of `getLLMProvider` (`classify-documents.ts`, `extract-invoice.ts`, `review-metadata.ts`) are headless one-shot document analysis; they stay on the in-process provider unless a headless kurier API is added. | M |

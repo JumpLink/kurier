@@ -47,12 +47,15 @@ import {
   failureToShow,
   keepsDraft,
   loginUnavailableReason,
+  onboardingView,
   openLoginSession,
+  probeConnections,
   staleDialog,
   type AgentAttachment,
   type AgentCommand,
   type AgentSnapshot,
   type ComposerInput,
+  type ConnectionFacts,
   type EmptyStateView,
   type FailureNotice,
   type McpServer,
@@ -66,6 +69,7 @@ import { installWidgetCss } from './css.ts';
 import { ConfigRow } from './config-row.ts';
 import { FailureDialog } from './failure-dialog.ts';
 import { LoginDialog } from './login-dialog.ts';
+import { OnboardingPage } from './onboarding-page.ts';
 import { PermissionDialog } from './permission-dialog.ts';
 import { TranscriptView } from './transcript-view.ts';
 import Template from './chat.blp';
@@ -124,6 +128,12 @@ export interface KurierChatOptions {
    * Absent: an agent exists.
    */
   readonly noAgent?: Extract<EmptyStateView, { kind: 'no-agent' }>;
+  /**
+   * Offer to connect a provider when the agent has none. Off by default: it starts a private login
+   * server once to read the connection state, which a host opts into. See `onboarding.ts` in core —
+   * the page is an offer, never a wall, and an unreadable state shows the ordinary chat.
+   */
+  readonly providerOnboarding?: boolean;
   /** The host's idle page, into the `closed` slot. Absent: that state renders nothing. */
   readonly closedPage?: Gtk.Widget;
   /** The host's nothing-found page, into the `no-agent` slot. Absent: that state renders nothing. */
@@ -185,6 +195,12 @@ export class KurierChat extends Adw.Bin {
   /** The modal a failure earns. Only ever raised from `#onSnapshot`; `failure.ts` decides what it says. */
   readonly #failures: FailureDialog;
   readonly #login = new LoginDialog();
+  #providerOnboarding: boolean;
+  #connection: ConnectionFacts = { kind: 'unknown' };
+  #onboardingDismissed = false;
+  /** A dev hook's stand-in for the probe and for `hasLogin`; see `stageOnboarding`. */
+  #onboardingStaged = false;
+  #onboardingPage: OnboardingPage | null = null;
   /** The agent the widget starts, which is also the one a login is for. */
   readonly #loginAgent: AgentCommand;
   /**
@@ -227,6 +243,7 @@ export class KurierChat extends Adw.Bin {
     this.#hostConversation = options.onConversation;
     this.#hostNotice = options.onNotice;
     this.#loginAgent = options.agent;
+    this.#providerOnboarding = options.providerOnboarding === true;
     // `this` rather than a window, which is why `PermissionDialog` and `FailureDialog` take a
     // `Gtk.Widget`: a widget a host embeds does not know what window it will end up in, and
     // `Adw.Dialog.present` walks up to the root by itself.
@@ -312,6 +329,12 @@ export class KurierChat extends Adw.Bin {
     this._composerHost.child = this.#composer.widget;
     if (options.closedPage) this._closedHost.child = options.closedPage;
     if (options.noAgentPage) this._noAgentHost.child = options.noAgentPage;
+    if (this.#providerOnboarding && !this.#unavailable) {
+      void probeConnections(options.agent).then((facts) => {
+        this.#connection = facts;
+        this.#refreshOnboarding();
+      });
+    }
   }
 
   // ─── what a host opens, closes and asks about ───────────────────────────────────────────────
@@ -380,7 +403,7 @@ export class KurierChat extends Adw.Bin {
     this.#agent.startConversation(chat.cwd);
     this.#permissions.close();
     this.#transcript.setEntries([]);
-    this._stack.visibleChildName = this.#unavailable ? 'no-agent' : 'new';
+    this._stack.visibleChildName = this.#unavailable ? 'no-agent' : this.#newPage();
     this._cwdCaption.label = `Working in ${displayCwd(chat.cwd, chat.home)}`;
     this._cwdCaption.visible = !this.#unavailable;
   }
@@ -489,7 +512,8 @@ export class KurierChat extends Adw.Bin {
     // what is on top of it. The same for a new chat, whose first line is drawn before its session
     // exists.
     const visible = this._stack.visibleChildName;
-    if (visible === 'empty' || visible === 'new') this._stack.visibleChildName = 'open';
+    if (visible === 'empty' || visible === 'new' || visible === 'onboarding')
+      this._stack.visibleChildName = 'open';
   }
 
   /**
@@ -544,6 +568,48 @@ export class KurierChat extends Adw.Bin {
     return this.#permissions.show(question);
   }
 
+  // ─── provider onboarding ─────────────────────────────────────────────────────────────────────
+
+  /** The page a new chat shows: the onboarding offer where `onboardingView` says so, else "New chat". */
+  #newPage(): 'new' | 'onboarding' {
+    const view = onboardingView({
+      enabled: this.#providerOnboarding,
+      noAgent: this.#unavailable !== undefined,
+      loginAvailable: this.#onboardingStaged || this.hasLogin,
+      connection: this.#connection,
+      dismissed: this.#onboardingDismissed,
+    });
+    if (view === null) return 'new';
+    if (this.#onboardingPage === null) {
+      this.#onboardingPage = new OnboardingPage(view, {
+        onConnect: () => this.openLogin(),
+        onContinue: () => {
+          this.#onboardingDismissed = true;
+          this.#refreshOnboarding();
+        },
+      });
+      this._stack.add_named(this.#onboardingPage.widget, 'onboarding');
+    }
+    return 'onboarding';
+  }
+
+  /** Re-decide the page — only if the person is on one of the two it chooses between. */
+  #refreshOnboarding(): void {
+    const visible = this._stack.visibleChildName;
+    if (visible === 'new' || visible === 'onboarding') this._stack.visibleChildName = this.#newPage();
+  }
+
+  /**
+   * For a host's dev hook: show the onboarding page as if the probe had found no provider and a login
+   * could run, so it can be photographed against the stand-in agent. Never used outside a fixture.
+   */
+  stageOnboarding(): void {
+    this.#onboardingStaged = true;
+    this.#providerOnboarding = true;
+    this.#connection = { kind: 'none', browser: 10, key: 228 };
+    this.#refreshOnboarding();
+  }
+
   // ─── the login ──────────────────────────────────────────────────────────────────────────────
 
   /** Whether a login could work at all. A host with `false` leaves its own entry insensitive. */
@@ -567,6 +633,8 @@ export class KurierChat extends Adw.Bin {
         // A turn in flight is left alone, so say so instead of claiming a restart that did not happen.
         if (!(await this.#agent.restartAgent()))
           throw new Error('a turn is still running — send again once it ends');
+        this.#connection = { kind: 'connected' };
+        this.#refreshOnboarding();
       },
     });
     this.#login.show(this, controller);

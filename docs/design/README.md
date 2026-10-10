@@ -33,3 +33,4 @@ in [dev-fixtures.md](../dev-fixtures.md).
 | Start with earlier chats, none open | ![](screenshots/startup.png) | |
 | No agent found | ![](screenshots/no-agent.png) | |
 | Notice banner | ![](screenshots/notice.png) | |
+| Provider onboarding (no provider connected) | ![](screenshots/onboarding.png) | |
