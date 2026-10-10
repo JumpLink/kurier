@@ -626,7 +626,7 @@ function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Wid
 function buildToolCard(line: ToolLine): Gtk.Widget {
   const card = new Gtk.Box({
     orientation: Gtk.Orientation.HORIZONTAL,
-    spacing: 8,
+    spacing: 10,
     cssClasses: ['card', CSS.toolCard],
   });
   card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: ROW_ICON_PX }));
@@ -649,7 +649,7 @@ function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
   // above and below put theirs in.
   const row = new Gtk.Box({
     orientation: Gtk.Orientation.HORIZONTAL,
-    spacing: 8,
+    spacing: 10,
     cssClasses: [CSS.toolStatus],
   });
   row.append(new Gtk.Image({ iconName: TOOL_FALLBACK_ICON, pixelSize: ROW_ICON_PX, cssClasses: [CSS.dim] }));
