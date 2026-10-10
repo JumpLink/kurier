@@ -20,5 +20,21 @@
     "@lotse/acp": "*",
     "@lotse/core": "*",
     "@lotse/session": "*"
+  },
+  "peerDependencies": {
+    "@girs/adw-1": "^5.4.0",
+    "@girs/gdk-4.0": "^5.4.0",
+    "@girs/glib-2.0": "^5.4.0",
+    "@girs/gobject-2.0": "^5.4.0",
+    "@girs/gtk-4.0": "^5.4.0",
+    "@girs/pango-1.0": "^5.4.0"
+  },
+  "devDependencies": {
+    "@girs/adw-1": "5.4.0",
+    "@girs/gdk-4.0": "5.4.0",
+    "@girs/glib-2.0": "5.4.0",
+    "@girs/gobject-2.0": "5.4.0",
+    "@girs/gtk-4.0": "5.4.0",
+    "@girs/pango-1.0": "5.4.0"
   }
 }
