@@ -10,7 +10,7 @@
  *
  * No `type` tag, and a `description` the schema does not define. Read as the protocol's *agent* auth
  * method — the kind where the client is expected to arrange the login itself — the sentence in that
- * description is an instruction to the client. `classifyAuthMethods` (`@kurier/acp/gate`) is the first
+ * description is an instruction to the client. `classifyAuthMethods` (`@lotse/acp/gate`) is the first
  * half of the fix; this file is the second: **two paths, and both are real.**
  *
  * - **The agent can run the login itself** (`kind: 'terminal'`, or it handed over `args`). It gets
@@ -32,8 +32,8 @@
  * than a missing feature.
  */
 
-import type { AuthMethodInfo, ClassifiedAuthMethods, ClientGate } from '@kurier/acp';
-import { classifyAuthMethods } from '@kurier/acp/gate';
+import type { AuthMethodInfo, ClassifiedAuthMethods, ClientGate } from '@lotse/acp';
+import { classifyAuthMethods } from '@lotse/acp/gate';
 
 import { DEFAULT_AGENT } from './agents/launcher.ts';
 import { OPENCODE_LOGIN } from './agents/opencode.ts';

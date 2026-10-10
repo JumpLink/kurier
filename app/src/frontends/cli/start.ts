@@ -21,9 +21,9 @@ import {
   toTranscript,
   withAuthHint,
   type KurierPaths,
-} from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
-import type { TranscriptEntry } from '@kurier/session';
+} from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
+import type { TranscriptEntry } from '@lotse/session';
 
 import { agentForNew } from './choose.ts';
 import { commandGate } from './gate.ts';

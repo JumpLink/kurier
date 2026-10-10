@@ -6,8 +6,8 @@ an approval dialog and a provider login as **one widget**, `KurierChat`. You bri
 data directory, the agent choice and your own permission policy.
 
 Both packages are LGPL-3.0-or-later, so you may link them into an application under another licence;
-changes to the packages themselves stay LGPL. Reference: [`@kurier/core`](../packages/core/README.md),
-[`@kurier/widget`](../packages/widget/README.md). Why the line is drawn where it is:
+changes to the packages themselves stay LGPL. Reference: [`@lotse/core`](../packages/core/README.md),
+[`@lotse/widget`](../packages/widget/README.md). Why the line is drawn where it is:
 [ADR 0001](adr/0001-lotse-as-an-embeddable-widget.md).
 
 The finished code of this guide is `app/tests/examples/embed.ts`; it is type-checked with the app, so
@@ -16,11 +16,11 @@ it matches the signatures.
 ## 1. Depend on the packages
 
 ```json
-{ "dependencies": { "@kurier/widget": "*", "@kurier/core": "*", "@kurier/session": "*" } }
+{ "dependencies": { "@lotse/widget": "*", "@lotse/core": "*", "@lotse/session": "*" } }
 ```
 
-`@kurier/session` supplies `createSessionStore`, a small JSON store you may use or replace; the widget
-only needs two callbacks (step 4). `@kurier/acp` (the protocol layer) comes in transitively.
+`@lotse/session` supplies `createSessionStore`, a small JSON store you may use or replace; the widget
+only needs two callbacks (step 4). `@lotse/acp` (the protocol layer) comes in transitively.
 
 ## 2. Give kurier its own data directory
 
@@ -78,7 +78,7 @@ Generate the module from the catalog instead of copying kurier's manifest:
 Put the module in your manifest's `modules`, **before** your own module, and keep `--share=network` in
 `finish-args` (the agent runs inside the sandbox). It is `extra-data`: url, sha256 and size come from the
 catalog, nothing is downloaded when you generate, and an entry without a checksum fails loudly. In code,
-`flatpakAgentModule(agent, arches?)` from `@kurier/core` returns the same object. Kurier's own manifest
+`flatpakAgentModule(agent, arches?)` from `@lotse/core` returns the same object. Kurier's own manifest
 carries the identical module (a test compares them byte for byte), so a refresh of the pin reaches you by
 regenerating. Then point `agentSource` at `'bundled'`, as above.
 
@@ -185,7 +185,7 @@ contents of people's work:
 
 ## Privacy: free hosted models never get private data
 
-`@kurier/core` keeps a small list of hosted models that are free and documented as zero-retention
+`@lotse/core` keeps a small list of hosted models that are free and documented as zero-retention
 (`FREE_MODELS`, `freeModelFirst`) and sorts them to the top of the model dropdown. It is a **hint**: kurier
 never selects a model, hides one or guesses. "Free" still means time-limited, and what you send goes to
 the provider that hosts the model; the onboarding page says so.
@@ -201,8 +201,8 @@ For a host that handles client or personal data, the rule is yours to enforce:
 
 ## Where to go next
 
-- [`@kurier/widget`](../packages/widget/README.md): every option and member.
-- [`@kurier/core`](../packages/core/README.md): agent resolution, session, login, view models.
+- [`@lotse/widget`](../packages/widget/README.md): every option and member.
+- [`@lotse/core`](../packages/core/README.md): agent resolution, session, login, view models.
 - [login.md](login.md): how the in-app login works, and what was measured.
 - [dev-fixtures.md](dev-fixtures.md): stand-in agent and the `KU_APP_*` hooks, for screenshots and tests.
 - [design/README.md](design/README.md): what each state looks like.

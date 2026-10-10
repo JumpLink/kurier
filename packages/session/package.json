@@ -1,5 +1,5 @@
 {
-  "name": "@kurier/session",
+  "name": "@lotse/session",
   "version": "0.1.1",
   "license": "LGPL-3.0-or-later",
   "private": true,
@@ -15,6 +15,6 @@
     "src"
   ],
   "dependencies": {
-    "@kurier/acp": "*"
+    "@lotse/acp": "*"
   }
 }

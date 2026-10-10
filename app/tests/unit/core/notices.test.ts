@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { noticeDue } from '@kurier/core';
+import { noticeDue } from '@lotse/core';
 import {
   DEFAULT_NOTICES,
   markSeen,

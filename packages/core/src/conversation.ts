@@ -6,7 +6,7 @@
  * put back in front of an agent (`reattach`, from what that agent advertised).
  */
 
-import { newSession, type AgentSource, type SessionRecord } from '@kurier/session';
+import { newSession, type AgentSource, type SessionRecord } from '@lotse/session';
 
 const TITLE_MAX = 72;
 

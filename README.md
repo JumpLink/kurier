@@ -81,7 +81,7 @@ otherwise, the choice in `settings.json` above both. An empty session file opens
 your first prompt starts the session. Every dev hook, the stand-in agent that needs no model, and the
 measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
 
-**The chat is a widget, and this window is one consumer of it.** `@kurier/widget` (`packages/widget`,
+**The chat is a widget, and this window is one consumer of it.** `@lotse/widget` (`packages/widget`,
 LGPL) holds `KurierChat` — one conversation: the transcript, the composer with its model and mode
 controls, the tool cards, the approval dialog, the login — and another GTK app embeds it by parenting
 one widget and passing which agent, which directory and which MCP servers to use. The window in
@@ -90,7 +90,7 @@ between them is drawn in [ADR 0001](docs/adr/0001-lotse-as-an-embeddable-widget.
 [docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
 
 To embed the chat in your own app, start with the [host guide](docs/embedding.md); the API is documented in
-[`@kurier/widget`](packages/widget/README.md) and [`@kurier/core`](packages/core/README.md).
+[`@lotse/widget`](packages/widget/README.md) and [`@lotse/core`](packages/core/README.md).
 
 Design decisions are in [docs/adr/](docs/adr/README.md). The GUI's look and screenshots of every
 state are in [docs/design/](docs/design/README.md).
@@ -135,5 +135,5 @@ See [AGENTS.md](AGENTS.md).
 ## License
 
 The apps are [AGPL-3.0-or-later](LICENSE); the reusable packages under `packages/*`
-(`@kurier/acp`, `@kurier/session`, `@kurier/core`, `@kurier/widget`) are LGPL-3.0-or-later, each with its own `LICENSE` and
+(`@lotse/acp`, `@lotse/session`, `@lotse/core`, `@lotse/widget`) are LGPL-3.0-or-later, each with its own `LICENSE` and
 `COPYING`. © Pascal Garber.

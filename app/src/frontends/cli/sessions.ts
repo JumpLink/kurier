@@ -8,9 +8,9 @@
 
 import type { CommandModule } from 'yargs';
 
-import type { KurierPaths } from '@kurier/core';
-import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
-import type { SessionRecord } from '@kurier/session';
+import type { KurierPaths } from '@lotse/core';
+import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@lotse/session';
+import type { SessionRecord } from '@lotse/session';
 
 import { err, pickArgv, showSession, showSessionTable } from './output.ts';
 

@@ -19,8 +19,8 @@ import {
   freeModelFirst,
   modelControl,
   type ConfigValue,
-} from '@kurier/core';
-import type { SessionConfigOption } from '@kurier/acp/types';
+} from '@lotse/core';
+import type { SessionConfigOption } from '@lotse/acp/types';
 
 /** The agent's list, in the agent's order, with two of them named by the hint. */
 function values(...ids: string[]): ConfigValue[] {

@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "Kurier app: the `kurier` binary \u2014 a CLI over @kurier/acp and @kurier/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
+  "description": "Kurier app: the `kurier` binary \u2014 a CLI over @lotse/acp and @lotse/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -91,10 +91,10 @@
     }
   },
   "dependencies": {
-    "@kurier/acp": "*",
-    "@kurier/core": "*",
-    "@kurier/session": "*",
-    "@kurier/widget": "*",
+    "@lotse/acp": "*",
+    "@lotse/core": "*",
+    "@lotse/session": "*",
+    "@lotse/widget": "*",
     "yargs": "^18.1.0"
   },
   "devDependencies": {

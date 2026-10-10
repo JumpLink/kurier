@@ -21,7 +21,7 @@ import Adw from '@girs/adw-1';
 import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
-import type { AgentChoice, ResolveContext } from '@kurier/core';
+import type { AgentChoice, ResolveContext } from '@lotse/core';
 import { choiceFromKey, type ChoicesView } from '../../core/settings-view.ts';
 
 /** What the host detection found; the part of a `ResolveContext` the rows are built from. */

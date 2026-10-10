@@ -31,7 +31,7 @@
 > unfixable, and it is what the abandoned `wip/stdio-close-gate` branch was built on.
 >
 > **Per finding, re-checked against `main` on 2026-10-10.** "Core" marks what blocks or shapes the
-> `@kurier/core` extraction.
+> `@lotse/core` extraction.
 >
 > | #   | Finding                                          | Status                                                     | Core |
 > | --- | ------------------------------------------------ | ---------------------------------------------------------- | ---- |
@@ -218,7 +218,7 @@ Evidence:
     options.onNotice?.(describeAuth(auth.agent, auth.terminal));
   }
 ```
-Breaks when: `classifyAuthMethods` and `describeAuth` are protocol-knowledge that belongs in `@kurier/acp`. The app should not know that `authMethods` splits into `terminal` vs `agent` kinds — that's the gate's job. The `gate.ts` already exports `classifyAuthMethods`; the app re-imports it.
+Breaks when: `classifyAuthMethods` and `describeAuth` are protocol-knowledge that belongs in `@lotse/acp`. The app should not know that `authMethods` splits into `terminal` vs `agent` kinds — that's the gate's job. The `gate.ts` already exports `classifyAuthMethods`; the app re-imports it.
 Fix shape: Move `describeAuth` to `gate.ts` (or a new `auth.ts` in acp), or make `AcpClient.initialize` return the classified auth info.
 
 ### `app/src/frontends/cli/auth.ts:79-98` — Auth flow logic duplicates `gate.ts` classification
@@ -353,7 +353,7 @@ Fix shape: Document the microtask timing, or make `onClose` synchronous for `Clo
 - `client.ts:481-490` Unknown agent methods get `METHOD_NOT_FOUND` (correct JSON-RPC behavior)
 
 ### Architectural Rule: `packages/acp` no `node:child_process`, `gi://`, etc. — **HOLDS**
-- Verified all imports in `packages/acp/src/*.ts` — only internal and `@kurier/acp` imports
+- Verified all imports in `packages/acp/src/*.ts` — only internal and `@lotse/acp` imports
 - `transport.ts` defines `Transport` interface and `channelTransport` adapter
 - Actual subprocess code is in `app/src/core/agents/stdio.ts` which imports `node:child_process`
 

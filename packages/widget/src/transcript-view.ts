@@ -48,7 +48,7 @@ import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 import Pango from '@girs/pango-1.0';
 
-import type { TranscriptEntry } from '@kurier/session';
+import type { TranscriptEntry } from '@lotse/session';
 
 import {
   followLanded,
@@ -60,7 +60,7 @@ import {
   type AdjustmentSignal,
   type DisclosureItem,
   type TranscriptItem,
-} from '@kurier/core';
+} from '@lotse/core';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './tool-line.ts';

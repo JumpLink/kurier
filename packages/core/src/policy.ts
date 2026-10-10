@@ -30,8 +30,8 @@
  *   option is.
  */
 
-import type { PermissionGate } from '@kurier/acp/gate';
-import type { ContentBlock, PermissionOption, RequestPermissionRequest } from '@kurier/acp/types';
+import type { PermissionGate } from '@lotse/acp/gate';
+import type { ContentBlock, PermissionOption, RequestPermissionRequest } from '@lotse/acp/types';
 
 import { agentNames, initialFocusResponseId, optionLabel, usableOptions } from './permission.ts';
 

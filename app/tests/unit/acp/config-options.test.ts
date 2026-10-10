@@ -19,11 +19,11 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import { KURIER_CLIENT_CAPABILITIES } from '@kurier/acp/gate';
-import { CLIENT_METHODS } from '@kurier/acp/methods';
-import { isAuthRequired } from '@kurier/acp/client';
-import type { SessionConfigOption, SessionNotification, SessionUpdate } from '@kurier/acp/types';
+import { AcpClient } from '@lotse/acp/client';
+import { KURIER_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
+import { CLIENT_METHODS } from '@lotse/acp/methods';
+import { isAuthRequired } from '@lotse/acp/client';
+import type { SessionConfigOption, SessionNotification, SessionUpdate } from '@lotse/acp/types';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 

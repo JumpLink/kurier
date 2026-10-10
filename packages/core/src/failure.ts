@@ -64,7 +64,7 @@
  * therefore *shown* — a dialog, and the caption under the entry — and neither is recorded.
  */
 
-import { isAuthRequired, RpcError, UnsupportedCapabilityError } from '@kurier/acp';
+import { isAuthRequired, RpcError, UnsupportedCapabilityError } from '@lotse/acp';
 
 import type { AgentAttachment } from './turn.ts';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
+import { AcpClient } from '@lotse/acp/client';
 import {
   FileSystemRefusedError,
   KURIER_CLIENT_CAPABILITIES,
@@ -9,16 +9,16 @@ import {
   classifyAuthMethods,
   denyAll,
   rejectOnce,
-} from '@kurier/acp/gate';
-import { UNSUPPORTED_AGENT_METHODS } from '@kurier/acp/methods';
-import type { Transport } from '@kurier/acp/transport';
+} from '@lotse/acp/gate';
+import { UNSUPPORTED_AGENT_METHODS } from '@lotse/acp/methods';
+import type { Transport } from '@lotse/acp/transport';
 import {
   ERROR_CODES,
   type AuthMethodInfo,
   type PermissionOption,
   type RequestPermissionRequest,
-} from '@kurier/acp/types';
-import { newSession } from '@kurier/session';
+} from '@lotse/acp/types';
+import { newSession } from '@lotse/session';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 

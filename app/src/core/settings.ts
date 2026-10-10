@@ -17,13 +17,13 @@
  *
  * `AgentChoice` names a launcher id *and* a source, so "the bundled opencode" and "my opencode" are two
  * different choices: they keep separate logins and histories (`core/agents/isolation.ts`). The choice
- * itself, and `describeChoice`, are in `@kurier/core` with the resolution that reads them; this file is
+ * itself, and `describeChoice`, are in `@lotse/core` with the resolution that reads them; this file is
  * only the file it is kept in.
  */
 
 import { chmodSync, readFileSync, renameSync } from 'node:fs';
 
-import type { AgentChoice } from '@kurier/core';
+import type { AgentChoice } from '@lotse/core';
 
 import { writePrivateFile } from './private-file.ts';
 

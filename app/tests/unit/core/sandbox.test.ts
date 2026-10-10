@@ -40,7 +40,7 @@ import {
   which,
   type AgentCommand,
   type SandboxFacts,
-} from '@kurier/core';
+} from '@lotse/core';
 
 /** Sandboxed: the one fact, present. */
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };

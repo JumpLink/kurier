@@ -88,7 +88,7 @@ export const WINDOW_MIN_WIDTH_PX = 360;
 export const COLLAPSE_WIDTH_PX = 720;
 
 /**
- * The conversation's measure is `CONTENT_MAX_WIDTH_PX` in `@kurier/widget`, not a constant of this
+ * The conversation's measure is `CONTENT_MAX_WIDTH_PX` in `@lotse/widget`, not a constant of this
  * file: it caps the transcript and the composer, which are the widget's, while the 720 above
  * collapses this window's sidebar. The two were always separate decisions that happened to be equal
  * — now they are also in separate packages, which is what keeps a host from changing one and getting

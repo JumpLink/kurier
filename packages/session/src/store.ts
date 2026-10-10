@@ -27,7 +27,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { assertScopeIsNotAuthority } from '@kurier/acp/gate';
+import { assertScopeIsNotAuthority } from '@lotse/acp/gate';
 
 import { appendTurns, byRecency, type SessionRecord, type TranscriptEntry } from './model.ts';
 

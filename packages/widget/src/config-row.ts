@@ -67,7 +67,7 @@ import {
   modelControl,
   type ConfigRowControl,
   type ConfigRowView,
-} from '@kurier/core';
+} from '@lotse/core';
 import { CSS } from './css.ts';
 
 /** Widest a dropdown asks to be; three of them and the Send button fit the content clamp on one line. */

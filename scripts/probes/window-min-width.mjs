@@ -115,7 +115,7 @@ function readSheet(relative, name) {
  * second copy of the stylesheet is a second thing to keep in step with the first.
  *
  * **Two files since ADR 0001 step 5**, because the sheet is: the chat's rules are
- * `@kurier/widget`'s `WIDGET_CSS` and the app's own three are `APP_CSS`; the widget installs
+ * `@lotse/widget`'s `WIDGET_CSS` and the app's own three are `APP_CSS`; the widget installs
  * its sheet itself, so both are loaded here. Reading only the app's file would measure a window with no transcript padding at all —
  * which is exactly the kind of quietly-wrong baseline this function exists to avoid.
  */

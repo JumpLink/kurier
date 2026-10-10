@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import type { SessionNotification, SessionUpdate } from '@kurier/acp/types';
+import type { SessionNotification, SessionUpdate } from '@lotse/acp/types';
 
-import { toTranscript } from '@kurier/core';
+import { toTranscript } from '@lotse/core';
 
 const AT = '2026-09-30T10:00:00.000Z';
 

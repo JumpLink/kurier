@@ -22,9 +22,9 @@ import {
   type NotAnsweredReason,
   type PermissionDecision,
   type PermissionQuestion,
-} from '@kurier/core';
+} from '@lotse/core';
 
-import type { PermissionOption, RequestPermissionRequest } from '@kurier/acp/types';
+import type { PermissionOption, RequestPermissionRequest } from '@lotse/acp/types';
 
 /** The four options a real agent sends, which is the only shape that exercises the whole rule. */
 const ALL_FOUR: RequestPermissionRequest['options'] = [

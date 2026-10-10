@@ -36,19 +36,19 @@ import {
   narrowConfigSelect,
   usableConfigValues,
   type UsableConfigValue,
-} from '@kurier/acp/narrow';
+} from '@lotse/acp/narrow';
 import type {
   KnownConfigCategory,
   SessionConfigOption,
   SetSessionConfigOptionRequest,
-} from '@kurier/acp/types';
+} from '@lotse/acp/types';
 
 import { freeModelFirst } from './free-models.ts';
 
 /**
  * One value in a `select`, as the surface shows it.
  *
- * Named here as well as in `@kurier/acp/narrow` because the surface's vocabulary is the control's,
+ * Named here as well as in `@lotse/acp/narrow` because the surface's vocabulary is the control's,
  * not the protocol's: it draws a `ConfigValue`, and it should not have to know that the wire calls it
  * a `SessionConfigSelectOption` with a filter applied. Same shape, one name per layer.
  */

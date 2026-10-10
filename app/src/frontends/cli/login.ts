@@ -37,7 +37,7 @@ import {
   type LoginHooks,
   type LoginMethod,
   type LoginProvider,
-} from '@kurier/core';
+} from '@lotse/core';
 
 import { agentForNew } from './choose.ts';
 import { err, out, pickArgv } from './output.ts';

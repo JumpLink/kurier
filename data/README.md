@@ -161,7 +161,7 @@ re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging. T
 when the module in either `package.json` or the generated `eu.jumplink.Lotse.json` disagrees with
 the catalog, so a forgotten `init --force` is red.
 
-**The bundled copy gets its own `HOME`** (`@kurier/core`'s `agents/isolation.ts`). opencode v2 reads
+**The bundled copy gets its own `HOME`** (`@lotse/core`'s `agents/isolation.ts`). opencode v2 reads
 `~/.claude/skills` and `~/.agents/skills`, v1's `OPENCODE_DISABLE_CLAUDE_CODE` and
 `OPENCODE_DISABLE_EXTERNAL_SKILLS` are gone, and under `--filesystem=host` the sandbox's `HOME` is
 the person's real home (measured). So the one switch left is `HOME` itself.

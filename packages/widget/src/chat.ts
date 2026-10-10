@@ -16,7 +16,7 @@
  *
  * **This file decides nothing.** Every question it answers — may Send be pressed, what does the
  * status line say, is this failure still owed a dialog, what does a response id mean — is answered
- * by `@kurier/core`, and the widget's job is to pass the answer to a child and hand the child's
+ * by `@lotse/core`, and the widget's job is to pass the answer to a child and hand the child's
  * events back. That is the same rule `window.ts` was written under, and it is what made this split
  * possible at all: a surface with no decisions in it can be moved.
  *
@@ -36,7 +36,7 @@ import GObject from '@girs/gobject-2.0';
 // real, so the typelib is loaded either way.
 import type Gtk from '@girs/gtk-4.0';
 
-import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@lotse/session';
 
 import {
   AgentSession,
@@ -62,7 +62,7 @@ import {
   type NotAnsweredReason,
   type PermissionQuestion,
   type RecordedResolution,
-} from '@kurier/core';
+} from '@lotse/core';
 
 import { Composer } from './composer.ts';
 import { installWidgetCss } from './css.ts';
@@ -118,7 +118,7 @@ export interface KurierChatOptions {
   /**
    * The host's own MCP servers, forwarded to `session/new` unchanged.
    *
-   * **Passed through, never read.** `@kurier/core` forwards them as opaque objects and never looks
+   * **Passed through, never read.** `@lotse/core` forwards them as opaque objects and never looks
    * past `type` (`AGENTS.md`: MCP is passed through, not known), so a host wires its own servers in
    * without a line of widget-specific code.
    */
@@ -188,7 +188,7 @@ export class KurierChat extends Adw.Bin {
   readonly #config: ConfigRow;
   /**
    * The approval dialog. One per widget, because one question is ever shown at a time —
-   * `@kurier/core`'s `permission.ts` queues the rest, and `PermissionDialog.show` replaces rather
+   * `@lotse/core`'s `permission.ts` queues the rest, and `PermissionDialog.show` replaces rather
    * than stacks.
    */
   readonly #permissions: PermissionDialog;
@@ -281,7 +281,7 @@ export class KurierChat extends Adw.Bin {
       ...(options.createSession ? { create: options.createSession } : {}),
       ...(options.agentSource ? { source: options.agentSource } : {}),
       ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
-      // Forwarded as the host gave them. `@kurier/core` passes them to `session/new` and never reads
+      // Forwarded as the host gave them. `@lotse/core` passes them to `session/new` and never reads
       // past `type`, so a host wires its own servers in without a line of widget-specific code.
       ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
       ...(options.now ? { now: options.now } : {}),
@@ -356,7 +356,7 @@ export class KurierChat extends Adw.Bin {
    * as given and never looks a session up — the widget has no opinion about where sessions live.
    *
    * **`record.turns` is handed over unchanged.** `TranscriptView.setEntries` takes exactly what the
-   * store holds and projects it through `@kurier/core`; a surface that filtered first would be
+   * store holds and projects it through `@lotse/core`; a surface that filtered first would be
    * re-deriving history the agent's own `session/load` is the authority on (`AGENTS.md` § Privacy:
    * the transcript is a record of what happened, not a re-derivation of it).
    *
@@ -472,7 +472,7 @@ export class KurierChat extends Adw.Bin {
   /**
    * Put up the dialog a failure has earned — **once per failure, and never a stale one.**
    *
-   * Three decisions, all of them made in `@kurier/core`'s `failure.ts`:
+   * Three decisions, all of them made in `@lotse/core`'s `failure.ts`:
    *
    * - `failureToShow(attachment, shown)` — is this failure still owed a dialog? It is `null` for a
    *   failure already shown (identity, not "is one open": a dismissal closes the dialog and the
@@ -559,7 +559,7 @@ export class KurierChat extends Adw.Bin {
    *
    * **The gate may only narrow.** `'ask'` is the one answer that lets the question reach a person;
    * everything else — `'decline'`, a throw, a rejected promise, a value from a host that returned
-   * something else entirely — resolves `null`, which `@kurier/core` reads as the dismissal and
+   * something else entirely — resolves `null`, which `@lotse/core` reads as the dismissal and
    * answers `cancelled`. A host whose policy code broke has not approved anything (guardrail 2).
    */
   async #ask(question: PermissionQuestion): Promise<string | null> {

@@ -1,7 +1,7 @@
 /**
  * The app's CSS: the three rules that are this window's own, and nothing of the chat's.
  *
- * **Two providers on the display, and no rule is in both.** `KurierChat` installs `@kurier/widget`'s
+ * **Two providers on the display, and no rule is in both.** `KurierChat` installs `@lotse/widget`'s
  * sheet itself (`installWidgetCss`), so a host that embeds it alone is styled; the app's provider
  * (`main.ts`) carries only the sidebar.
  *
@@ -15,7 +15,7 @@
  * them look like the pages the widget would have drawn there.
  */
 
-import { CSS as WIDGET_CSS_CLASSES } from '@kurier/widget';
+import { CSS as WIDGET_CSS_CLASSES } from '@lotse/widget';
 
 /** Adwaita name classes, declared so a typo is a visible gap rather than a silently plain widget. */
 const DIM = 'dim-label';
@@ -51,7 +51,7 @@ export const APP_CSS = `
  * Class names the app's own files use, exported so a typo is a compile error rather than plain text.
  *
  * The sidebar's three, plus `calm` for the window's idle pages — the widget's map
- * (`CSS` from `@kurier/widget`) has the chat's.
+ * (`CSS` from `@lotse/widget`) has the chat's.
  */
 export const CSS = {
   sessionTitle: 'kurier-session-title',

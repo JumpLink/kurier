@@ -28,7 +28,7 @@ import {
   type AgentChoice,
   type AgentDetection,
   type BundledAgent,
-} from '@kurier/core';
+} from '@lotse/core';
 import { saveDecision, type Settings, type SettingsProblemKind } from './settings.ts';
 
 export const AUTOMATIC_KEY = 'auto';

@@ -25,7 +25,7 @@ import {
   type AgentCommand,
   type AgentDetection,
   type ResolveContext,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const SHA = 'c'.repeat(64);
 const DATA = '/synthetic/data/kurier';

@@ -20,11 +20,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { AcpClient } from '@kurier/acp/client';
-import { KURIER_CLIENT_CAPABILITIES } from '@kurier/acp/gate';
-import { channelTransport } from '@kurier/acp/transport';
+import { AcpClient } from '@lotse/acp/client';
+import { KURIER_CLIENT_CAPABILITIES } from '@lotse/acp/gate';
+import { channelTransport } from '@lotse/acp/transport';
 
-import { OPENCODE_COMMAND, StdioChannel, which } from '@kurier/core';
+import { OPENCODE_COMMAND, StdioChannel, which } from '@lotse/core';
 
 let exitCode = 0;
 

@@ -14,9 +14,9 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import type { ClientGate } from '@kurier/acp/gate';
-import type { PermissionOption, RequestPermissionRequest } from '@kurier/acp/types';
+import { AcpClient } from '@lotse/acp/client';
+import type { ClientGate } from '@lotse/acp/gate';
+import type { PermissionOption, RequestPermissionRequest } from '@lotse/acp/types';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 

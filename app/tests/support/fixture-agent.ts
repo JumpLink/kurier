@@ -23,14 +23,9 @@ import {
   encodeNotification,
   encodeSuccess,
   type JsonRpcMessage,
-} from '@kurier/acp/jsonrpc';
-import {
-  AGENT_METHODS,
-  AGENT_NOTIFICATIONS,
-  CLIENT_METHODS,
-  CLIENT_NOTIFICATIONS,
-} from '@kurier/acp/methods';
-import type { CloseListener, Transport, TransportListener } from '@kurier/acp/transport';
+} from '@lotse/acp/jsonrpc';
+import { AGENT_METHODS, AGENT_NOTIFICATIONS, CLIENT_METHODS, CLIENT_NOTIFICATIONS } from '@lotse/acp/methods';
+import type { CloseListener, Transport, TransportListener } from '@lotse/acp/transport';
 import {
   ERROR_CODES,
   PROTOCOL_VERSION,
@@ -46,7 +41,7 @@ import {
   type SessionNotification,
   type SessionUpdate,
   type StopReason,
-} from '@kurier/acp/types';
+} from '@lotse/acp/types';
 
 /**
  * The three options `opencode acp` 2.0.19 reports, with the shape it reports them in.

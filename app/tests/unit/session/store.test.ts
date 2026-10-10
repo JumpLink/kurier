@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSessionStore, newSession } from '@kurier/session';
+import { createSessionStore, newSession } from '@lotse/session';
 
 const AT = '2026-09-30T10:00:00.000Z';
 

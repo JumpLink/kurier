@@ -14,7 +14,7 @@
  * would put two bubbles where the person sent one, and would make an answer's own bubbles
  * indistinguishable from two answers. So a run of adjacent entries of one kind is joined.
  *
- * **2. Joined with nothing between, and trimmed only at the end.** `labelOf` in `@kurier/session`
+ * **2. Joined with nothing between, and trimmed only at the end.** `labelOf` in `@lotse/session`
  * arrived at this first and says why: trimming each chunk before joining glues words together at the
  * seam (`'first '` + `'answer'` becomes `'firstanswer'`), which is the mid-word artefact both
  * functions exist to remove. A test here asserts the two agree on the same input, so a change to one
@@ -47,7 +47,7 @@
  * it as a plain row.
  */
 
-import type { EntryKind, TranscriptEntry } from '@kurier/session';
+import type { EntryKind, TranscriptEntry } from '@lotse/session';
 
 /**
  * Kinds whose adjacent entries are one message rather than several — see decision 1.

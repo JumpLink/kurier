@@ -12,7 +12,7 @@
 import Adw from '@girs/adw-1';
 import Gtk from '@girs/gtk-4.0';
 
-import type { FailureNotice } from '@kurier/core';
+import type { FailureNotice } from '@lotse/core';
 
 /** The dismissal, and the only string in here that is not part of a sentence. */
 const CLOSE_RESPONSE = 'close';

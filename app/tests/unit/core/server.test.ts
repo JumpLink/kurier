@@ -9,7 +9,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { serverCommand, startServer, whyNoLoginServer, type AgentCommand } from '@kurier/core';
+import { serverCommand, startServer, whyNoLoginServer, type AgentCommand } from '@lotse/core';
 
 function agent(program: string, extra: Partial<AgentCommand> = {}): AgentCommand {
   return { id: 'opencode', title: 'opencode', program, args: ['acp'], ...extra };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { displayCwd, resolveCwd, type CwdFacts } from '@kurier/core';
+import { displayCwd, resolveCwd, type CwdFacts } from '@lotse/core';
 
 /** Synthetic paths only; `exists` answers for exactly the ones a case lists. */
 function facts(existing: string[], over: Partial<CwdFacts> = {}): CwdFacts {

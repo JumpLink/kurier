@@ -6,7 +6,7 @@ opencode 2.0.22, 2026-10-04.
 
 ## Why this is not the old "no in-window login"
 
-`@kurier/core`'s `failure.ts` used to say a window cannot log in, because that would store a credential kurier has no
+`@lotse/core`'s `failure.ts` used to say a window cannot log in, because that would store a credential kurier has no
 safe place for. That was right for the only path then available (`opencode auth login` in a terminal) and
 it stays right for an **API key**. It is not true for an **OAuth flow run by opencode**: opencode starts it,
 talks to the provider and keeps the result in its own store. kurier shows a URL and a code and asks whether

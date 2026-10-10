@@ -10,14 +10,14 @@
  * this" instead of mutating the world to find out where the code writes.
  *
  * The `KurierPaths` shape itself, and `kurierPathsUnder(root)` for a host that hands kurier a
- * directory, are in `@kurier/core`: core takes the paths and never resolves them, and XDG plus the
+ * directory, are in `@lotse/core`: core takes the paths and never resolves them, and XDG plus the
  * `KURIER_*` overrides are a decision only an app gets to make.
  */
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { KurierPaths } from '@kurier/core';
+import type { KurierPaths } from '@lotse/core';
 
 /** `$XDG_DATA_HOME`, or the XDG default. An explicit value must be absolute, per the spec. */
 export function xdgDataHome(env: NodeJS.ProcessEnv = process.env): string {

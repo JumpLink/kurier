@@ -2,7 +2,7 @@
  * `kurier auth` — trap 1 of the plan, given a command.
  *
  * Without this command `kurier start` dies on `-32000 auth_required` with a stack trace instead of a
- * sentence. What it does about that is decided in `@kurier/core`'s `auth.ts`: which of the two paths an
+ * sentence. What it does about that is decided in `@lotse/core`'s `auth.ts`: which of the two paths an
  * agent's `authMethods` allow, what the login command is, and the order the two handshakes run in. What
  * is here is the terminal: the flags, the lines, the exit codes, and the one thing a window would have
  * to do differently — running the login with **inherited stdio**, because a login that opens a browser
@@ -21,7 +21,7 @@ import {
   which,
   type AgentCommand,
   type KurierPaths,
-} from '@kurier/core';
+} from '@lotse/core';
 
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';

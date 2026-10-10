@@ -1,14 +1,14 @@
-# @kurier/widget
+# @lotse/widget
 
 The chat surface, as a widget another GTK4 / libadwaita app embeds. `KurierChat` is an `Adw.Bin` that
 shows **one conversation**: the transcript, the composer with its model, effort and mode controls, the
 tool and thought cards, the approval dialog, failure notices and the provider login. It owns one agent
-subprocess and renders what `@kurier/core` reports.
+subprocess and renders what `@lotse/core` reports.
 
 Licence: **LGPL-3.0-or-later** (`LICENSE`, `COPYING` in this directory).
 
 The widget draws; every decision (may Send be pressed, what does this failure say, which options may a
-permission dialog show) is made in [`@kurier/core`](../core/README.md). The host brings the window, the
+permission dialog show) is made in [`@lotse/core`](../core/README.md). The host brings the window, the
 session list, the menu and the preferences. The full walkthrough, from data directory to shutdown, is
 the [host guide](../../docs/embedding.md); the design of the split is
 [ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
@@ -20,15 +20,15 @@ Requires GJS with GTK 4 and libadwaita, and an ACP agent (opencode today) on `PA
 The packages are `private` and not yet on a registry; depend on them as a workspace:
 
 ```json
-{ "dependencies": { "@kurier/widget": "*", "@kurier/core": "*", "@kurier/session": "*" } }
+{ "dependencies": { "@lotse/widget": "*", "@lotse/core": "*", "@lotse/session": "*" } }
 ```
 
 ```ts
-import { KurierChat } from '@kurier/widget';
+import { KurierChat } from '@lotse/widget';
 ```
 
-`.` is the public entry. Two further sub-paths exist for kurier's own tests (`@kurier/widget/tool-line`,
-`@kurier/widget/permission-dialog`); a host does not need them.
+`.` is the public entry. Two further sub-paths exist for kurier's own tests (`@lotse/widget/tool-line`,
+`@lotse/widget/permission-dialog`); a host does not need them.
 
 ## Minimal example
 
@@ -46,9 +46,9 @@ import {
   resolveDefault,
   resolveRecorded,
   type McpServer,
-} from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
-import { KurierChat } from '@kurier/widget';
+} from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
+import { KurierChat } from '@lotse/widget';
 
 export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): KurierChat {
   const paths = kurierPathsUnder(dataRoot);
@@ -167,5 +167,5 @@ terminates only afterwards. Terminating first would lose the work of the turn in
 
 ## Related
 
-[`@kurier/core`](../core/README.md) · [host guide](../../docs/embedding.md) · [design](../../docs/design/README.md)
+[`@lotse/core`](../core/README.md) · [host guide](../../docs/embedding.md) · [design](../../docs/design/README.md)
 (what the widget looks like, with screenshots) · [login](../../docs/login.md)

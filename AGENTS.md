@@ -21,10 +21,10 @@ layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `se
 
 | Package | Contains | May import |
 |---|---|---|
-| `@kurier/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
-| `@kurier/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@kurier/acp`, `node:fs` — no `gi://`, no agent adapter |
-| `@kurier/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@kurier/acp`, `@kurier/session`, `node:*` — no `gi://`, no yargs, no widget |
-| `@kurier/widget` | **The chat surface, as a widget.** `KurierChat` (`chat.ts` + `chat.blp`) — one conversation: transcript (`transcript-view.ts`, `tool-line.ts`), composer (`composer.ts`, `config-row.ts`), the approval dialog (`permission-dialog.ts` + `permission-body.blp`), the failure and login dialogs, self-installed CSS | `@kurier/core`, `@kurier/session`, `gi://` (GTK 4, Adw 1) — no app, no decisions of its own |
+| `@lotse/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
+| `@lotse/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@lotse/acp`, `node:fs` — no `gi://`, no agent adapter |
+| `@lotse/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@lotse/acp`, `@lotse/session`, `node:*` — no `gi://`, no yargs, no widget |
+| `@lotse/widget` | **The chat surface, as a widget.** `KurierChat` (`chat.ts` + `chat.blp`) — one conversation: transcript (`transcript-view.ts`, `tool-line.ts`), composer (`composer.ts`, `config-row.ts`), the approval dialog (`permission-dialog.ts` + `permission-body.blp`), the failure and login dialogs, self-installed CSS | `@lotse/core`, `@lotse/session`, `gi://` (GTK 4, Adw 1) — no app, no decisions of its own |
 | `kurier-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita shell in `src/frontends/gui/` (its own bundle) around one `KurierChat` | all of the above; `gi://` only under `frontends/gui/` |
 
 **`packages/acp` does not know that subprocesses exist.** No `spawn`, no `node:child_process`, no
@@ -41,7 +41,7 @@ the package, while reading and writing one app's file stays here. Before adding 
 whether a host would want it; if yes it belongs one level down. [ADR
 0001](docs/adr/0001-lotse-as-an-embeddable-widget.md) records what stayed and why.
 
-**The app imports `@kurier/core`, never a file inside it** — and the same for `@kurier/widget`. Each
+**The app imports `@lotse/core`, never a file inside it** — and the same for `@lotse/widget`. Each
 package's `src/index.ts` is a deliberate barrel, so what is public is a decision somebody made rather than
 whatever a consumer reached for; a new export is one line there. The widget also exports `./tool-line` and
 `./permission-dialog`, both **for measurements, not for hosts** (a Node-capable unit test, the focus probe).
@@ -54,9 +54,9 @@ reached only through its getters and methods. The two idle pages are built in `w
 `closedPage`/`noAgentPage` — their copy belongs to whatever surrounds a chat. **No named imports from a
 `.blp`, anywhere**: [docs/toolchain-traps.md](docs/toolchain-traps.md#named-imports-from-a-blp).
 
-`@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
+`@lotse/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
 `KurierPaths` (`app/src/core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)`
-from `@kurier/core` for a host), a test passes a temp dir.
+from `@lotse/core` for a host), a test passes a temp dir.
 
 ## The CLI
 
@@ -186,7 +186,7 @@ session dies on an error message instead of on code. `classifyAuthMethods` (`gat
 as the protocol's *agent* auth method: it means the client has to arrange the login itself, which
 is what `kurier auth` runs outside the ACP channel.
 
-**What to do about it is decided once, in `@kurier/core`'s `auth.ts`** — `authPlan` (which of the two
+**What to do about it is decided once, in `@lotse/core`'s `auth.ts`** — `authPlan` (which of the two
 paths the methods allow), `describeAuthMethods` (the handshake notice), `loginCommandFor` (the program,
 the bundled copy's own) and `arrangeAuth` (ask the agent, run the login, **ask it again** — the second
 handshake is the agent's own yes rather than an exit code read as one). A surface passes in only what
@@ -257,7 +257,7 @@ the same call a sidebar row makes) rather than around it, so a screenshot is of 
 re-implementation.
 
 **Three dialogs, and only three failures earn one.** Plan §6 asks for the auth trap and the reattach
-refusal to be *shown*, and `@kurier/core`'s `failure.ts` is where that is decided: `failureKind` classifies an error
+refusal to be *shown*, and `@lotse/core`'s `failure.ts` is where that is decided: `failureKind` classifies an error
 by its **type and the turn state** (`RpcError` -32000, `UnsupportedCapabilityError`,
 `FailureContext.promptSent`), never by its wording; `failureNotice` returns a dialog for `auth`, `model`
 and `unsupported` and **`null` for `start`** — a bad command or a handshake timeout is already the
@@ -290,7 +290,7 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@kurier/core`'s `login/`, [docs/login.md](docs/login.md)): the
+**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@lotse/core`'s `login/`, [docs/login.md](docs/login.md)): the
 agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
 stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
 a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it

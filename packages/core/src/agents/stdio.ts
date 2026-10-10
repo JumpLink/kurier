@@ -19,7 +19,7 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 
-import { channelTransport, type RawChannel, type Transport } from '@kurier/acp/transport';
+import { channelTransport, type RawChannel, type Transport } from '@lotse/acp/transport';
 
 import { prepareIsolation } from './isolation.ts';
 import {
@@ -158,7 +158,7 @@ export class StdioChannel implements RawChannel {
     });
     this.#child.stdout.setEncoding('utf8');
     this.#child.stdout.on('data', (chunk: string) => {
-      // A chunk boundary is not a message boundary. The `MessageReader` in @kurier/acp owns that
+      // A chunk boundary is not a message boundary. The `MessageReader` in @lotse/acp owns that
       // decision; this layer only moves bytes and never looks inside a line.
       for (const listener of this.#dataListeners) listener(chunk);
     });

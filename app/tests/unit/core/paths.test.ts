@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
-import { createSessionStore, newSession } from '@kurier/session';
+import { createSessionStore, newSession } from '@lotse/session';
 
 import {
   gatherResolveContext,
@@ -12,7 +12,7 @@ import {
   isolationEnv,
   kurierPathsUnder,
   prepareIsolation,
-} from '@kurier/core';
+} from '@lotse/core';
 import { DEFAULT_NOTICES, writeNotices } from '../../../src/core/notices.ts';
 import { saveSettings } from '../../../src/core/settings.ts';
 import {

@@ -1,7 +1,7 @@
 /**
- * `@kurier/core` — kurier without a surface.
+ * `@lotse/core` — kurier without a surface.
  *
- * Layer 2, between the protocol (`@kurier/acp`) and whatever is rendering: which agent to start
+ * Layer 2, between the protocol (`@lotse/acp`) and whatever is rendering: which agent to start
  * and how to start it, the session a prompt turn runs in, the view models a chat is drawn from,
  * and the provider login. The CLI, the Adwaita window and an embedded widget are three consumers
  * of the same code, which is the whole reason this package exists — see
@@ -109,7 +109,7 @@ export {
   type OpenAgentOptions,
   type TurnOptions,
 } from './run.ts';
-export type { McpServer } from '@kurier/acp';
+export type { McpServer } from '@lotse/acp';
 export {
   AgentSession,
   type AgentSessionEvents,

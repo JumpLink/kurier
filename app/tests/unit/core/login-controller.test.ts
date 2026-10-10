@@ -10,7 +10,7 @@ import {
   type LoginSession,
   type LoginState,
   type OAuthStatus,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const DEVICE: LoginMethod = { id: 'device', kind: 'oauth', label: 'Device code', fields: [] };
 const KEY: LoginMethod = { id: 'key', kind: 'key', label: 'API key', fields: [] };

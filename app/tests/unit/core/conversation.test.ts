@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { conversationRecord, titleFromPrompt, unsavedMessage } from '@kurier/core';
+import { conversationRecord, titleFromPrompt, unsavedMessage } from '@lotse/core';
 
 const AT = '2026-10-02T09:00:00.000Z';
 

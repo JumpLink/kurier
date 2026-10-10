@@ -15,7 +15,7 @@
 import Adw from '@girs/adw-1';
 import Gtk from '@girs/gtk-4.0';
 
-import type { LoginController, LoginField, LoginMethod, LoginProvider, LoginState } from '@kurier/core';
+import type { LoginController, LoginField, LoginMethod, LoginProvider, LoginState } from '@lotse/core';
 
 const CLAMP_PX = 420;
 

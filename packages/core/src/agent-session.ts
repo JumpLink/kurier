@@ -29,15 +29,15 @@
  * same rule the CLI's Ctrl-C obeys (`AGENTS.md`).
  */
 
-import type { AcpClient, McpServer, RequestPermissionRequest } from '@kurier/acp';
-import type { ClientGate } from '@kurier/acp/gate';
+import type { AcpClient, McpServer, RequestPermissionRequest } from '@lotse/acp';
+import type { ClientGate } from '@lotse/acp/gate';
 import type {
   RequestPermissionResponse,
   SessionConfigOption,
   SessionId,
   SessionUpdate,
-} from '@kurier/acp/types';
-import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
+} from '@lotse/acp/types';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@lotse/session';
 
 import { sameCommand, type RecordedResolution } from './agents/resolve.ts';
 import type { AgentCommand } from './agents/stdio.ts';

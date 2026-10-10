@@ -12,7 +12,7 @@ import {
   isResponse,
   parseLine,
   type JsonRpcMessage,
-} from '@kurier/acp/jsonrpc';
+} from '@lotse/acp/jsonrpc';
 
 export default async () => {
   await describe('MessageReader — chunk boundaries', async () => {

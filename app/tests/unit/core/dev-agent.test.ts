@@ -12,7 +12,7 @@ import {
   standInCommand,
   standInScriptPath,
   type ResolvedAgent,
-} from '@kurier/core';
+} from '@lotse/core';
 
 export default async () => {
   await describe('dev-agent — the stand-in is not a launcher', async () => {

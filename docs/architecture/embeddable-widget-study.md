@@ -1,4 +1,4 @@
-# Study: kurier as an embeddable widget (`@kurier/widget`)
+# Study: kurier as an embeddable widget (`@lotse/widget`)
 
 Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Facts are from the repo as of 2026-10-09; items marked **UNVERIFIED** were not measured. The `mcpServers` question was measured on 2026-10-10 (section 3).
 
@@ -11,10 +11,10 @@ Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Fa
 
 | Today (AGPL `app/`) | Goes to | Notes |
 |---|---|---|
-| `core/agent-session.ts`, `turn.ts`, `failure.ts`, `config-row.ts`, `config.ts`, `composer-state.ts`, `conversation.ts`, `transcript.ts`, `transcript-items.ts`, `usage.ts`, `scroll.ts`, `interrupt.ts`, `permission.ts`, `policy.ts`, `free-models.ts`, `empty-state.ts` | `@kurier/core` (new, pure, no `gi://`) | The widget's controller layer. `AgentSession` is the heart. Check each for `paths.ts`/`settings.ts` imports; those must become injected options. |
-| `core/agents/*` (`catalog`, `detect`, `resolve`, `probe`, `sandbox`, `isolation`, `stdio`, `launcher`, `opencode`, `server`) | `@kurier/core` or `@kurier/agents` | `stdio.ts` spawns child processes, so it must not go into `@kurier/acp` (that package knows no subprocesses). `catalog.ts` imports `app/data/bundled-agents.json`; the data file must move with it, or be injected. |
-| `core/login/*` (`api`, `controller`, `flow`, `providers`, `session`) + `app/data/login-providers.json` | `@kurier/core` | No widget code; already shared by CLI and window. |
-| `frontends/gui/*` widgets: `composer`, `transcript-view`, `config-row`, `permission-dialog` (+ `.blp`), `failure-dialog`, `login-dialog`, `css`, `constants` (parts) | `@kurier/widget` (GTK/Adw) | |
+| `core/agent-session.ts`, `turn.ts`, `failure.ts`, `config-row.ts`, `config.ts`, `composer-state.ts`, `conversation.ts`, `transcript.ts`, `transcript-items.ts`, `usage.ts`, `scroll.ts`, `interrupt.ts`, `permission.ts`, `policy.ts`, `free-models.ts`, `empty-state.ts` | `@lotse/core` (new, pure, no `gi://`) | The widget's controller layer. `AgentSession` is the heart. Check each for `paths.ts`/`settings.ts` imports; those must become injected options. |
+| `core/agents/*` (`catalog`, `detect`, `resolve`, `probe`, `sandbox`, `isolation`, `stdio`, `launcher`, `opencode`, `server`) | `@lotse/core` or `@lotse/agents` | `stdio.ts` spawns child processes, so it must not go into `@lotse/acp` (that package knows no subprocesses). `catalog.ts` imports `app/data/bundled-agents.json`; the data file must move with it, or be injected. |
+| `core/login/*` (`api`, `controller`, `flow`, `providers`, `session`) + `app/data/login-providers.json` | `@lotse/core` | No widget code; already shared by CLI and window. |
+| `frontends/gui/*` widgets: `composer`, `transcript-view`, `config-row`, `permission-dialog` (+ `.blp`), `failure-dialog`, `login-dialog`, `css`, `constants` (parts) | `@lotse/widget` (GTK/Adw) | |
 | `frontends/gui/window.ts` (1356 lines) | **Split.** Extract a `KurierChat` widget (transcript + composer + config row + dialogs + `AgentSession` wiring). The window shell stays. | Biggest cost: `MainWindow` currently mixes shell (NavigationSplitView, session list, actions, preferences) with chat logic. |
 
 ### Stays app-only (AGPL)
@@ -25,7 +25,7 @@ Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Fa
   settings as constructor options; the host decides. `paths.ts` stays the kurier app's resolver.
 - `scripts/stand-in-agent.mjs` and the dev fixtures.
 
-`@kurier/session` (LGPL) already fits: the store takes a path.
+`@lotse/session` (LGPL) already fits: the store takes a path.
 
 ### What step 3 actually did (2026-10-10)
 
@@ -44,7 +44,7 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
   are core and the settings file is the app's; `NOTICE_IDS` and `noticeDue` are core and the notices file
   is the app's. In each case the decision is shared and the file handling is one app's.
 - **The tests stayed in `app/tests/unit/core/`** with their imports repointed at the barrel, as the
-  `@kurier/acp` and `@kurier/session` tests already do: one runner in `app/tests/test.mts` is what makes
+  `@lotse/acp` and `@lotse/session` tests already do: one runner in `app/tests/test.mts` is what makes
   the dual GJS + Node run possible at all.
 
 ### What step 5 actually did (2026-10-10)
@@ -72,8 +72,8 @@ split of `window.ts` came out with five deltas worth recording.
   its `KU_APP_*` log lines did not move.
 - **`win.login` stayed an app action.** It is a menu entry, and a menu is the host's; the widget
   exposes `hasLogin` and `openLogin()` and holds the dialog.
-- **Two deliberate reach-ins beside the barrel, both for measurements**: `@kurier/widget/tool-line`
-  (no imports at all, so the unit test keeps its Node half) and `@kurier/widget/permission-dialog`
+- **Two deliberate reach-ins beside the barrel, both for measurements**: `@lotse/widget/tool-line`
+  (no imports at all, so the unit test keeps its Node half) and `@lotse/widget/permission-dialog`
   (the focus probe has to measure *this* widget). A host uses neither.
 
 ## 2. Embedding API sketch
@@ -192,9 +192,9 @@ Widget needs:
 |---|---|---|
 | 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? (yes, measured) | S |
 | 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
-| 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
+| 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@lotse/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | **Done** (`AgentSessionOptions.mcpServers`). Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
-| 5 | **Done** (`packages/widget`, see above for the deltas). Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
+| 5 | **Done** (`packages/widget`, see above for the deltas). Create `@lotse/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
 | 6 | **Done** (`onboarding.ts` in core, `onboarding-page.ts` in the widget; see the ADR). Inline provider onboarding page; the connected-state signal was left out | M |
 | 7 | Public API: signals/properties, docs, an example host app, license files (`LICENSE` + `COPYING`), `gjsify foreach` checks | M |
 | 8 | Flatpak module generator from `bundled-agents.json`; make `BUNDLED_PREFIX` configurable | M |

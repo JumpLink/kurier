@@ -36,7 +36,7 @@
  * until then a switch would be a control the agent is not obliged to honour.
  */
 import { configValue, projectConfigOptions, type ConfigControl, type ConfigValue } from './config.ts';
-import type { SessionConfigOption, SessionUpdate, SetSessionConfigOptionRequest } from '@kurier/acp/types';
+import type { SessionConfigOption, SessionUpdate, SetSessionConfigOptionRequest } from '@lotse/acp/types';
 
 /** What the row needs that is not the agent's own answer: a set in flight, and a sentence. */
 export interface ConfigRowInput {

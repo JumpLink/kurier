@@ -4,7 +4,7 @@
  * Both runtimes, no display. The whole point of the module is that these two questions are answered
  * before any widget exists, so this file is where they are answered twice over.
  */
-import { RpcError, UnsupportedCapabilityError } from '@kurier/acp';
+import { RpcError, UnsupportedCapabilityError } from '@lotse/acp';
 import { describe, expect, it } from '@gjsify/unit';
 
 import {
@@ -17,10 +17,10 @@ import {
   isQuotaExhausted,
   staleDialog,
   type AgentAttachment,
-} from '@kurier/core';
+} from '@lotse/core';
 
 /**
- * ACP's own "log in first", exactly as `@kurier/acp` raises it: an `RpcError` carrying the wire
+ * ACP's own "log in first", exactly as `@lotse/acp` raises it: an `RpcError` carrying the wire
  * code. The constructor takes the whole `WireError`, so the message and the code are passed as one.
  */
 function authRequired(): unknown {

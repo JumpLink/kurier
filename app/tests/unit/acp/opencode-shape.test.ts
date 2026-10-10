@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
+import { AcpClient } from '@lotse/acp/client';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 

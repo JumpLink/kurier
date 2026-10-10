@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { BUNDLED_PREFIX, parseBundledCatalog, type AgentDetection } from '@kurier/core';
+import { BUNDLED_PREFIX, parseBundledCatalog, type AgentDetection } from '@lotse/core';
 import { DEFAULT_SETTINGS, type Settings } from '../../../src/core/settings.ts';
 import {
   AUTOMATIC_KEY,

@@ -13,9 +13,9 @@ import {
   resolveDefault,
   resolveRecorded,
   type McpServer,
-} from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
-import { KurierChat } from '@kurier/widget';
+} from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
+import { KurierChat } from '@lotse/widget';
 
 export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): KurierChat {
   // Everything kurier writes goes under `dataRoot`, in the host's own data directory.

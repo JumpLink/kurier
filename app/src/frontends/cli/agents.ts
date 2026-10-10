@@ -22,7 +22,7 @@ import {
   type AgentCommand,
   type AgentDetection,
   type KurierPaths,
-} from '@kurier/core';
+} from '@lotse/core';
 import { parseChoiceSpec, readSettings, saveSettings, type Settings } from '../../core/settings.ts';
 
 import { err, out, pickArgv } from './output.ts';

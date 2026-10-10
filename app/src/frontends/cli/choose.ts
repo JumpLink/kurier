@@ -17,7 +17,7 @@ import {
   type KurierPaths,
   type ResolvedAgent,
   type ResolvedSource,
-} from '@kurier/core';
+} from '@lotse/core';
 import { readSettings } from '../../core/settings.ts';
 
 import { err } from './output.ts';

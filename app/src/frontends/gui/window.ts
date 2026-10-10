@@ -6,7 +6,7 @@
  * back here as an internal child. What stays in TypeScript is the session list — whose content is a
  * running agent's — the chat widget, and every decision the window makes about the two.
  *
- * **The conversation is no longer this file's.** `@kurier/widget`'s `KurierChat` owns the
+ * **The conversation is no longer this file's.** `@lotse/widget`'s `KurierChat` owns the
  * transcript, the composer, the config row, the three dialogs and the agent behind them;
  * `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws the line and this window is now one host
  * among possible others. What is left here is what names *kurier*: the sidebar and its list, the
@@ -15,7 +15,7 @@
  * rather than around them, which is the same rule the hooks already followed for the composer.
  *
  * **This file decides nothing.** Every question it answers — may Send be pressed, what does the
- * status line say, where does the scroll go — is answered by `@kurier/core`, and the window's job is
+ * status line say, where does the scroll go — is answered by `@lotse/core`, and the window's job is
  * to pass the answer to a widget and to hand the widget's events back.
  *
  * **Two panes, two header bars, and that is not the thing being avoided.** An
@@ -74,10 +74,10 @@ import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
 // Type-only, and the `import type` says so: the labels, boxes and buttons of the no-agent page are
 // the only `Gtk` this file names now, and the template is what builds them. The widgets that used to
-// be constructed here travelled to `@kurier/widget`.
+// be constructed here travelled to `@lotse/widget`.
 import type Gtk from '@girs/gtk-4.0';
 
-import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@kurier/session';
+import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@lotse/session';
 
 import {
   parseConfigOptionSpec,
@@ -86,8 +86,8 @@ import {
   type McpServer,
   type NoticeView,
   type RecordedResolution,
-} from '@kurier/core';
-import { KurierChat } from '@kurier/widget';
+} from '@lotse/core';
+import { KurierChat } from '@lotse/widget';
 import {
   APP_NAME,
   COLLAPSE_WIDTH_PX,

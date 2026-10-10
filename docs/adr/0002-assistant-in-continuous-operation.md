@@ -31,7 +31,7 @@ Curlew backend later.
 ## Decision
 
 1. **`kurier serve` is a long-running process**, run as a systemd user unit. It builds on
-   `@kurier/core` (ADR 0001) and runs headless: no `gi://` GTK import, no display (werkstatt ADR
+   `@lotse/core` (ADR 0001) and runs headless: no `gi://` GTK import, no display (werkstatt ADR
    0004).
 2. **Triggers start the work.** Three kinds: a schedule (poll a source through its own CLI or MCP
    server at an interval), a message on the channel, and later a push (a D-Bus signal, a webhook).
@@ -141,7 +141,7 @@ Curlew backend later.
 
 - `AGENTS.md` changes on acceptance: "MCP wiring against the real apps" and "principal policy"
   leave the "not here yet" list, and guardrail 2 names the `serve` amendment.
-- `serve` needs ADR 0001 steps 2 to 4 first: injectable paths and settings, `@kurier/core`,
+- `serve` needs ADR 0001 steps 2 to 4 first: injectable paths and settings, `@lotse/core`,
   `mcpServers` through `AgentSession`.
 - kurier gains an MCP client for the channel. That is not a change to "MCP is passed through, not
   known" for sessions: a session's `mcpServers` stay opaque.

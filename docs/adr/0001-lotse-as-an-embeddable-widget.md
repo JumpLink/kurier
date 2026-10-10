@@ -16,8 +16,8 @@ so the reusable parts have to leave `app/`.
 
 ## Decision
 
-1. **Two new LGPL packages.** `@kurier/core` holds the session, agent and login logic moved out
-   of the AGPL app. `@kurier/widget` holds a `KurierChat` widget split out of `window.ts`; the
+1. **Two new LGPL packages.** `@lotse/core` holds the session, agent and login logic moved out
+   of the AGPL app. `@lotse/widget` holds a `KurierChat` widget split out of `window.ts`; the
    kurier window becomes one consumer of it.
 2. **The host bundles its own agent.** It can ship opencode as Flatpak extra-data, as kurier does.
 3. **The host passes its own MCP servers** in ACP `session/new` `mcpServers`. No global opencode
@@ -68,13 +68,13 @@ Planned; steps 1 to 8 are done.
    sessions, settings and notices files; a bundled agent's `HOME`/`XDG_*` follow `dataDir`) is built once at the
    app and CLI entry (`kurierPaths()`, defaults and `KURIER_*` knobs unchanged) and passed down; a host builds
    its own with `kurierPathsUnder(root)`.
-3. Create `@kurier/core`. **Done:** `packages/core` (LGPL) holds the agents, the session, the turn, the
+3. Create `@lotse/core`. **Done:** `packages/core` (LGPL) holds the agents, the session, the turn, the
    login, the failure classification and the view-model files, with `data/bundled-agents.json`,
    `login-providers.json` and `free-models.json` moved in beside them. The app imports one barrel
    (`packages/core/src/index.ts`); nothing imports a core file by path. The auth policy came along in the
    same step rather than later: it was split between the CLI and a private function in `run.ts`, so a
    window had to re-derive it (`auth.ts`, with `runLogin` and `open` as the surface's hooks).
-4. Plumb `mcpServers`. **Done:** `AgentSessionOptions.mcpServers` (ACP `McpServer[]`, type exported from `@kurier/core`)
+4. Plumb `mcpServers`. **Done:** `AgentSessionOptions.mcpServers` (ACP `McpServer[]`, type exported from `@lotse/core`)
    goes unchanged into `session/new` and the reattach of a stored session. Absent means `[]` in `session/new`
    and nothing added to a reattach, as before; there is no CLI flag and no GUI setting.
 
@@ -84,7 +84,7 @@ Planned; steps 1 to 8 are done.
    `session-groups.ts` and `private-file.ts`. `frontends/*` is surface code and was never a candidate.
    The unit tests stayed under `app/tests/unit/core/` with their imports repointed, because one runner
    there is what keeps the dual GJS + Node run working.
-5. Create `@kurier/widget`; split `KurierChat` out of `window.ts`. **Done:** `packages/widget` (LGPL) holds
+5. Create `@lotse/widget`; split `KurierChat` out of `window.ts`. **Done:** `packages/widget` (LGPL) holds
    `KurierChat`, an `Adw.Bin` a host parents anywhere. It owns the whole chat surface — the transcript,
    the composer with its model/effort/mode rows, the tool and thought cards, the permission dialog, the
    failure and login dialogs, and the stack that switches between them. A host passes a resolved
@@ -121,7 +121,7 @@ Planned; steps 1 to 8 are done.
 7. API docs. **Done:** a README for each package ([core](../../packages/core/README.md),
    [widget](../../packages/widget/README.md)) and the host guide [docs/embedding.md](../embedding.md). The examples are
    type-checked files under `app/tests/examples/`, so the docs follow the signatures.
-8. Flatpak module generator from `bundled-agents.json`. **Done:** `flatpakAgentModule` in `@kurier/core` and
+8. Flatpak module generator from `bundled-agents.json`. **Done:** `flatpakAgentModule` in `@lotse/core` and
    `scripts/flatpak-agent-module`; a test pins the output byte for byte to the module in kurier's own manifest.
 9. Host integration in Steuererklärung.
 

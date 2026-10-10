@@ -24,7 +24,7 @@
 import Gtk from '@girs/gtk-4.0';
 import { runAdwaitaApp } from '@gjsify/adwaita-app';
 
-import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
+import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@lotse/session';
 
 import {
   BUNDLED_AGENTS,
@@ -40,7 +40,7 @@ import {
   resolveCwd,
   resolveDefaultWithNote,
   resolveRecorded,
-} from '@kurier/core';
+} from '@lotse/core';
 import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
 import { kurierPaths } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
@@ -215,7 +215,7 @@ const status = await runAdwaitaApp({
       // startup and appends a batch per streamed chunk; a fresh store per append would re-read and
       // re-parse a file that may hold thirty conversations, for every token an agent emits. The store is
       // a synchronous JSON file with no cache of its own, so this is the only place that can be improved,
-      // and "improve it" is a change to `@kurier/session` rather than a decision for a surface.
+      // and "improve it" is a change to `@lotse/session` rather than a decision for a surface.
       appendTurns: (sessionId, entries) => {
         createSessionStore(paths.sessionsFile).append(sessionId, entries);
       },

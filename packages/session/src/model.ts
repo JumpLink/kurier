@@ -8,7 +8,7 @@
  * store, therefore none to hand on, therefore a session passed around in a group chat is a
  * corridor and not a key.
  *
- * `assertScopeIsNotAuthority` in `@kurier/acp` is the runtime canary over the same idea, because a
+ * `assertScopeIsNotAuthority` in `@lotse/acp` is the runtime canary over the same idea, because a
  * TypeScript type cannot stop a later `{ ...session, grants: [...] }`. The canary is what makes
  * this type more than a comment.
  *
@@ -17,8 +17,8 @@
  * does not. Nothing else changes.
  */
 
-import { assertScopeIsNotAuthority } from '@kurier/acp/gate';
-import type { SessionId } from '@kurier/acp/types';
+import { assertScopeIsNotAuthority } from '@lotse/acp/gate';
+import type { SessionId } from '@lotse/acp/types';
 
 /** Who is in the session. `'local'` is the only value Scheibe 1 can produce. */
 export type Principal = string;

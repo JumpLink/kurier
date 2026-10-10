@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import type { StopReason } from '@kurier/acp/types';
+import type { StopReason } from '@lotse/acp/types';
 
 import {
   agentExitedEntry,
@@ -15,7 +15,7 @@ import {
   type CancelledBy,
   type TurnEvent,
   type TurnState,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const ALL: readonly TurnState[] = ['idle', 'thinking', 'waiting-for-you', 'stopped', 'gone'];
 

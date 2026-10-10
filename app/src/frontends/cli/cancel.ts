@@ -12,8 +12,8 @@
 
 import type { CommandModule } from 'yargs';
 
-import { openAgent, type KurierPaths } from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
+import { openAgent, type KurierPaths } from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
 
 import { agentForRecorded } from './choose.ts';
 import { silentGate } from './gate.ts';

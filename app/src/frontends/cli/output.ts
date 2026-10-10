@@ -7,10 +7,10 @@
  * watching a turn sees both; a script sees one.
  */
 
-import type { SessionNotification } from '@kurier/acp/types';
-import { labelOf, type SessionRecord } from '@kurier/session';
+import type { SessionNotification } from '@lotse/acp/types';
+import { labelOf, type SessionRecord } from '@lotse/session';
 
-import { chunkToText, describeUsage } from '@kurier/core';
+import { chunkToText, describeUsage } from '@lotse/core';
 
 export function out(line = ''): void {
   process.stdout.write(`${line}\n`);

@@ -1,4 +1,4 @@
-# @kurier/core
+# @lotse/core
 
 Kurier without a surface: which agent to start and how, the session a prompt turn runs in, the view
 models a chat is drawn from, and the provider login. No `gi://`, no widget, no CLI parser — so it runs
@@ -7,8 +7,8 @@ on GJS and on Node, and a host decides everything that needs deciding.
 Licence: **LGPL-3.0-or-later** (`LICENSE`, `COPYING` in this directory). Kurier's apps are AGPL; this
 package is the part a stranger may link into their own application.
 
-If you want the finished GTK4 / libadwaita chat, use [`@kurier/widget`](../widget/README.md) and read
-the [host guide](../../docs/embedding.md). Use `@kurier/core` directly to drive an agent without that
+If you want the finished GTK4 / libadwaita chat, use [`@lotse/widget`](../widget/README.md) and read
+the [host guide](../../docs/embedding.md). Use `@lotse/core` directly to drive an agent without that
 widget, or to build your own surface on the same logic.
 
 ## Install and import
@@ -17,11 +17,11 @@ The package is `private` and not yet on a registry. Take it as a workspace depen
 `packages/` directory) and depend on it by name, as the other packages here do:
 
 ```json
-{ "dependencies": { "@kurier/core": "*", "@kurier/session": "*" } }
+{ "dependencies": { "@lotse/core": "*", "@lotse/session": "*" } }
 ```
 
 ```ts
-import { kurierPathsUnder, AgentSession } from '@kurier/core';
+import { kurierPathsUnder, AgentSession } from '@lotse/core';
 ```
 
 There is **one entry point**: `.` (`src/index.ts`). Nothing else is importable, so everything below is
@@ -31,11 +31,11 @@ the login policy, the free-model list), which the bundler inlines.
 ## Minimal example
 
 Resolve an agent, start it, run one prompt turn (`denyAll` refuses every permission request). Needs
-`@kurier/acp` as well; the file is type-checked in `app/tests/examples/core-turn.ts`.
+`@lotse/acp` as well; the file is type-checked in `app/tests/examples/core-turn.ts`.
 
 ```ts
-import { denyAll } from '@kurier/acp';
-import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@kurier/core';
+import { denyAll } from '@lotse/acp';
+import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@lotse/core';
 
 const paths = kurierPathsUnder('/path/to/my-app-data');
 const agent = resolveDefault(gatherResolveContext(paths));
@@ -126,7 +126,7 @@ An agent asks `session/request_permission`; the answer is always a person's or a
 | `permissionView`, `PermissionView`, `usableOptions`, `orderOptions`, `optionLabel`, `decideFromView`, `answerFor` | What the dialog shows and how a button press becomes a decision. Only the four standard option kinds are shown; the wording is kurier's, never the agent's. |
 | `PermissionDecision`, `NotAnsweredReason` | The outcome, including why nothing was answered (`dismissed`, `turn-cancelled`, …). |
 | `terminalGate`, `Terminal` | A command-line gate that asks on a terminal. |
-| `ClientGate` (from `@kurier/acp`) | `{ permission }`. Fail-closed by default (`denyAll`). |
+| `ClientGate` (from `@lotse/acp`) | `{ permission }`. Fail-closed by default (`denyAll`). |
 
 ### Login and auth
 
@@ -182,5 +182,5 @@ Pure functions from state to "what to draw", tested on Node and GJS. Use them to
 
 ## Related
 
-[`@kurier/widget`](../widget/README.md) · [host guide](../../docs/embedding.md) ·
+[`@lotse/widget`](../widget/README.md) · [host guide](../../docs/embedding.md) ·
 [ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md) · [login](../../docs/login.md)

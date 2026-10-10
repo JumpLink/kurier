@@ -14,7 +14,7 @@ import {
   resolveAgent,
   type AgentDetection,
   type AgentFacts,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const SHA = 'b'.repeat(64);
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
+import { AcpClient } from '@lotse/acp/client';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@lotse/session';
 
 import {
   AgentSession,
@@ -15,7 +15,7 @@ import {
   type McpServer,
   type PermissionQuestion,
   type RecordedResolution,
-} from '@kurier/core';
+} from '@lotse/core';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
 
 const SESSION = { id: 'ses_fixture_0001', cwd: '/fixture' };

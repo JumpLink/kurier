@@ -27,8 +27,8 @@ import {
   projectConfigOptions,
   type ConfigRowControl,
   type ConfigRowView,
-} from '@kurier/core';
-import type { SessionConfigOption } from '@kurier/acp/types';
+} from '@lotse/core';
+import type { SessionConfigOption } from '@lotse/acp/types';
 
 import {
   buildManyModelOptions,

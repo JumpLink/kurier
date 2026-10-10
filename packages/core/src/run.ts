@@ -2,7 +2,7 @@
  * The session runner: the three steps every command that talks to an agent performs.
  *
  * Start the process, shake hands, get out of the way. Everything protocol-shaped lives in
- * `@kurier/acp`; everything decision-shaped lives in the `ClientGate` the caller passes in. What
+ * `@lotse/acp`; everything decision-shaped lives in the `ClientGate` the caller passes in. What
  * is left here is the part that is *only* true of kurier: which launcher, which working
  * directory, and what to do when the agent says it needs a login.
  *
@@ -17,8 +17,8 @@ import {
   type ClientGate,
   type SessionNotification,
   type StopReason,
-} from '@kurier/acp';
-import { classifyAuthMethods } from '@kurier/acp/gate';
+} from '@lotse/acp';
+import { classifyAuthMethods } from '@lotse/acp/gate';
 
 import { stdioTransport, type AgentCommand } from './agents/stdio.ts';
 import { describeAuthMethods } from './auth.ts';

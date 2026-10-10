@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient, ProtocolVersionMismatchError, UnsupportedCapabilityError } from '@kurier/acp/client';
-import type { Transport } from '@kurier/acp/transport';
+import { AcpClient, ProtocolVersionMismatchError, UnsupportedCapabilityError } from '@lotse/acp/client';
+import type { Transport } from '@lotse/acp/transport';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 

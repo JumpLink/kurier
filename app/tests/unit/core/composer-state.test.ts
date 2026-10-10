@@ -8,7 +8,7 @@ import {
   type AgentAttachment,
   type ComposerInput,
   type TurnState,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const ALL: readonly TurnState[] = ['idle', 'thinking', 'waiting-for-you', 'stopped', 'gone'];
 

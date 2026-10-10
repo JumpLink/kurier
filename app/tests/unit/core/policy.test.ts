@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { describe as describeRequest, permissionView, terminalGate } from '@kurier/core';
+import { describe as describeRequest, permissionView, terminalGate } from '@lotse/core';
 import { scriptedTerminal } from '../../../src/frontends/cli/terminal.ts';
 
-import type { RequestPermissionRequest } from '@kurier/acp/types';
+import type { RequestPermissionRequest } from '@lotse/acp/types';
 
 function requestWith(options: RequestPermissionRequest['options']): RequestPermissionRequest {
   return {

@@ -1,6 +1,6 @@
 // The example in packages/core/README.md, type-checked with the app and not run. Keep the two in step.
-import { denyAll } from '@kurier/acp';
-import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@kurier/core';
+import { denyAll } from '@lotse/acp';
+import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@lotse/core';
 
 export async function sayHello(dataRoot: string): Promise<void> {
   const paths = kurierPathsUnder(dataRoot);

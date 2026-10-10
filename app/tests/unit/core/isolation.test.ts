@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { isolationDirs, isolationEnv, prepareIsolation } from '@kurier/core';
+import { isolationDirs, isolationEnv, prepareIsolation } from '@lotse/core';
 
 function withTempDir(run: (dir: string) => void): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'kurier-isolation-'));

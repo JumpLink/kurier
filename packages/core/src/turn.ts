@@ -26,8 +26,8 @@
  * renders as "the turn is not finished".
  */
 
-import type { RequestPermissionRequest, SessionId, StopReason } from '@kurier/acp/types';
-import type { TranscriptEntry } from '@kurier/session';
+import type { RequestPermissionRequest, SessionId, StopReason } from '@lotse/acp/types';
+import type { TranscriptEntry } from '@lotse/session';
 
 import type { TurnState } from './composer-state.ts';
 import type { FailureKind } from './failure.ts';

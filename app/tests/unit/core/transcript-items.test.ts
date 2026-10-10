@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { labelOf, newSession, type TranscriptEntry } from '@kurier/session';
+import { labelOf, newSession, type TranscriptEntry } from '@lotse/session';
 
-import { toTranscriptItems, type TranscriptItem } from '@kurier/core';
+import { toTranscriptItems, type TranscriptItem } from '@lotse/core';
 
 const AT = '2026-09-30T10:00:00.000Z';
 const LATER = '2026-09-30T10:00:01.000Z';
@@ -110,7 +110,7 @@ export default async () => {
 
     await it('keeps the space that was inside a chunk instead of trimming each one', async () => {
       // `'first '` + `'answer'` is `'first answer'`. Trimming per chunk gives `'firstanswer'`, which
-      // is the mid-word glue `labelOf` in `@kurier/session` also refuses to do.
+      // is the mid-word glue `labelOf` in `@lotse/session` also refuses to do.
       expect(textOf(toTranscriptItems([entry('agent', 'first '), entry('agent', 'answer')])[0])).toBe(
         'first answer',
       );

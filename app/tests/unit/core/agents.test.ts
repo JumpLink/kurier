@@ -13,7 +13,7 @@ import {
   which,
   type AgentDetection,
   type SandboxFacts,
-} from '@kurier/core';
+} from '@lotse/core';
 import { agentsReport, settingsReport } from '../../../src/frontends/cli/agents.ts';
 
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };

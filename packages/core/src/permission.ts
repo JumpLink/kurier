@@ -41,7 +41,7 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   ToolCallUpdate,
-} from '@kurier/acp/types';
+} from '@lotse/acp/types';
 
 /** Where a request points, flattened into renderable lines. */
 export type PermissionView = {

@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import { DENY_EVERYTHING, classifyAuthMethods } from '@kurier/acp/gate';
-import type { AuthMethodInfo } from '@kurier/acp/types';
+import { AcpClient } from '@lotse/acp/client';
+import { DENY_EVERYTHING, classifyAuthMethods } from '@lotse/acp/gate';
+import type { AuthMethodInfo } from '@lotse/acp/types';
 
 import {
   OPENCODE_COMMAND,
@@ -21,7 +21,7 @@ import {
   loginCommandFor,
   type AgentCommand,
   type AuthArrangement,
-} from '@kurier/core';
+} from '@lotse/core';
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 
 /** A method the agent tagged, so it can run the login in a terminal it already owns. */
