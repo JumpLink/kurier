@@ -27,6 +27,26 @@ Design study behind [ADR 0001](../adr/0001-kurier-as-an-embeddable-widget.md). F
 
 `@kurier/session` (LGPL) already fits: the store takes a path.
 
+### What step 3 actually did (2026-10-10)
+
+The tables above are the plan; `packages/core` followed them with four deltas worth recording.
+
+- **The data files moved, they were not made injectable.** `packages/core/data/` holds
+  `bundled-agents.json`, `login-providers.json` and `free-models.json`, and `app/data/` is gone. Injection
+  is still the right answer for a host that wants its own provider policy (section 5), but it is a
+  second decision and this step was a move.
+- **The auth policy moved too, and it was not on the list.** It was split between `frontends/cli/auth.ts`
+  and a private `describeAuth` in `run.ts`, so a window would have had to re-derive both — the exact
+  shape of problem this package exists to end. `packages/core/src/auth.ts` now holds the plan, the
+  sentences and the two-handshake flow, with `runLogin` and `open` injected per surface.
+- **Three files on the "stays" list were split, not kept whole.** The `KurierPaths` *shape* is core and
+  the XDG/`KURIER_*` resolver is the app's (`paths.ts` both sides); `AgentChoice` and `describeChoice`
+  are core and the settings file is the app's; `NOTICE_IDS` and `noticeDue` are core and the notices file
+  is the app's. In each case the decision is shared and the file handling is one app's.
+- **The tests stayed in `app/tests/unit/core/`** with their imports repointed at the barrel, as the
+  `@kurier/acp` and `@kurier/session` tests already do: one runner in `app/tests/test.mts` is what makes
+  the dual GJS + Node run possible at all.
+
 ## 2. Embedding API sketch
 
 ```ts
@@ -66,7 +86,7 @@ shared with the user's `~/.config/opencode` or with the kurier app.
   `McpServerStdio` = `{name, command (absolute path), args[], env[{name,value}]}`. Http/Sse are gated by the agent's
   `mcpCapabilities`; opencode 2.0.19 advertises `{"http":true,"sse":false}` (AGENTS.md handshake), stdio is the baseline.
 - **kurier today:** `AcpClient.newSession` / `reattach` already accept `mcpServers` (`packages/acp/src/client.ts:227-242`)
-  and forward them opaquely. Every call site passes `[]`: `app/src/core/agent-session.ts:682`, `frontends/cli/start.ts:97`,
+  and forward them opaquely. Every call site passes `[]`: `packages/core/src/agent-session.ts:682`, `app/src/frontends/cli/start.ts:97`,
   `resume.ts:104`, `cancel.ts:67`. So the widget work is plumbing an option through `AgentSession`, nothing in the protocol layer.
   Note `reattach` must receive the same list, otherwise a resumed session loses the tools.
 - **Does opencode honour it? Yes, measured** with opencode 2.0.25 by `scripts/probes/acp-mcp-servers.mjs` (scratch HOME and XDG dirs, no model call, no login): after `session/new` the stdio server was spawned and received `initialize`, `notifications/initialized` and `tools/list`. Remaining risk: if opencode drops an entry it cannot start, the session may still open without an error.
@@ -79,9 +99,9 @@ shared with the user's `~/.config/opencode` or with the kurier app.
 
 ## 4. Bundling
 
-- **Data:** `app/data/bundled-agents.json` lists agents with per-arch `dist` (url, sha256, size), `command` (`["acp"]`),
+- **Data:** `packages/core/data/bundled-agents.json` lists agents with per-arch `dist` (url, sha256, size), `command` (`["acp"]`),
   flag-only `env` (e.g. `OPENCODE_DISABLE_AUTOUPDATE`), `installPath` and `binary`. `scripts/refresh-bundled-agent` updates it.
-- **Prefix:** `BUNDLED_PREFIX = '/app/extra/agents'` in `core/agents/catalog.ts` (the only place it is written;
+- **Prefix:** `BUNDLED_PREFIX = '/app/extra/agents'` in `packages/core/src/agents/catalog.ts` (the only place it is written;
   `installPath` must equal `${BUNDLED_PREFIX}/${id}`, validated by `parseBundledCatalog`). Not `/app/bin`, so it doesn't
   shadow a host opencode. `/app/extra` because the archive is Flatpak `extra-data` and `apply_extra` can only write there.
 - **Detection:** `detect.ts` (pure) ignores any host hit under the prefix; `resolve.ts` picks setting > first host > first
@@ -124,7 +144,7 @@ Widget needs:
 |---|---|---|
 | 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? | S |
 | 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
-| 3 | Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
+| 3 | **Done** (`packages/core`, see the ADR for what stayed behind). Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
 | 5 | Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |
 | 6 | Inline provider onboarding page + connected-state signal | M |
