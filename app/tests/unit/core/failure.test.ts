@@ -59,7 +59,7 @@ export default async function failure(): Promise<void> {
       const notice = failureNotice('quota')!;
       expect(notice.command).toBe(null);
       expect(notice.action).toBe('choose-model');
-      expect(notice.body.includes('kurier auth')).toBe(false);
+      expect(notice.body.includes('lotse auth')).toBe(false);
       expect(failureAction(notice, { modelChoice: true, login: false })).toBe('choose-model');
       expect(failureAction(notice, { modelChoice: false, login: false })).toBe(null);
     });
@@ -74,7 +74,7 @@ export default async function failure(): Promise<void> {
       // This is the case that matters: the controller never sees the raw RpcError, it sees what
       // `withAuthHint` threw. A classifier that only knew the RpcError would call every auth failure
       // in the app a plain start failure, and the dialog would never appear.
-      const wrapped = new AuthRequiredError('attaching to the session failed: run `kurier auth`');
+      const wrapped = new AuthRequiredError('attaching to the session failed: run `lotse auth`');
       expect(failureKind(wrapped, { promptSent: false })).toBe('auth');
     });
 
@@ -97,7 +97,7 @@ export default async function failure(): Promise<void> {
     await it('does not classify by wording — an agent’s own text cannot claim to be a failure kind', async () => {
       // The whole reason the rule is "match the type": an agent is free to put any words in an error,
       // including the words kurier uses for its own sentences.
-      expect(failureKind(new Error('session/load failed: run `kurier auth`'), { promptSent: false })).toBe(
+      expect(failureKind(new Error('session/load failed: run `lotse auth`'), { promptSent: false })).toBe(
         'start',
       );
       expect(
@@ -114,7 +114,7 @@ export default async function failure(): Promise<void> {
   // Issue #2: https://github.com/JumpLink/kurier/issues/2 — `opencode/fledge-alpha-free` is geo-blocked
   // from Germany, and opencode answers a provider 403 on `session/prompt` with the *same* -32000 it
   // answers the real login trap with. kurier used to show the auth dialog on that path, naming
-  // `kurier auth`, which does not help anybody. What separates them is that a prompt had gone out.
+  // `lotse auth`, which does not help anybody. What separates them is that a prompt had gone out.
   await describe('failure — the same -32000 after a prompt was sent', async () => {
     await it('is the model, not the login trap, when a prompt has gone out', async () => {
       // The raw `RpcError` first: `session/prompt` is not wrapped by `withAuthHint`, so this is exactly
@@ -151,11 +151,11 @@ export default async function failure(): Promise<void> {
   });
 
   await describe('failure — what the window says', async () => {
-    await it('names `kurier auth` for the auth trap, and offers the login the window can drive', async () => {
+    await it('names `lotse auth` for the auth trap, and offers the login the window can drive', async () => {
       const notice = failureNotice('auth');
       expect(notice).not.toBe(null);
       expect(notice?.command).toBe(AUTH_COMMAND);
-      expect(notice?.command).toBe('kurier auth');
+      expect(notice?.command).toBe('lotse auth');
       expect(notice?.action).toBe('login');
       expect(failureAction(notice!, { modelChoice: false, login: true })).toBe('login');
       expect(failureAction(notice!, { modelChoice: true, login: false })).toBe(null);
@@ -179,7 +179,7 @@ export default async function failure(): Promise<void> {
     await it('names a provider refusal without blaming one cause, and names both remedies', async () => {
       // The three causes are indistinguishable on this path — a region block, a rate limit and a login
       // that expired mid-turn all arrive as the same `-32000` — so the sentence may not pick one. And
-      // `kurier auth` has to stay in it: it is wrong for the case this notice was written for (issue
+      // `lotse auth` has to stay in it: it is wrong for the case this notice was written for (issue
       // #2) and right for the case that remains, so it is one clause of a sentence rather than the
       // headline.
       const notice = failureNotice('model');
@@ -188,7 +188,7 @@ export default async function failure(): Promise<void> {
       expect(notice?.body).toContain('region');
       expect(notice?.body).toContain('rate');
       expect(notice?.body).toContain('login');
-      expect(notice?.body).toContain('kurier auth');
+      expect(notice?.body).toContain('lotse auth');
       expect(notice?.body).toContain('another model');
     });
 
@@ -269,7 +269,7 @@ export default async function failure(): Promise<void> {
     const authFailure = (): AgentAttachment => ({
       status: 'failed',
       kind: 'auth',
-      message: 'attaching to the session failed: run `kurier auth`',
+      message: 'attaching to the session failed: run `lotse auth`',
     });
     const startFailure = (): AgentAttachment => ({
       status: 'failed',

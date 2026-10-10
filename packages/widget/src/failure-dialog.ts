@@ -78,7 +78,7 @@ export class FailureDialog {
       cssClasses: ['kurier-failure-dialog'],
     });
     // The command goes in the body rather than as a button, because it is not an action this window
-    // can take: `kurier auth` runs an interactive login in a terminal, and a button here that only
+    // can take: `lotse auth` runs an interactive login in a terminal, and a button here that only
     // copied a string to the clipboard would be a control that points at nothing (`AGENTS.md`'s rule
     // for this window). The sentence already names it.
     if (notice.command !== null) {

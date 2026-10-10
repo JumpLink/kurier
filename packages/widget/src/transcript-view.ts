@@ -319,7 +319,7 @@ export class TranscriptView {
    * An empty transcript draws nothing, and that is a decision to correct once. The first version
    * justified it with "the window already has an empty state" — true for a window with **no session
    * open**, which is `Adw.StatusPage` in `window.ts`, and false for a session that *is* open and holds
-   * no turns (`kurier start` with no prompt does exactly that, so it is not hypothetical). There the
+   * no turns (`lotse start` with no prompt does exactly that, so it is not hypothetical). There the
    * pane is blank, which reads as a load failure rather than as a conversation that has not started.
    * `window.ts` now puts a sentence in that case; this file stays out of it, because the empty state
    * and the empty *transcript* are two different questions and only the window knows which pane is

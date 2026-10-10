@@ -14,7 +14,7 @@
  * **Only a copy that runs where kurier runs.** A bundled agent runs inside the sandbox, so its loopback is
  * ours. A *host* opencode under a Flatpak runs on the other side of `flatpak-spawn --host`, in a network
  * the sandbox cannot see, so there is nothing to connect to: `whyNoLoginServer` says so and the caller
- * falls back to `kurier auth`.
+ * falls back to `lotse auth`.
  */
 
 import { spawn } from 'node:child_process';
@@ -53,7 +53,7 @@ export function whyNoLoginServer(agent: AgentCommand, facts: SandboxFacts): stri
   if (!agent.bundled && isSandboxed(facts)) {
     return (
       'your own opencode runs outside this sandbox, so its login server cannot be reached — ' +
-      'log in with `kurier auth` in a terminal instead'
+      'log in with `lotse auth` in a terminal instead'
     );
   }
   return null;

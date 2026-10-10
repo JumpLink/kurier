@@ -41,7 +41,7 @@ export default async () => {
     });
 
     await it('closes even when a session id is known but no turn runs', async () => {
-      // `kurier start` with no prompt opens a session and stops. Ctrl-C there should end the
+      // `lotse start` with no prompt opens a session and stops. Ctrl-C there should end the
       // process, not send a cancel into a session with nothing running in it.
       expect(decideInterrupt({ agentRunning: true, turnRunning: false, sessionId: 'ses_1' }).kind).toBe(
         'close',

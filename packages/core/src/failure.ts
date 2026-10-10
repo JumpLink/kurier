@@ -3,7 +3,7 @@
  *
  * **Why this file exists, and why it is not a paragraph in `agent-session.ts`.** Plan §6 names two
  * failures that are not "the agent went away": an **auth trap** (the agent wants a human to log in
- * first, and the remedy is `kurier auth` in a terminal this window does not have) and a **reattach
+ * first, and the remedy is `lotse auth` in a terminal this window does not have) and a **reattach
  * refusal** (the agent offers neither `session/load` nor `session/resume`, so an existing
  * conversation cannot be reopened — trap 2). Both arrive at the **window** as one exception and one
  * sentence, and without a kind the surface cannot tell "this person must run a command in a terminal"
@@ -20,7 +20,7 @@
  * **Four kinds, because each one has a different consequence for a person.**
  *
  * - `auth` — the only failure with a **command to run somewhere else**. It gets a dialog, and the
- *   dialog names `kurier auth` and says why a window cannot do it instead (plan §6: "A window has no
+ *   dialog names `lotse auth` and says why a window cannot do it instead (plan §6: "A window has no
  *   terminal to inherit … inventing an in-window login would be storing a credential this project
  *   deliberately has no safe place for").
  * - `model` — **the same wire error, arrived at after a turn started.** See the section on
@@ -41,7 +41,7 @@
  * provider 403 on `session/prompt` as JSON-RPC `-32000 "Authentication required: provider
  * authentication required"`. That is the **same error class and the same code** as the real login trap
  * at `session/new`/`session/load`. Before this kind existed, kurier showed the auth dialog on that path
- * — naming `kurier auth`, which does not help anybody: logging in is not what is wrong. Upstream
+ * — naming `lotse auth`, which does not help anybody: logging in is not what is wrong. Upstream
  * record: issue #2.
  *
  * So the split cannot be made from the message (a reword away) and cannot be made from the code (the
@@ -55,7 +55,7 @@
  * why the `'model'` notice names **both** remedies in provider-neutral words and why its button offers
  * the one kurier can actually perform — changing a model through the protocol. Saying so in the dialog
  * rather than in a comment is the point: a person who really has lost their login is told about
- * `kurier auth`, and a person whose free model is blocked from their country is told to pick another
+ * `lotse auth`, and a person whose free model is blocked from their country is told to pick another
  * one, and neither is told something false.
  *
  * **A refusal is not written to the transcript.** The transcript is a record of what happened, and no
@@ -109,7 +109,7 @@ export class AuthRequiredError extends Error {
  * `data.errorName: "provider.quota"` ("Upstream request failed: Insufficient account funds", measured on
  * 2.0.22 with a logged-in Zen account that had no balance). The name is a field the agent set for exactly
  * this, so it is matched like a code and never like a sentence. It is the one case where the login
- * *worked*: the provider knew the account and refused it for money, so `kurier auth` would not help.
+ * *worked*: the provider knew the account and refused it for money, so `lotse auth` would not help.
  */
 export function isQuotaExhausted(error: unknown): boolean {
   if (!(error instanceof RpcError)) return false;
@@ -161,7 +161,7 @@ export interface FailureNotice {
    * the only honest remedy it can name is the command a person runs themselves. An empty string is
    * never returned: a caller that has nothing to run gets `null` and shows no command line.
    *
-   * `null` for `'model'` **on purpose**, and the notice's own body says why: it names `kurier auth` as
+   * `null` for `'model'` **on purpose**, and the notice's own body says why: it names `lotse auth` as
    * one of two remedies rather than as the one. `FailureDialog` renders `command` as a bolded "Run this
    * in a terminal" call to action, which is the wrong shape for a sentence whose other half is a button
    * this window *can* press.
@@ -200,7 +200,7 @@ export interface FailureActionContext {
   /**
    * The window can log in itself: the agent is one whose own login API kurier drives (opencode), and its
    * login server can be reached from here (`whyNoLoginServer`). Without it the `auth` dialog stays a
-   * sentence that names `kurier auth`, as before.
+   * sentence that names `lotse auth`, as before.
    */
   readonly login: boolean;
 }
@@ -221,7 +221,7 @@ export function failureAction(notice: FailureNotice, context: FailureActionConte
 }
 
 /** The command `AGENTS.md` § "Trap 1" already tells a person to run. Named here so it is named once. */
-export const AUTH_COMMAND = 'kurier auth';
+export const AUTH_COMMAND = 'lotse auth';
 
 /**
  * The dialog this failure still owes, or `null` if it owes none.
@@ -299,12 +299,12 @@ export function failureNotice(kind: FailureKind): FailureNotice | null {
         // **Both remedies, in provider-neutral words, and neither of them asserted.** Three causes are
         // indistinguishable on this path — a region block, a rate limit and a login that expired
         // mid-turn all arrive as the same `-32000` — so the sentence names all three and does not pick
-        // one. The `kurier auth` advice that used to stand alone here was *wrong* for the case it was
+        // one. The `lotse auth` advice that used to stand alone here was *wrong* for the case it was
         // written for (issue #2), and dropping it entirely would be wrong for the case that remains; so
         // it stays, as one half of a sentence, and the button is the half kurier can actually perform.
         body:
           'The provider turned this request down. It may be limited by region or rate, or it may need ' +
-          'a login. Choose another model, or run kurier auth in a terminal.',
+          'a login. Choose another model, or run lotse auth in a terminal.',
         // `null`, not `AUTH_COMMAND`: see `FailureNotice.command`. This dialog's remedy is a button.
         command: null,
         action: 'choose-model',

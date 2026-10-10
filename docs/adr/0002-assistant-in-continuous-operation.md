@@ -9,7 +9,7 @@
 
 ## Context
 
-kurier today runs one turn at a time: `kurier start`, `kurier resume`, and the window. A person
+lotse today runs one turn at a time: `lotse start`, `lotse resume`, and the window. A person
 is always there to answer `session/request_permission`.
 
 The next step is an assistant that runs all the time. It notices what needs doing, asks its
@@ -30,7 +30,7 @@ Curlew backend later.
 
 ## Decision
 
-1. **`kurier serve` is a long-running process**, run as a systemd user unit. It builds on
+1. **`lotse serve` is a long-running process**, run as a systemd user unit. It builds on
    `@lotse/core` (ADR 0001) and runs headless: no `gi://` GTK import, no display (werkstatt ADR
    0004).
 2. **Triggers start the work.** Three kinds: a schedule (poll a source through its own CLI or MCP
@@ -153,7 +153,7 @@ Curlew backend later.
 ## Order of work
 
 1. ADR 0001 steps 2 to 4.
-2. `kurier serve`: unit file, schedule, state, log, state manifest.
+2. `lotse serve`: unit file, schedule, state, log, state manifest.
 3. Users, profiles, tasks: configuration format and validation, with synthetic test fixtures.
 4. Channel interface and the Curlew implementation (needs Curlew's XMPP send, Curlew ADR 0004).
 5. Questions: ids, expiry, answer parsing, resuming the session, the `serve` gate.

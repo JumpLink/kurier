@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Kurier
 Comment=Start coding agents as subprocesses and drive their sessions
-Exec=kurier-app
+Exec=lotse-app
 Icon=eu.jumplink.Lotse
 Terminal=false
 Type=Application

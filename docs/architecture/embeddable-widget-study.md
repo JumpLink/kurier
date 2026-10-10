@@ -5,7 +5,7 @@ Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Fa
 ## 1. What forms the widget, what moves, what stays
 
 **Constraint:** an LGPL package must not depend on AGPL code. Today everything under `app/src` is AGPL
-(`kurier-cli`), including `core/` and `frontends/gui/`. Anything the widget needs must move to `packages/*`.
+(`lotse-cli`), including `core/` and `frontends/gui/`. Anything the widget needs must move to `packages/*`.
 
 ### Moves to LGPL packages
 
@@ -169,7 +169,7 @@ Exists today:
   European providers, excluded ones). `server.ts` starts a private `opencode serve --port 0` on 127.0.0.1 with an in-memory
   Basic-auth password and the same isolation env.
 - `frontends/gui/login-dialog.ts` (352 lines) renders it; `failure-dialog.ts` offers **Log in…** on an `auth` failure.
-- CLI: `kurier login`, `kurier auth`. No credential is stored by kurier: opencode keeps it, an API key lives in memory for one call.
+- CLI: `lotse login`, `lotse auth`. No credential is stored by kurier: opencode keeps it, an API key lives in memory for one call.
 - Model choice: `config-row.ts` with `free-models.json` ordering.
 
 Widget needs:

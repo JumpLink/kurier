@@ -10,7 +10,7 @@
   "build-options": {
     "append-path": "/usr/lib/sdk/node24/bin:/usr/lib/sdk/typescript/bin:/app/bin"
   },
-  "command": "kurier-app",
+  "command": "lotse-app",
   "finish-args": [
     "--device=dri",
     "--share=ipc",
@@ -62,19 +62,19 @@
       ]
     },
     {
-      "name": "kurier",
+      "name": "lotse",
       "buildsystem": "simple",
       "build-commands": [
         "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs install --immutable",
-        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build",
-        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs workspace kurier-cli build:app",
+        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs workspace lotse-cli build",
+        "XDG_CACHE_HOME=\"$PWD/flatpak-gjsify-cache\" gjs -m build-aux/gjsify.gjs.mjs workspace lotse-cli build:app",
         "install -d /app/bin",
-        "printf '#!/usr/bin/gjs -m\\n' > /app/bin/kurier-app",
-        "cat app/dist/kurier-app.gjs.mjs >> /app/bin/kurier-app",
-        "chmod 0755 /app/bin/kurier-app",
-        "printf '#!/usr/bin/gjs -m\\n' > /app/bin/kurier",
-        "cat app/dist/kurier.gjs.mjs >> /app/bin/kurier",
-        "chmod 0755 /app/bin/kurier",
+        "printf '#!/usr/bin/gjs -m\\n' > /app/bin/lotse-app",
+        "cat app/dist/lotse-app.gjs.mjs >> /app/bin/lotse-app",
+        "chmod 0755 /app/bin/lotse-app",
+        "printf '#!/usr/bin/gjs -m\\n' > /app/bin/lotse",
+        "cat app/dist/lotse.gjs.mjs >> /app/bin/lotse",
+        "chmod 0755 /app/bin/lotse",
         "install -Dm644 data/eu.jumplink.Lotse.desktop /app/share/applications/eu.jumplink.Lotse.desktop",
         "install -Dm644 data/eu.jumplink.Lotse.metainfo.xml /app/share/metainfo/eu.jumplink.Lotse.metainfo.xml",
         "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",

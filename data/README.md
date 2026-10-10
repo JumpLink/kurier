@@ -36,7 +36,7 @@ inside the metainfo — which is why the same TODO lives in the config as an abs
 
 ## Running from a checkout
 
-`gjsify run app/dist/kurier-app.gjs.mjs` needs no installation. Installation buys two
+`gjsify run app/dist/lotse-app.gjs.mjs` needs no installation. Installation buys two
 things a checkout does not have:
 
 - the window icon, because `main.ts` sets `applicationIcon: APP_ID` and GTK resolves
@@ -46,7 +46,7 @@ things a checkout does not have:
 
 ```sh
 gjsify install
-gjsify workspace kurier-cli build:app
+gjsify workspace lotse-cli build:app
 npm run packaging:install          # per-user XDG data dir
 PREFIX=/usr npm run packaging:install   # or system-wide, needs root
 ```
@@ -56,8 +56,8 @@ rebuilds both caches (`update-desktop-database`, `gtk-update-icon-cache`) when t
 tools exist. A full `install -D` line per file is in the script header if you prefer
 to do it by hand.
 
-**`Exec=kurier-app` names a binary this install does not create.** `gjsify ship` is
-what produces one — it stages `bin/kurier-app` with a launcher that derives its own
+**`Exec=lotse-app` names a binary this install does not create.** `gjsify ship` is
+what produces one — it stages `bin/lotse-app` with a launcher that derives its own
 prefix, plus the same four files, and packs it as `.deb`/`.rpm`/Flatpak. Until you run
 it, the desktop entry is installed and points at a command that is not on `PATH`.
 
@@ -109,7 +109,7 @@ a test:
   sourcing it from `/bin/sh`, because `~/.zshrc` is zsh syntax that dash cannot parse.
   **Known limit:** a `.bashrc` guarded by `[ -t 0 ]` returns early when there is no
   terminal, and there never is one here, so such a person gets the login PATH and
-  `kurier agents` says NOT FOUND. A `$-`-style guard is fine. The fix belongs on the
+  `lotse agents` says NOT FOUND. A `$-`-style guard is fine. The fix belongs on the
   machine: put the agent's PATH in `~/.profile` or `~/.bash_profile`.
 - **`$SHELL` that is not zsh or bash (fish, nushell, csh) gets the login PATH and no
   rc**, because the inner script is POSIX `sh` and their config is not.
@@ -119,7 +119,7 @@ Ending the agent is subtler than it looks: the pid kurier holds is the sandbox-s
 leave no `opencode acp` behind), while **SIGKILL cannot be forwarded** and would orphan
 the host process. `killGraceMs` exists for that reason.
 
-The build is end to end: it installs `kurier-app` and the `kurier` CLI, both with a
+The build is end to end: it installs `lotse-app` and the `kurier` CLI, both with a
 `#!/usr/bin/gjs -m` shebang, because the manifest's `command` execs them directly and a
 bundle without a shebang is handed to `/bin/sh`, which answers with a syntax error. Two
 generated inputs make it work offline and both are committed: `build-aux/gjsify.gjs.mjs`

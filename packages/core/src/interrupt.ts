@@ -5,7 +5,7 @@
  * `runTurn` used to install the `SIGINT` handler itself — and `runTurn` runs *after* the handshake.
  * So a Ctrl-C during `initialize`, which for a cold `opencode acp` is seconds of real waiting,
  * killed the process with no handler installed and left the agent subprocess running: nothing owned
- * it, nobody terminated it, and the next `kurier start` found a stray process it knew nothing
+ * it, nobody terminated it, and the next `lotse start` found a stray process it knew nothing
  * about. An agent holds a model session and a lock in its own data directory, so "it will probably
  * die on its own" is not a cleanup strategy.
  *

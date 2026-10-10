@@ -5,11 +5,11 @@
 - Deciders: Pascal Garber
 - Related: [design study](../architecture/embeddable-widget-study.md)
 
-kurier had no ADRs before this one, so it takes number 0001.
+lotse had no ADRs before this one, so it takes number 0001.
 
 ## Context
 
-kurier is an AGPL app with the session, agent and login logic inside `app/src/core` and the chat
+lotse is an AGPL app with the session, agent and login logic inside `app/src/core` and the chat
 UI inside a 1356-line `window.ts`. Other GTK apps would like an agent chat without writing their
 own ACP client. An LGPL package may not depend on AGPL code ([werkstatt ADR 0003](../../../../docs/adr/0003-apps-are-agpl-packages-are-lgpl.md)),
 so the reusable parts have to leave `app/`.

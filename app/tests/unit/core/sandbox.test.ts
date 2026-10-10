@@ -730,7 +730,7 @@ export default async () => {
         });
         // Nothing, and that is the correct answer for two independent reasons: the probe runs in a
         // POSIX `sh` that never read the bash rc, AND even if it had, a function is not a program.
-        // Either way `kurier agents` says NOT FOUND rather than printing a name it cannot run.
+        // Either way `lotse agents` says NOT FOUND rather than printing a name it cannot run.
         expect(result.stdout.trim()).toBe('');
         expect(result.status).not.toBe(0);
       });

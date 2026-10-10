@@ -40,30 +40,30 @@ inside one GJS process with no Node process anywhere in the chain:
 
 ```bash
 gjsify install
-gjsify workspace kurier-cli build
-gjsify run app/dist/kurier.gjs.mjs agents
+gjsify workspace lotse-cli build
+gjsify run app/dist/lotse.gjs.mjs agents
 ```
 
 The first time you run a session against opencode, you likely need to log in first:
 
 ```bash
-kurier auth --agent opencode
+lotse auth --agent opencode
 ```
 
 `opencode acp` advertises an interactive login (`Run \`opencode auth login\` in the terminal`) as
-its auth method — not a token kurier could hand over by itself. Without `kurier auth`, a session
+its auth method — not a token kurier could hand over by itself. Without `lotse auth`, a session
 started before you are logged in dies on `-32000 auth_required` instead of on your prompt.
 
 ## Commands
 
 ```bash
-kurier start [--agent opencode] [prompt…]   # new session, one prompt turn, prints the agent's stream
-kurier sessions                             # list kurier's own records for the local principal
-kurier resume <id> [prompt…]                # reattach a stored session, then optionally one prompt turn
-kurier cancel <id>                          # send session/cancel
-kurier auth [--agent opencode]              # the interactive-login escape hatch
-kurier login [provider]                     # log in through the agent's OAuth flow, no terminal (opencode v2)
-kurier agents                               # the launchers that are registered, and whether the binary is on PATH
+lotse start [--agent opencode] [prompt…]   # new session, one prompt turn, prints the agent's stream
+lotse sessions                             # list kurier's own records for the local principal
+lotse resume <id> [prompt…]                # reattach a stored session, then optionally one prompt turn
+lotse cancel <id>                          # send session/cancel
+lotse auth [--agent opencode]              # the interactive-login escape hatch
+lotse login [provider]                     # log in through the agent's OAuth flow, no terminal (opencode v2)
+lotse agents                               # the launchers that are registered, and whether the binary is on PATH
 ```
 
 ## Run the surface
@@ -72,8 +72,8 @@ The GTK4 / libadwaita window is a **separate bundle** from the CLI, because `gi:
 imported under `frontends/gui/`:
 
 ```bash
-gjsify workspace kurier-cli build:app      # → app/dist/kurier-app.gjs.mjs
-gjsify run app/dist/kurier-app.gjs.mjs
+gjsify workspace lotse-cli build:app      # → app/dist/lotse-app.gjs.mjs
+gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 It picks its agent the same way the CLI does — your own copy of `opencode` first, a bundled one
@@ -118,7 +118,7 @@ adapter for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
 passes, builds and attaches every installable format to the tag's GitHub release (packaging runs only on a tag or a manual dispatch, never on a push or PR): `.deb`, `.rpm`,
 `.AppImage`, a Flatpak (`eu.jumplink.Lotse.flatpak`, from the manifest in
 [data/README.md](data/README.md)), a macOS `.app.zip` (arm64 + x64), and a Windows program
-directory `.zip` and `.msi` (x64). All of it packages the GUI (`kurier-app`), the one binary with
+directory `.zip` and `.msi` (x64). All of it packages the GUI (`lotse-app`), the one binary with
 a desktop entry and an App-ID; the `kurier` CLI installs alongside it inside the `.deb`/`.rpm`/
 Flatpak but ships no format of its own.
 

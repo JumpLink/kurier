@@ -123,7 +123,7 @@ export class FileSystemRefusedError extends Error {
 
   constructor(path: string) {
     super(
-      `kurier does not expose a file system to agents: ${path} was refused on principle, not by accident.`,
+      `lotse does not expose a file system to agents: ${path} was refused on principle, not by accident.`,
     );
     this.name = 'FileSystemRefusedError';
     this.path = path;
@@ -138,7 +138,7 @@ export class FileSystemRefusedError extends Error {
  * `opencode acp` advertises `{ id: "opencode-login", name: "Login with opencode", description:
  * "Run `opencode auth login` in the terminal" }` — no `type`, and a description that is not in
  * the schema. Read as the protocol's *agent* auth method it means "the client is expected to
- * arrange the login itself", which is what `kurier auth` does: it runs the command the agent's
+ * arrange the login itself", which is what `lotse auth` does: it runs the command the agent's
  * own `authenticate` would have run, outside the ACP channel. Dying on a missing
  * `opencode auth login` is trap 1 of the plan, and this classification is the first half of the
  * fix.

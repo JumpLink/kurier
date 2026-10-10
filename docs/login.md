@@ -1,6 +1,6 @@
 # Logging in to a provider from kurier
 
-Status: **the core, `kurier login` and the window's dialog exist.** The window offers **Log in…** on the
+Status: **the core, `lotse login` and the window's dialog exist.** The window offers **Log in…** on the
 auth dialog (`KU_APP_LOGIN=1` opens it for a screenshot) and restarts the agent after a login. Measured on
 opencode 2.0.22, 2026-10-04.
 
@@ -41,7 +41,7 @@ stores it; measured 204 on 2.0.22, and the key was found in opencode's own store
 have a key method, 10 an OAuth one. The `env` method (read a variable) is not offered.
 
 The key is held for the length of that one call: not in the controller's `state`, not in a message, not in a
-file. The CLI reads it from stdin (`echo "$KEY" | kurier login scaleway`), never from an argument, which would
+file. The CLI reads it from stdin (`echo "$KEY" | lotse login scaleway`), never from an argument, which would
 sit in the process list and the shell history.
 
 `packages/core/data/login-providers.json` holds what kurier owns: the providers it does not offer (`xai`, by decision of
@@ -65,13 +65,13 @@ A host opting in with `providerOnboarding` gets the same login from an inline pa
 
 ## Limits, and what is not known
 
-- **v2 only.** v1 answers a 404 on the catalog and `kurier login` says "use `kurier auth`".
+- **v2 only.** v1 answers a 404 on the catalog and `lotse login` says "use `lotse auth`".
 - **A host opencode under a Flatpak is out of reach:** it runs outside the sandbox, so its loopback port is
-  not ours. `kurier auth` is the path there. The bundled copy runs inside, so it works.
+  not ours. `lotse auth` is the path there. The bundled copy runs inside, so it works.
 - **Not measured: does an already running `opencode acp` see a fresh login?** Needs a real account.
-  `kurier login` says an agent that is already running may need a restart.
+  `lotse login` says an agent that is already running may need a restart.
 - **GJS keeps the main loop alive after the server has gone.** Any child `startServer` launches, even a
-  plain `sh` that exits by itself, leaves `kurier login` running after its handler returns; the same child
+  plain `sh` that exits by itself, leaves `lotse login` running after its handler returns; the same child
   through a bare `spawn` does not. Not isolated (stdout/stderr listeners, encoding, timers, `unref`, closing
   on `close` instead of `exit`, destroying the streams, deferring the resolve: none of them changed it).
   The command therefore ends itself. Worth a minimal reproduction for gjsify.

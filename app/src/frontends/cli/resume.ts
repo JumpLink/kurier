@@ -1,5 +1,5 @@
 /**
- * `kurier resume <id> [prompt…]` — put a stored session back in front of its agent.
+ * `lotse resume <id> [prompt…]` — put a stored session back in front of its agent.
  *
  * How it is put back is the agent's decision, negotiated at the handshake, not ours: `session/load`
  * when the agent offers it (the history is replayed), `session/resume` when it does not (the
@@ -32,7 +32,7 @@ const command = (paths: KurierPaths): CommandModule => ({
   describe: 'reattach a recorded session and optionally run one prompt turn',
   builder: (yargs) =>
     yargs
-      .positional('id', { type: 'string', describe: 'the session id from `kurier sessions`' })
+      .positional('id', { type: 'string', describe: 'the session id from `lotse sessions`' })
       .positional('prompt', {
         type: 'string',
         array: true,
@@ -57,7 +57,7 @@ const command = (paths: KurierPaths): CommandModule => ({
     const store = createSessionStore(paths.sessionsFile);
     const record = store.get(id);
     if (!record) {
-      err(`no session with id ${id} — \`kurier sessions\` lists what kurier has`);
+      err(`no session with id ${id} — \`lotse sessions\` lists what kurier has`);
       process.exitCode = 1;
       return;
     }

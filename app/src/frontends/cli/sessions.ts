@@ -1,5 +1,5 @@
 /**
- * `kurier sessions` — kurier's own records, for one principal.
+ * `lotse sessions` — kurier's own records, for one principal.
  *
  * Note what this lists and what it does not: these are *kurier's* records, not the agent's. The
  * agent has its own history and hands it over on request; this is the local file, which is what a
@@ -43,7 +43,7 @@ const command = (paths: KurierPaths): CommandModule => ({
     if (records.length === 0) {
       err(
         pickArgv<boolean>(raw, 'all') === true
-          ? 'kurier has no sessions yet — `kurier start` opens one'
+          ? 'kurier has no sessions yet — `lotse start` opens one'
           : `no sessions for principal "${principal}" (try --all)`,
       );
     }

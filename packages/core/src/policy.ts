@@ -47,7 +47,7 @@ export interface Terminal {
 
 export interface TerminalGateOptions {
   terminal: Terminal;
-  /** Called with one line per decision. `kurier start` writes these to the session transcript. */
+  /** Called with one line per decision. `lotse start` writes these to the session transcript. */
   onDecision?: (optionId: string | null) => void;
 }
 
@@ -64,7 +64,7 @@ export function terminalGate(options: TerminalGateOptions): PermissionGate {
     const declined = initialFocusResponseId(offered);
 
     if (!terminal.interactive) {
-      // Piped or redirected: the gate cannot ask, so it denies. `kurier start` is documented as
+      // Piped or redirected: the gate cannot ask, so it denies. `lotse start` is documented as
       // needing a terminal for anything beyond one prompt turn without tool calls. **The narrowest
       // decline, same as the interactive path** — a pipe is not a reason to answer more broadly.
       onDecision?.(declined);

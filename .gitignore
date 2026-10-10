@@ -23,7 +23,7 @@ package-lock.json
 # Defence in depth only. The real guarantee is that no session data is ever WRITTEN here:
 # kurier's store lives at $XDG_DATA_HOME/kurier/sessions.json, outside the repo, by
 # construction (see app/src/core/store.ts). This repository is PUBLIC.
-kurier-data/
+lotse-data/
 *.sessions.json
 sessions.json
 

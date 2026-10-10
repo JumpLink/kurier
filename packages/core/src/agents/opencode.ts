@@ -20,12 +20,12 @@ export const OPENCODE_COMMAND: AgentCommand = {
 };
 
 /**
- * The login command `kurier auth` runs.
+ * The login command `lotse auth` runs.
  *
  * Trap 1 of the plan: `opencode acp` advertises `{ id: "opencode-login", name: "Login with
  * opencode", description: "Run `opencode auth login` in the terminal" }` — the protocol's *agent*
  * auth method, which means the client is expected to arrange the login itself. Without this,
- * `kurier start` dies on an error message instead of on code.
+ * `lotse start` dies on an error message instead of on code.
  *
  * It is a plain command on this machine, not something routed through the ACP channel: the agent
  * asked for a login, and a login is a person at a terminal. Running it as a child process with

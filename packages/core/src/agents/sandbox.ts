@@ -129,7 +129,7 @@ export function isSandboxed(facts: SandboxFacts): boolean {
  * with the stock Debian/Ubuntu guard behaves differently depending on how that guard is written: one
  * that tests `$-` for `i` passes under `-i`, while one that tests whether stdin is a tty (`[ -t 0 ]`)
  * returns early no matter what, because there is no tty here and there never will be. So a person
- * whose agent PATH is set below such a guard gets the login PATH instead, and `kurier agents` says
+ * whose agent PATH is set below such a guard gets the login PATH instead, and `lotse agents` says
  * NOT FOUND. The answer stays honest rather than becoming a guess, and the fix belongs on the
  * machine: put the PATH in `~/.profile` or `~/.bash_profile`, which a login shell reads without
  * either guard. This is measured and stated, not asserted.

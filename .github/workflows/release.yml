@@ -9,9 +9,9 @@ name: Release
 # or lint did not pass.
 #
 # Three artifacts: `ship-deb-rpm-appimage` (.deb, .rpm, .AppImage — all from `gjsify.ship`, the GUI
-# binary `kurier-app`), `ship-macos-windows` (both macos-app-zips, windows-dir-zip, .msi), and
+# binary `lotse-app`), `ship-macos-windows` (both macos-app-zips, windows-dir-zip, .msi), and
 # `ship-flatpak` (eu.jumplink.Lotse.flatpak, from the hand-maintained manifest that stages both
-# `kurier` and `kurier-app` and bundles opencode as extra-data).
+# `lotse` and `lotse-app` and bundles opencode as extra-data).
 on:
   push:
     tags: ['v*']
@@ -48,7 +48,7 @@ jobs:
       contents: read
 
   # ── Packaging (ADR 0024 in gjsify: assembly is not host-bound, only running the payload is).
-  # `gjsify.ship` packages the GUI (`kurier-app`), the one binary with a desktop entry and an
+  # `gjsify.ship` packages the GUI (`lotse-app`), the one binary with a desktop entry and an
   # App-ID. msitools adds `wixl`, the Linux-side MSI compiler `gjsify ship windows --target msi`
   # needs; appimagetool is downloaded below because no distro packages it.
   ship:
@@ -102,10 +102,10 @@ jobs:
         run: gjsify install --immutable
 
       - name: Build the GUI app bundle (GJS, for Linux)
-        run: gjsify workspace kurier-cli build:app
+        run: gjsify workspace lotse-cli build:app
 
       - name: Build the GUI app bundle (Node, for macOS + Windows)
-        run: gjsify workspace kurier-cli build:app:node
+        run: gjsify workspace lotse-cli build:app:node
 
       # Pinned by version AND digest, the same shape gjsify's own CI image uses. The RUNTIME pin
       # is the load-bearing half: appimagetool otherwise fetches it per-arch from type2-runtime's
@@ -235,9 +235,9 @@ jobs:
   # `bwrap`, which a `fedora:44` container without `options: --privileged` refuses ("Can't mount
   # proc on /proc: Permission denied").
   #
-  # Builds from the hand-maintained root `eu.jumplink.Lotse.json` — it stages BOTH `kurier` and
-  # `kurier-app` and carries the bundled opencode (`extra-data` + `apply_extra`), which is not
-  # what `gjsify ship --target flatpak` would produce. That manifest's `kurier` module fetches a
+  # Builds from the hand-maintained root `eu.jumplink.Lotse.json` — it stages BOTH `lotse` and
+  # `lotse-app` and carries the bundled opencode (`extra-data` + `apply_extra`), which is not
+  # what `gjsify ship --target flatpak` would produce. That manifest's `lotse` module fetches a
   # `git` source at a pinned tag (what Flathub builds); for a release the source is the checkout
   # instead, otherwise v0.2.0's CI would package whatever the manifest's tag says.
   ship-flatpak:
@@ -329,7 +329,7 @@ jobs:
       - name: Point the manifest at this checkout
         run: |
           set -eu
-          jq '(.modules[] | select(.name == "kurier") | .sources) |=
+          jq '(.modules[] | select(.name == "lotse") | .sources) |=
                 map(if type == "object" and .type == "git"
                     then {type: "dir", path: ".", skip: [".git", ".flatpak-builder", "flatpak-build", "repo"]}
                     else . end)' \
@@ -373,7 +373,7 @@ jobs:
           path: ship
           merge-multiple: true
 
-      # From the TAG rather than a checkout — this job never checks the repo out. `kurier-app` is
+      # From the TAG rather than a checkout — this job never checks the repo out. `lotse-app` is
       # this repo's own public binary name, not a secret.
       - name: Assert every artifact arrived
         env:
@@ -382,7 +382,7 @@ jobs:
           set -eu
           ls -la ship
           version="${TAG#v}"
-          binary=kurier-app
+          binary=lotse-app
           missing=0
           for f in \
             "${binary}_${version}-1_all.deb" \

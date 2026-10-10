@@ -141,7 +141,7 @@ Evidence:
     process.once('SIGINT', interrupt);
   }
 ```
-Breaks when: `kurier start` is run with piped stdin (not a TTY). The `processTerminal()` returns `interactive: false`, but `runTurn` still registers the `SIGINT` handler. If the parent shell sends `SIGINT` to the process group, the handler fires and cancels the turn — but the gate would have already declined everything. Worse, if the process is in a pipeline, `SIGINT` behavior is platform-dependent.
+Breaks when: `lotse start` is run with piped stdin (not a TTY). The `processTerminal()` returns `interactive: false`, but `runTurn` still registers the `SIGINT` handler. If the parent shell sends `SIGINT` to the process group, the handler fires and cancels the turn — but the gate would have already declined everything. Worse, if the process is in a pipeline, `SIGINT` behavior is platform-dependent.
 Fix shape: Only register `SIGINT` when `terminal.interactive === true`, or document that `onInterrupt` is only called on TTY.
 
 ### `app/src/frontends/cli/auth.ts:142-149` — `runInteractively` doesn't distinguish spawn failure from exit code

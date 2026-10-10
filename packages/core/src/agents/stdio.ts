@@ -34,7 +34,7 @@ import {
 export interface AgentCommand {
   /** The adapter id, e.g. `opencode`. What a session record stores as `agent`. */
   readonly id: string;
-  /** What a human sees in `kurier agents`. */
+  /** What a human sees in `lotse agents`. */
   readonly title: string;
   /** The binary, resolved on PATH. */
   readonly program: string;
@@ -91,7 +91,7 @@ const STDIN_CHUNK_BYTES = 4096;
 
 /**
  * How long the "is it installed" host probe may take. Short, because the probe sits on the path of
- * `kurier agents` and of any window that reports launcher state: a slow answer reads as a broken
+ * `lotse agents` and of any window that reports launcher state: a slow answer reads as a broken
  * app, and nothing about resolving one program's location is worth more than this.
  */
 const HOST_PROBE_TIMEOUT_MS = 5000;
@@ -240,7 +240,7 @@ export class StdioChannel implements RawChannel {
    * End the agent, politely first.
    *
    * `SIGTERM`, then `SIGKILL` after a grace period: an agent mid-turn holds open state, and a bare
-   * `SIGKILL` leaves a lock behind in its own data directory that fails the *next* `kurier start`
+   * `SIGKILL` leaves a lock behind in its own data directory that fails the *next* `lotse start`
    * with a message about a lock nobody remembers. The timer is unref'd so it can never be the
    * reason the CLI hangs on exit.
    */
@@ -308,7 +308,7 @@ export class StdioChannel implements RawChannel {
    * have been read. On GJS `node:child_process` is polyfilled over `Gio.Subprocess`, so stdout
    * arrives through `read_bytes_async` — a GLib main-context source — and the child's `exit`
    * source can be dispatched first. Ending here dropped the final JSON-RPC message, which for a
-   * one-turn `kurier start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
+   * one-turn `lotse start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
    * before the stdio streams are drained, so the same code was a latent bug there too.
    *
    * Node's own answer is the event called `close` — emitted once the process has ended *and* the
@@ -387,7 +387,7 @@ export function needsWindowsShell(program: string, platform: NodeJS.Platform = p
  * opencode in it" without a subprocess; the third is the one impure step, and it sits behind the
  * injected `facts` argument so a test that does not want it can say so.
  *
- * This is the difference between `kurier agents` reporting "not installed" and reporting "broken",
+ * This is the difference between `lotse agents` reporting "not installed" and reporting "broken",
  * which are two very different messages to somebody reading them at 23:00.
  */
 export function which(
@@ -453,7 +453,7 @@ function probeOnHostAsync(argv: string[]): Promise<string | null> {
 /** The pure PATH walk, now PATHEXT-aware. */
 function whichOnPath(program: string, env: NodeJS.ProcessEnv): string | null {
   const path = env['PATH'] ?? '';
-  // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `kurier agents`
+  // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `lotse agents`
   // honest on the platform the app is eventually meant to run on.
   const separator = path.includes(';') ? ';' : ':';
   const extensions = pathextCandidates(env);
@@ -496,7 +496,7 @@ function pathextCandidates(env: NodeJS.ProcessEnv): string[] {
 function probeOnHost(argv: string[]): string | null {
   // `stdin: 'ignore'` and a bounded `timeout` because this runs on a path a person waits on: a host
   // whose shell hangs — an rc that blocks on a terminal read, a `gpg-agent` prompt, a network mount
-  // in a login script — would otherwise hang `kurier agents` and, through it, the window that asks.
+  // in a login script — would otherwise hang `lotse agents` and, through it, the window that asks.
   // `stdio` rather than `stdin`: this is `spawnSync`, and there the option that covers all three
   // descriptors is `stdio` — `stdin` is an `spawn` option and the type says so. The probe must not
   // read stdin (a host rc could block on one) and does not write stderr, so 'ignore' on both is the
@@ -535,7 +535,7 @@ export function parseHostProbeOutput(stdout: string): string | null {
  * builtin, and each of those prints its own NAME — bare `opencode` for an alias, which is not
  * something `spawn` can execute. kurier spawns a *program*, so anything that is not a path is "not
  * installed" as far as this table is concerned; reporting it otherwise would put a name in a
- * `kurier agents` STATE column that would fail the moment somebody acted on it.
+ * `lotse agents` STATE column that would fail the moment somebody acted on it.
  *
  * Exported because it is the whole of the rule, and a rule with no test is a comment.
  */

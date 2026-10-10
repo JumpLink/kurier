@@ -10,7 +10,7 @@
  * dialog that is meant to explain it. A saved choice that names an id this build does not know gets a row
  * of its own for the same reason.
  *
- * Row keys are `auto`, `<id>:host` and `<id>:bundled`; `kurier agents --use` takes the last two as they
+ * Row keys are `auto`, `<id>:host` and `<id>:bundled`; `lotse agents --use` takes the last two as they
  * are and spells Automatic `none`.
  *
  * **A host install may still be unknown.** Inside a Flatpak finding one means asking the host, which takes

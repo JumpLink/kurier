@@ -81,7 +81,7 @@ export function isResponse(message: JsonRpcMessage): message is JsonRpcResponse 
 /**
  * The error raised for a JSON-RPC failure response. It carries the wire `code` because the
  * caller branches on it: `-32_000` means "authenticate first", which is the difference between
- * `kurier auth` and a crash.
+ * `lotse auth` and a crash.
  */
 export class RpcError extends Error {
   readonly code: number;

@@ -745,7 +745,7 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: -32_603,
   /** `$/cancel_request`. */
   REQUEST_CANCELLED: -32_800,
-  /** The agent wants a human to log in first. Trap 1 of the plan — `kurier auth`. */
+  /** The agent wants a human to log in first. Trap 1 of the plan — `lotse auth`. */
   AUTH_REQUIRED: -32_000,
   RESOURCE_NOT_FOUND: -32_002,
 } as const;

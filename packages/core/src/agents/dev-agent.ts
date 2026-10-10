@@ -2,7 +2,7 @@
  * The stand-in agent: a spawnable ACP peer for the window, and the hook that chooses it.
  *
  * **It is deliberately NOT in `agents/launcher.ts`, and the reason is that table's own header.** That
- * table is "a table of programs, not of capabilities" and `kurier agents` prints it as what a person
+ * table is "a table of programs, not of capabilities" and `lotse agents` prints it as what a person
  * can install and run. The stand-in is a dev fixture inside this repository — a file under
  * `scripts/`, run with Node, reachable only by naming it in a dev hook — and putting it in the table
  * would print "Kurier stand-in agent" to somebody who asked which agents they have, next to OpenCode,
@@ -18,7 +18,7 @@
  *
  * ```sh
  * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
- *   ./node_modules/.bin/gjsify workspace kurier-cli start:app
+ *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  * ```
  *
  * **It runs on Node, not GJS, and `program: 'node'` is the honest spelling of that.** The script is

@@ -47,7 +47,7 @@ const parseArgs = () =>
     .command(agentsCommand(paths))
     .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
     .strictCommands()
-    .scriptName('kurier')
+    .scriptName('lotse')
     .locale('en')
     .help()
     .fail(false)

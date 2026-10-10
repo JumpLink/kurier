@@ -1,7 +1,7 @@
 /**
  * The record of a conversation that has just been opened with an agent.
  *
- * One function for `kurier start` and the window, so the CLI and the GUI cannot drift about what a new
+ * One function for `lotse start` and the window, so the CLI and the GUI cannot drift about what a new
  * session looks like on disk: the title, which copy of the agent held it, where it ran, and how it is
  * put back in front of an agent (`reattach`, from what that agent advertised).
  */
@@ -25,7 +25,7 @@ export interface ConversationInput {
   readonly agent: string;
   readonly agentSource: AgentSource;
   readonly cwd: string;
-  /** What the person asked first; empty for `kurier start` without a prompt. */
+  /** What the person asked first; empty for `lotse start` without a prompt. */
   readonly prompt: string;
   readonly at: string;
   readonly supportsLoadSession: boolean;

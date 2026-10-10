@@ -174,7 +174,7 @@ export function isOnScreen(sessionId: SessionId, shown: SessionId | null): boole
  * started yet, and the handshake is in flight — a cold `opencode acp` takes *seconds*, and silence
  * during that is what makes a window look broken); `gone` and `failed` are two different failures that
  * need two different sentences: the agent ran and ended, versus the agent never got going at all
- * (bad command, handshake failure, `auth_required` — trap 1, whose remedy is `kurier auth`).
+ * (bad command, handshake failure, `auth_required` — trap 1, whose remedy is `lotse auth`).
  */
 export type AgentAttachment =
   /** Nothing has been started. The first prompt starts it — see `agent-session.ts`. */
@@ -187,7 +187,7 @@ export type AgentAttachment =
    * The agent never came up — **or refused the turn.**
    *
    * **`kind` is the whole reason this is not just a `message`.** Four failures land here and three of
-   * them need something a person must do somewhere else — an auth trap (`kurier auth`, trap 1), a
+   * them need something a person must do somewhere else — an auth trap (`lotse auth`, trap 1), a
    * provider refusal after a prompt was sent (issue #2), and a reattach refusal (trap 2, which leaves
    * the window empty) — so the surface has to be able to tell them from "the binary is not on PATH".
    * Classified by `failureKind` in `core/failure.ts`, which is where the four ways of reading it are

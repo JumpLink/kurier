@@ -43,7 +43,7 @@ export default async () => {
 
   await describe('whyNoLoginServer', async () => {
     await it("explains a host copy under a Flatpak, which runs where this sandbox's loopback does not reach", async () => {
-      expect(whyNoLoginServer(agent('opencode'), { flatpakInfoExists: true })!.includes('kurier auth')).toBe(
+      expect(whyNoLoginServer(agent('opencode'), { flatpakInfoExists: true })!.includes('lotse auth')).toBe(
         true,
       );
     });

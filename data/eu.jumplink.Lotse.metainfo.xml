@@ -100,7 +100,7 @@
     <kudo>HiDpiIcon</kudo>
   </kudos>
   <provides>
-    <binary>kurier-app</binary>
+    <binary>lotse-app</binary>
     <binary>kurier</binary>
   </provides>
 </component>

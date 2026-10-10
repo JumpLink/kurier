@@ -34,7 +34,7 @@ advice, and nothing here is promised to users: ask Anthropic before advertising 
 1. **Host install only, never bundled.** Same order as every agent: the person's own copy. Bundling
    needs the Commercial Terms.
 2. **No Claude login in kurier.** Kurier shows "sign in with `claude` in a terminal", exactly like
-   `kurier auth`. It never opens, proxies or stores a Claude flow. This also rules out a
+   `lotse auth`. It never opens, proxies or stores a Claude flow. This also rules out a
    provider-connect screen for Claude, whatever the screen for other providers becomes.
 3. **API key is the documented way,** a subscription is the person's own choice.
 4. **Say it in plain text.** "Runs Claude Code" is allowed; the name or logo in kurier's own name or

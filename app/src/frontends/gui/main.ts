@@ -1,19 +1,19 @@
 /**
  * The native GNOME front-end — entry point.
  *
- * A third surface on the same kernel as `kurier start` and the MCP server: it builds an `AcpClient`
+ * A third surface on the same kernel as `lotse start` and the MCP server: it builds an `AcpClient`
  * and calls the same `app/src/core` actions, and it renders every sentence about a session from the
  * transcript the core produced. Nothing about ACP, about permissions or about a config option is
  * decided in here.
  *
  * **Its own bundle, not a subcommand of the CLI.** `import Gtk from '@girs/gtk-4.0'` becomes a
  * top-level `gi://Gtk` in the bundle, so folding this into `kurier.gjs.mjs` would make every
- * `kurier sessions` in a terminal — including over SSH, where there is no display at all — load GTK
+ * `lotse sessions` in a terminal — including over SSH, where there is no display at all — load GTK
  * and libadwaita and die. Two entry points, one kernel. Verified by the build: `gi://Adw` and
  * `gi://Gtk` appear 0× in the CLI bundle and ≥1× in this one.
  *
- *   build: gjsify workspace kurier-cli build:app    (→ dist/kurier-app.gjs.mjs)
- *   run:   gjsify workspace kurier-cli start:app
+ *   build: gjsify workspace lotse-cli build:app    (→ dist/lotse-app.gjs.mjs)
+ *   run:   gjsify workspace lotse-cli start:app
  *
  * The shell is `@gjsify/adwaita-app`'s `runAdwaitaApp`, which owns the `runAsync` lifecycle — never
  * the synchronous `run()`, which starves the promise-job queue, so an awaited agent answer never
@@ -136,7 +136,7 @@ const status = await runAdwaitaApp({
       'the questions it asks. The agent brings its own model, its own tools and its own login — ' +
       'kurier shows what it offers and asks before it acts. The same kernel as the command line.',
   },
-  // The same read `kurier sessions` does, principal filter included: two surfaces listing different
+  // The same read `lotse sessions` does, principal filter included: two surfaces listing different
   // sessions from one file would make one of them wrong, and nobody could say which.
   createWindow: (app) =>
     new MainWindow(app, {

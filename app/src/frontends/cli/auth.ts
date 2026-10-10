@@ -1,7 +1,7 @@
 /**
- * `kurier auth` — trap 1 of the plan, given a command.
+ * `lotse auth` — trap 1 of the plan, given a command.
  *
- * Without this command `kurier start` dies on `-32000 auth_required` with a stack trace instead of a
+ * Without this command `lotse start` dies on `-32000 auth_required` with a stack trace instead of a
  * sentence. What it does about that is decided in `@lotse/core`'s `auth.ts`: which of the two paths an
  * agent's `authMethods` allow, what the login command is, and the order the two handshakes run in. What
  * is here is the terminal: the flags, the lines, the exit codes, and the one thing a window would have
@@ -102,7 +102,7 @@ const command = (paths: KurierPaths): CommandModule => ({
  *
  * Routed through the same host rewrite as the ACP channel (`agents/sandbox.ts`), because a login is a
  * host program for exactly the reason the agent is: it opens a browser and keeps its credentials under
- * the person's own home. A `kurier auth` that only worked on a desktop install would be a second
+ * the person's own home. A `lotse auth` that only worked on a desktop install would be a second
  * version of the same bug.
  */
 function runInteractively(command: AgentCommand): Promise<number> {

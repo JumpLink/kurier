@@ -1235,9 +1235,9 @@ export default async () => {
       // that went wrong half way through.
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
-        // `withAuthHint`'s sentence, which names `kurier auth` — the remedy a window has no terminal
+        // `withAuthHint`'s sentence, which names `lotse auth` — the remedy a window has no terminal
         // for (plan §6, trap 1).
-        expect(attachment.message).toContain('kurier auth');
+        expect(attachment.message).toContain('lotse auth');
         // **And the kind, which is what lets a surface tell this from a bad command.** The message
         // alone cannot: both reach the composer as one caption, and only one of them has a command to
         // run elsewhere. `core/failure.ts` decides the rest from this.
@@ -1247,7 +1247,7 @@ export default async () => {
 
     await it('a bad command is a failure to start, and gets no kind that has a dialog', async () => {
       // The other half of the split: if ENOENT also came out as `auth`, every missing binary would
-      // put a modal naming `kurier auth` on screen, which is a remedy for a problem the person does
+      // put a modal naming `lotse auth` on screen, which is a remedy for a problem the person does
       // not have.
       const h = harness({ failWith: new Error('spawn opencode ENOENT') });
       await h.session.prompt('hello');
@@ -1300,7 +1300,7 @@ export default async () => {
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
         expect(attachment.kind).toBe('model');
-        // The dialog a window will put up: a sentence and a button, and **no** `kurier auth` command
+        // The dialog a window will put up: a sentence and a button, and **no** `lotse auth` command
         // line — the `command` field is what `FailureDialog` renders as "Run this in a terminal".
         const notice = failureNotice(attachment.kind);
         expect(notice).not.toBe(null);
@@ -1355,7 +1355,7 @@ export default async () => {
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
         expect(attachment.kind).toBe('auth');
-        expect(failureNotice(attachment.kind)?.command).toBe('kurier auth');
+        expect(failureNotice(attachment.kind)?.command).toBe('lotse auth');
       }
     });
   });

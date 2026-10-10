@@ -363,7 +363,7 @@ const window = new Adw.ApplicationWindow({
   application: null,
   defaultWidth: 480,
   defaultHeight: 600,
-  title: `kurier width probe (floor ${FLOOR === null ? 'none' : String(FLOOR)})`,
+  title: `lotse width probe (floor ${FLOOR === null ? 'none' : String(FLOOR)})`,
   ...(FLOOR === null ? {} : { widthRequest: FLOOR }),
 });
 

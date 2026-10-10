@@ -181,7 +181,7 @@ export interface MainWindowOptions {
   /**
    * The app's own MCP servers, handed to the widget and forwarded to `session/new` unchanged.
    *
-   * Nothing passes any today — `kurier serve` is the step that wires the suite's servers in (ADR
+   * Nothing passes any today — `lotse serve` is the step that wires the suite's servers in (ADR
    * 0002) — and the pass-through is here rather than added later because the widget already takes it
    * and a host that cannot reach the option would be the reason to edit two files instead of one.
    */

@@ -839,7 +839,7 @@ export class AgentSession {
    *
    * **A failure here is a sentence, not an exception.** `openAgent` rejects for a binary that is not
    * on PATH, a handshake that times out, a protocol version kurier does not implement, and — through
-   * `withAuthHint` — for `auth_required`, whose remedy is `kurier auth` in a terminal this window does
+   * `withAuthHint` — for `auth_required`, whose remedy is `lotse auth` in a terminal this window does
    * not have (plan §6, trap 1). All four become `AgentAttachment: 'failed'` with the message, which is
    * what the composer puts under the entry, so the person reads what to do instead of watching a
    * spinner that will never resolve.

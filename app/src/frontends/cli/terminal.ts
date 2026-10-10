@@ -7,7 +7,7 @@
  * looks broken. Every command that both asks a question and runs a turn shares this one object.
  *
  * Questions go to **stderr**, answers come from stdin: that keeps a piped stdout machine-readable,
- * which is what makes `kurier start "…"` composable in a shell.
+ * which is what makes `lotse start "…"` composable in a shell.
  */
 
 import { createInterface, type Interface } from 'node:readline';

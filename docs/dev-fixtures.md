@@ -21,7 +21,7 @@ same twice. `KU_APP_AGENT=stand-in` selects it; it is reachable through the dev 
 
 ```bash
 # a turn that streams and then ends on its own
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # the two states that are unreachable against a real agent: mid-stream, and a dying agent
 KU_STANDIN_HANG=1             # never answers end_turn — the running state, and what Stop is for
@@ -62,11 +62,11 @@ hook here):
 
 ```sh
 # four buttons — the default, and the dialog to photograph
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # two allows and no decline: the focus must land on the diff body, not on "Always allow"
 KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 KU_STANDIN_PERMISSION_NO_REJECT=1 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 `KU_APP_THINKING=1` sends the prompt, `KU_APP_PROMPT=<text>` says which. The two rules about *reading* a
@@ -100,12 +100,12 @@ turn, one set. What a screenshot shows is the row in the state a person's click 
 # a real set, over the real chain, with the stand-in's 400-model list
 KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_MODELS=400 \
   KU_APP_SESSION=fixture-2 KU_APP_CONFIG=model=openrouter/vendor/model-012 KU_APP_PROMPT=hi \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # the refusal: the agent says no, the row stays on what the agent last answered
 KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 \
   KU_APP_SESSION=fixture-2 KU_APP_CONFIG=mode=plan KU_APP_PROMPT=hi \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 **One line while the three controls fit, wrapped when they do not, and the row raises no floor.** The
@@ -146,7 +146,7 @@ because each of the four is a failure or a line that a healthy agent produces in
 conversation, and kurier's surface has a decision for each that nothing else here reaches:
 
 ```sh
-# trap 1: initialize succeeds, session/load answers -32000 → the auth dialog naming `kurier auth`
+# trap 1: initialize succeeds, session/load answers -32000 → the auth dialog naming `lotse auth`
 KU_STANDIN_AUTH=1
 
 # trap 2: neither loadSession nor resume → the refusal dialog, not an empty transcript
@@ -178,12 +178,12 @@ dialog's **Choose another model** button is only there when it is.
 # the model-refusal dialog, over the real chain, with a model list behind it
 KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_PROMPT_AUTH=1 \
   KU_APP_SESSION=fixture-2 KU_APP_THINKING=1 KU_APP_PROMPT=hi \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # the same refusal with no configuration row → the dialog still appears, Close only
 KU_APP_AGENT=stand-in KU_STANDIN_PROMPT_AUTH=1 \
   KU_APP_SESSION=fixture-2 KU_APP_THINKING=1 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 **The dropdown opening is the state only a button can reach,** like the dialog's own dismissal: a
@@ -217,19 +217,19 @@ second response has no shortcut, because `Adw.AlertDialog` has no callable `resp
 
 ```sh
 # Stop, mid-turn
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_APP_STOP=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_APP_STOP=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # Escape on an open permission dialog, and nothing else
 KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 KU_APP_STOP_ESCAPE=1 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # Close on the refusal dialog, then the session moving on underneath it
 KU_APP_AGENT=stand-in KU_STANDIN_NO_RESUME=1 KU_APP_DISMISS_FAILURE=1 KU_APP_SWITCH=fixture-1,fixture-2 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # issue #2: the model dialog's button, with a model list behind it
 KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_PROMPT_AUTH=1 KU_APP_CHOOSE_MODEL=1 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 **Why a hook for each, measured rather than assumed.** `ActivateWidget` on an `Adw.AlertDialog` response
@@ -255,7 +255,7 @@ Not a sixth pointer-only control in the table above, but the same reason: radio 
 #   gdbus call --session --dest eu.jumplink.Lotse --object-path /eu/jumplink/Lotse/devtools \
 #     --method org.gjsify.Devtools.ResizeWindow 360 600
 GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-in KU_APP_PREFERENCES_AGENT=opencode:bundled \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version. `app/src/core/settings-view.ts` decides the rows, and an unavailable agent stays listed rather than disappearing. **Inside a Flatpak the dialog opens before the host has answered** — rows read `Checking…` and fill in asynchronously — because waiting would show nothing at all for as long as `flatpak-spawn` takes.
@@ -272,7 +272,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 
 ## First run and New chat
 
-**First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `kurier start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate that one action.
+**First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `lotse start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate that one action.
 
 **The cwd** is `KURIER_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
 
@@ -282,7 +282,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
   GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
     KU_APP_AGENT=stand-in KU_APP_CWD=/tmp/x/project KU_STANDIN_DELAY_MS=1500 \
     KU_APP_THINKING=1 KU_APP_PROMPT='Say hello.' KU_APP_NEW_CHAT_MIDTURN=1 \
-    ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+    ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
   ```
 - `KU_APP_CWD=<path>` — pin the cwd so a screenshot never shows a private path; beats `KURIER_CWD`. `KU_APP_THINKING` + `KU_APP_PROMPT` also send into the pending chat.
 - The stand-in answers `session/new` with `ses_standin_0001`, then `…_2`, `…_3`: two chats in one window must not collide in the store.
@@ -293,7 +293,7 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 mkdir -p /tmp/x/project
 GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
   KU_APP_AGENT=stand-in KU_APP_CWD=/tmp/x/project KU_APP_THINKING=1 KU_APP_PROMPT='Say hello.' KU_APP_NEW_CHAT=1 \
-  ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+  ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 Two defects found on the way, both fixed: `agentStatus({status: 'none'})` was `attached: false`, so Send stayed disabled until an agent existed — and the agent only starts on the first prompt (only `KU_APP_THINKING` could send one); and `#open` re-read nothing, so a chat revisited after streaming showed the startup copy of its transcript.
@@ -304,13 +304,13 @@ The bundled copy exists only inside a Flatpak, so two hooks stand in for it. Bot
 
 - `KU_APP_NOTICE=1` — force the bundled-agent condition: the `Adw.Banner` under the content header shows (fixed English text from `packages/core/src/empty-state.ts`, one **Got it**). Not shown for a host install, with no agent, or once dismissed. The text is kept to three lines at 360 px: `Adw.Banner` ellipsizes beyond that, which cut the statement itself.
 - `KU_APP_NOTICE_DISMISS=1` — press **Got it** by emitting the banner's own `button-clicked`; logs one line. The id lands in `$KURIER_NOTICES_FILE` (default `$XDG_DATA_HOME/kurier/notices.json`, 0600 in 0700, atomic write); a corrupt or unreadable file shows the notice again and never stops startup.
-- `KU_APP_NO_AGENT=1` — force the nothing-found resolution (beats `KU_APP_AGENT`): the content pane says "No agent found" with the install command (selectable text, no markup), the docs link and a **Preferences** button (`app.preferences`); Send and the entry are off with the reason under the composer. `kurier start`, `kurier auth` and `kurier agents` print the same remedy (`NO_AGENT_REMEDY`).
+- `KU_APP_NO_AGENT=1` — force the nothing-found resolution (beats `KU_APP_AGENT`): the content pane says "No agent found" with the install command (selectable text, no markup), the docs link and a **Preferences** button (`app.preferences`); Send and the entry are off with the reason under the composer. `lotse start`, `lotse auth` and `lotse agents` print the same remedy (`NO_AGENT_REMEDY`).
 
 ```sh
 # synthetic everything; a missing sessions file is first run
 GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
   KURIER_NOTICES_FILE=/tmp/x/notices.json KU_APP_CWD=/tmp/x/project KU_APP_AGENT=stand-in \
-  KU_APP_NOTICE=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs   # or KU_APP_NO_AGENT=1
+  KU_APP_NOTICE=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs   # or KU_APP_NO_AGENT=1
 ```
 
 ## The permission dialog
@@ -347,10 +347,10 @@ that is the first tick, because there is no agent that could ask.
 
 ```bash
 # the agent's own question, mid-turn, over the real chain
-KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+KU_APP_AGENT=stand-in KU_APP_THINKING=1 KU_STANDIN_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 
 # just the dialog, with no agent at all
-KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
+KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
 ## The window floor
@@ -478,7 +478,7 @@ question. Both runtimes, as in postbote and beifahrer:
   inconvenient parts (a `_meta` bag it invented, a mid-turn `request_permission`, a paginated
   `session/list`), so a client that only passes against a polite peer is not tested.
 - **GJS**: one integration test that proves the real stdio chain against a real agent
-  (`kurier-cli test:real-agent`).
+  (`lotse-cli test:real-agent`).
 
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.

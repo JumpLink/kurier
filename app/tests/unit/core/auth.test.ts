@@ -139,7 +139,7 @@ export default async function auth(): Promise<void> {
         [
           'this agent advertises authentication:',
           '  Login with opencode (opencode-login) — Run `opencode auth login` in the terminal',
-          '  `kurier auth` arranges it; a session started before that will fail with -32000.',
+          '  `lotse auth` arranges it; a session started before that will fail with -32000.',
         ].join('\n'),
       );
     });

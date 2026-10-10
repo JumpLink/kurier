@@ -8,7 +8,7 @@
  *
  * The `finally` blocks are the reason this file exists as a unit. An ACP agent is a child process
  * with a model behind it; leaking one means a leaked process and a leaked session, and the second
- * `kurier start` then fails for a reason nobody can reconstruct.
+ * `lotse start` then fails for a reason nobody can reconstruct.
  */
 
 import {
@@ -28,7 +28,7 @@ export interface AgentHandle {
   client: AcpClient;
   /** Stderr from the agent, already split into lines. */
   readonly logLines: string[];
-  /** Name and version the agent reported, for `kurier start`'s first line. */
+  /** Name and version the agent reported, for `lotse start`'s first line. */
   readonly agentInfo: string;
   /**
    * End the agent. Resolves once the process has ended (bounded by `CLOSE_WAIT_MS`), so a caller that is
@@ -117,7 +117,7 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
 }
 
 /**
- * Re-thrown with the `kurier auth` hint attached, so a caller does not have to know the code.
+ * Re-thrown with the `lotse auth` hint attached, so a caller does not have to know the code.
  *
  * **`AuthRequiredError` and not a plain `Error`, and the message alone is why.** The hint turns
  * ACP's `-32000` into a sentence a person can act on, and a sentence is not a classification: a

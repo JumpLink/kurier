@@ -48,4 +48,4 @@ else
 fi
 
 echo "installed desktop entry, metainfo and icons under $root"
-echo "Exec=kurier-app is a binary this install does NOT create — see data/README.md"
+echo "Exec=lotse-app is a binary this install does NOT create — see data/README.md"

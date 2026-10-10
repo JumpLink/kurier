@@ -13,7 +13,7 @@
  * live turn to trigger it.
  *
  * NOT part of `gjsify test` / `test.mts`. Built and run explicitly:
- *   gjsify workspace kurier-cli test:real-agent
+ *   gjsify workspace lotse-cli test:real-agent
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';

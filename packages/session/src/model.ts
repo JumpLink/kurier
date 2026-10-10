@@ -32,8 +32,8 @@ export type EntryKind = 'user' | 'agent' | 'thought' | 'tool' | 'system';
  * One line of the transcript.
  *
  * The transcript is a *record of what happened*, not a re-derivation of it: an agent's own
- * `session/load` is the authority on history, and kurier's copy exists so `kurier sessions` and
- * `kurier resume` can show something without spawning a process. A transcript that claimed more
+ * `session/load` is the authority on history, and kurier's copy exists so `lotse sessions` and
+ * `lotse resume` can show something without spawning a process. A transcript that claimed more
  * than that would be a second source of truth about someone else's conversation.
  */
 export interface TranscriptEntry {
@@ -80,7 +80,7 @@ export interface SessionRecord {
   turns: TranscriptEntry[];
 }
 
-/** What `kurier start` needs to open a session. The clock is injected, so the model stays pure. */
+/** What `lotse start` needs to open a session. The clock is injected, so the model stays pure. */
 export interface NewSession {
   id: SessionId;
   agent: string;

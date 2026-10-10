@@ -1,7 +1,7 @@
 /**
  * The login dialog's logic, with no widget in it.
  *
- * A window cannot print a URL and wait on stdin the way `kurier login` does, so this holds the same
+ * A window cannot print a URL and wait on stdin the way `lotse login` does, so this holds the same
  * steps as a state a dialog can draw: the providers on offer, the fields a method still asks for, the
  * URL and code to show, the pasted code to collect, and the end. The dialog only renders `state` and
  * calls the methods below; every decision lives here, where a test can drive it without a display.

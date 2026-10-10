@@ -132,7 +132,7 @@ export default async () => {
     });
   });
 
-  await describe('kurier agents report', async () => {
+  await describe('lotse agents report', async () => {
     const launcher = LAUNCHERS[0]!;
     const found = (source: AgentDetection['source']): AgentDetection => ({
       id: launcher.id,
@@ -150,7 +150,7 @@ export default async () => {
       const host = agentsReport(LAUNCHERS, [found('host')], found('host'));
       expect(host[1]!.includes(' host ')).toBe(true);
       expect(host[host.length - 1]).toBe(
-        `kurier would use: ${launcher.id} (host, /synthetic/opencode, 1.2.3)`,
+        `lotse would use: ${launcher.id} (host, /synthetic/opencode, 1.2.3)`,
       );
 
       const bundled = agentsReport(LAUNCHERS, [found('bundled')], found('bundled'));
@@ -177,11 +177,11 @@ export default async () => {
       expect(lines[1]!.includes('not found')).toBe(true);
       expect(lines[1]!.includes('NOT FOUND')).toBe(true);
       expect(lines[1]!.includes('bundled')).toBe(false);
-      expect(lines[lines.length - 1]!.startsWith('kurier would use: none')).toBe(true);
+      expect(lines[lines.length - 1]!.startsWith('lotse would use: none')).toBe(true);
     });
   });
 
-  await describe('kurier agents — the setting lines', async () => {
+  await describe('lotse agents — the setting lines', async () => {
     await it('names the setting and where the file is', async () => {
       const lines = settingsReport(
         '/synthetic/config/kurier/settings.json',

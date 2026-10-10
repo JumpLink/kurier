@@ -190,9 +190,9 @@ export default async () => {
       { attachment: { status: 'gone', reason: 'exited with code 1' }, attached: false, mentions: 'code 1' },
       { attachment: { status: 'gone', reason: '' }, attached: false, mentions: 'exited' },
       {
-        attachment: { status: 'failed', kind: 'auth', message: 'run `kurier auth`, then try again' },
+        attachment: { status: 'failed', kind: 'auth', message: 'run `lotse auth`, then try again' },
         attached: false,
-        mentions: 'kurier auth',
+        mentions: 'lotse auth',
       },
     ];
 
@@ -226,7 +226,7 @@ export default async () => {
 
     await it('carries the auth hint through verbatim — it is the remedy', async () => {
       const message =
-        'attaching to the session failed: the agent wants a human to log in first. Run `kurier auth`, then try again.';
+        'attaching to the session failed: the agent wants a human to log in first. Run `lotse auth`, then try again.';
       expect(agentStatus({ status: 'failed', kind: 'auth', message }).note).toBe(message);
     });
 

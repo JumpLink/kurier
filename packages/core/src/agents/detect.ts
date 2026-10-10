@@ -71,7 +71,7 @@ export interface Resolution {
 }
 
 /**
- * The agent kurier would use now: the setting if that agent is available, else the first host install,
+ * The agent lotse would use now: the setting if that agent is available, else the first host install,
  * else the first bundled copy, else `null`.
  *
  * A setting names an id *and* a source. `host` is available when the id was found on the person's PATH;
@@ -111,7 +111,7 @@ export function resolveAgent(input: {
   return {
     detection: fallback,
     note: fallback
-      ? `${asked} — using ${fallback.id} (${fallback.source}) instead; choose again with \`kurier agents --use\``
+      ? `${asked} — using ${fallback.id} (${fallback.source}) instead; choose again with \`lotse agents --use\``
       : `${asked}, and no other agent is available either`,
   };
 }

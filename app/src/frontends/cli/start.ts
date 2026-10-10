@@ -1,5 +1,5 @@
 /**
- * `kurier start` — open a session, run one prompt turn, write it down.
+ * `lotse start` — open a session, run one prompt turn, write it down.
  *
  * The command is one turn, not a REPL, and that is a decision rather than a missing feature. A
  * REPL needs somewhere to put the approval surface, and the plan puts the surface in a later slice

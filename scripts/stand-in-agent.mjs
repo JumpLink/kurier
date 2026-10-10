@@ -44,7 +44,7 @@
  *
  * ```sh
  * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
- *   ./node_modules/.bin/gjsify workspace kurier-cli start:app
+ *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  *
  * # the configuration row, and the three states only this fixture can produce
  * KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_MODELS=400 KU_APP_CONFIG=model=openrouter/vendor/model-012
@@ -287,7 +287,7 @@ input.on('line', (line) => {
     case 'session/load':
     case 'session/resume':
       // **Trap 1, in the shape a real unauthenticated agent has it.** `-32000` is the code kurier's
-      // `isAuthRequired` matches and `withAuthHint` turns into a `kurier auth` sentence, and it is
+      // `isAuthRequired` matches and `withAuthHint` turns into a `lotse auth` sentence, and it is
       // refused *after* `initialize` succeeded — which is the point: the handshake works and the
       // session does not, so the failure cannot be caught anywhere earlier than the reattach.
       if (AUTH) return replyError(id, -32_000, 'Authentication required: run `opencode auth login`');

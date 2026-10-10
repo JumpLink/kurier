@@ -2,7 +2,7 @@
  * Output, in two streams with two jobs.
  *
  * **stdout carries the answer, stderr carries everything about the answer.** An agent's message
- * goes to stdout so `kurier start "…"` pipes into something useful; progress, notices, tool
+ * goes to stdout so `lotse start "…"` pipes into something useful; progress, notices, tool
  * questions and the agent's own log lines go to stderr so they never contaminate it. A person
  * watching a turn sees both; a script sees one.
  */

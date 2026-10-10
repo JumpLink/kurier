@@ -1,5 +1,5 @@
 /**
- * `kurier agents` — the launchers, and whether their binary is there.
+ * `lotse agents` — the launchers, and whether their binary is there.
  *
  * A small command with one job: make "not installed" and "broken" different sentences. Both look
  * identical from the outside until you know whether the binary exists, and the fix for each is
@@ -59,8 +59,8 @@ export function agentsReport(
   lines.push('');
   lines.push(
     chosen
-      ? `kurier would use: ${chosen.id} (${SOURCE_LABEL[chosen.source]}, ${chosen.path}${chosen.version ? `, ${chosen.version}` : ''})`
-      : `kurier would use: none — no agent is available — ${NO_AGENT_REMEDY}`,
+      ? `lotse would use: ${chosen.id} (${SOURCE_LABEL[chosen.source]}, ${chosen.path}${chosen.version ? `, ${chosen.version}` : ''})`
+      : `lotse would use: none — no agent is available — ${NO_AGENT_REMEDY}`,
   );
   return lines;
 }

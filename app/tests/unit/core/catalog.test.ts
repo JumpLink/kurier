@@ -186,7 +186,7 @@ export default async () => {
         await it(`${file} unpacks ${agent.id} where bundledProgram looks, before kurier's own module`, async () => {
           const index = modules.findIndex((entry) => entry['name'] === agent.id);
           expect(index >= 0).toBe(true);
-          expect(index < modules.findIndex((entry) => entry['name'] === 'kurier')).toBe(true);
+          expect(index < modules.findIndex((entry) => entry['name'] === 'lotse')).toBe(true);
           const sources = modules[index]!['sources'] as Array<Record<string, any>>;
           const filenames = new Set(
             sources.filter((s) => s['type'] === 'extra-data').map((s) => s['filename'] as string),

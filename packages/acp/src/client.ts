@@ -280,7 +280,7 @@ export class AcpClient {
    * `session/list`, following `nextCursor` to the end.
    *
    * A real answer paginates — `opencode acp` returns an opaque base64 cursor and more sessions
-   * behind it. `kurier sessions` shows the agent's whole history, so it walks the pages; the
+   * behind it. `lotse sessions` shows the agent's whole history, so it walks the pages; the
    * `maxPages` bound is a stop for a peer that keeps handing back a cursor.
    */
   async listSessions(
@@ -546,7 +546,7 @@ export class AcpClient {
         this.#write(
           encodeFailure(request.id, {
             code: ERROR_CODES.METHOD_NOT_FOUND,
-            message: `kurier implements no method "${request.method}"`,
+            message: `lotse implements no method "${request.method}"`,
           }),
         );
     }
@@ -668,7 +668,7 @@ export class UnsupportedCapabilityError extends Error {
   }
 }
 
-/** True when the error is ACP's "log in first" — the one that `kurier auth` exists for. */
+/** True when the error is ACP's "log in first" — the one that `lotse auth` exists for. */
 export function isAuthRequired(error: unknown): boolean {
   return error instanceof RpcError && error.code === ERROR_CODES.AUTH_REQUIRED;
 }

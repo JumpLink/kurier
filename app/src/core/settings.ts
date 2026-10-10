@@ -108,7 +108,7 @@ export function parseSettings(raw: string): ParsedSettings {
 }
 
 /**
- * `<id>`, `<id>:host`, `<id>:bundled` — the spelling `kurier agents --use` takes. A bare id means the
+ * `<id>`, `<id>:host`, `<id>:bundled` — the spelling `lotse agents --use` takes. A bare id means the
  * person's own install. `none` clears the choice (the GUI calls that Automatic). `known` limits the ids a person may *write*; the
  * file itself may still name an id this build lacks, and that is reported at resolution, not here.
  */

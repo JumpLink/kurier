@@ -17,7 +17,7 @@ import {
 export default async () => {
   await describe('dev-agent — the stand-in is not a launcher', async () => {
     await it('is absent from the table, and the table is unchanged', async () => {
-      // The reason this file exists rather than one line in `launcher.ts`: `kurier agents` prints that
+      // The reason this file exists rather than one line in `launcher.ts`: `lotse agents` prints that
       // table as what a person has installed, and a dev fixture next to OpenCode with no marker that it
       // is a fixture is a lie in the one command that is about honesty.
       expect(launcherIds()).toStrictEqual(['opencode']);
