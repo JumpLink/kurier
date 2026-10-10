@@ -198,9 +198,14 @@ export class KurierChat extends Adw.Bin {
   #providerOnboarding: boolean;
   #connection: ConnectionFacts = { kind: 'unknown' };
   #onboardingDismissed = false;
+  /** True from construction until the probe answers, so the page waits instead of flashing "New chat". */
+  #probing = false;
   /** A dev hook's stand-in for the probe and for `hasLogin`; see `stageOnboarding`. */
   #onboardingStaged = false;
   #onboardingPage: OnboardingPage | null = null;
+  /** The probe in flight, and the way to end it early: `shutdown()` must not leave its server behind. */
+  #probe: Promise<void> | null = null;
+  readonly #probeAbort = new AbortController();
   /** The agent the widget starts, which is also the one a login is for. */
   readonly #loginAgent: AgentCommand;
   /**
@@ -330,7 +335,10 @@ export class KurierChat extends Adw.Bin {
     if (options.closedPage) this._closedHost.child = options.closedPage;
     if (options.noAgentPage) this._noAgentHost.child = options.noAgentPage;
     if (this.#providerOnboarding && !this.#unavailable) {
-      void probeConnections(options.agent).then((facts) => {
+      this.#probing = true;
+      this.#probe = probeConnections(options.agent, { signal: this.#probeAbort.signal }).then((facts) => {
+        this.#probing = false;
+        if (this.#probeAbort.signal.aborted) return;
         this.#connection = facts;
         this.#refreshOnboarding();
       });
@@ -512,7 +520,7 @@ export class KurierChat extends Adw.Bin {
     // what is on top of it. The same for a new chat, whose first line is drawn before its session
     // exists.
     const visible = this._stack.visibleChildName;
-    if (visible === 'empty' || visible === 'new' || visible === 'onboarding')
+    if (visible === 'empty' || visible === 'new' || visible === 'onboarding' || visible === 'checking')
       this._stack.visibleChildName = 'open';
   }
 
@@ -571,7 +579,8 @@ export class KurierChat extends Adw.Bin {
   // ─── provider onboarding ─────────────────────────────────────────────────────────────────────
 
   /** The page a new chat shows: the onboarding offer where `onboardingView` says so, else "New chat". */
-  #newPage(): 'new' | 'onboarding' {
+  #newPage(): 'new' | 'onboarding' | 'checking' {
+    if (this.#probing) return 'checking';
     const view = onboardingView({
       enabled: this.#providerOnboarding,
       noAgent: this.#unavailable !== undefined,
@@ -596,7 +605,8 @@ export class KurierChat extends Adw.Bin {
   /** Re-decide the page — only if the person is on one of the two it chooses between. */
   #refreshOnboarding(): void {
     const visible = this._stack.visibleChildName;
-    if (visible === 'new' || visible === 'onboarding') this._stack.visibleChildName = this.#newPage();
+    if (visible === 'new' || visible === 'onboarding' || visible === 'checking')
+      this._stack.visibleChildName = this.#newPage();
   }
 
   /**
@@ -605,6 +615,7 @@ export class KurierChat extends Adw.Bin {
    */
   stageOnboarding(): void {
     this.#onboardingStaged = true;
+    this.#probing = false;
     this.#providerOnboarding = true;
     this.#connection = { kind: 'none', browser: 10, key: 228 };
     this.#refreshOnboarding();
@@ -778,6 +789,8 @@ export class KurierChat extends Adw.Bin {
    * `StdioChannel.terminate` are both idempotent, so a second call costs nothing.
    */
   async shutdown(): Promise<void> {
+    this.#probeAbort.abort();
+    await this.#probe;
     await this.#agent.shutdown();
     this.#agentClose?.();
   }

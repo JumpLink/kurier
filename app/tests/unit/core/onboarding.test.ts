@@ -152,5 +152,32 @@ export default async () => {
       expect(facts.kind).toBe('unknown');
       expect(closed.length).toBe(1);
     });
+
+    await it('gives up on a catalog that never answers, and still closes the server', async () => {
+      const closed: string[] = [];
+      const facts = await probeConnections(AGENT, {
+        reason: () => null,
+        timeoutMs: 20,
+        open: async () => fakeSession(() => new Promise<LoginProvider[]>(() => undefined), closed),
+      });
+      expect(facts.kind).toBe('unknown');
+      expect(closed.length).toBe(1);
+    });
+
+    await it('closes a server that started after the probe was aborted', async () => {
+      const closed: string[] = [];
+      const abort = new AbortController();
+      const pending = probeConnections(AGENT, {
+        reason: () => null,
+        signal: abort.signal,
+        open: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return fakeSession(async () => [provider('a', ['key'])], closed);
+        },
+      });
+      abort.abort();
+      expect((await pending).kind).toBe('unknown');
+      expect(closed.length).toBe(1);
+    });
   });
 };
