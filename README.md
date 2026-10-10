@@ -104,7 +104,7 @@ adapter for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
 ## Releasing
 
 `git tag vX.Y.Z && git push --tags` runs the whole of CI — tests, type check, lint — and, if it
-passes, builds and attaches every installable format to the tag's GitHub release: `.deb`, `.rpm`,
+passes, builds and attaches every installable format to the tag's GitHub release (packaging runs only on a tag or a manual dispatch, never on a push or PR): `.deb`, `.rpm`,
 `.AppImage`, a Flatpak (`eu.jumplink.Kurier.flatpak`, from the manifest in
 [data/README.md](data/README.md)), a macOS `.app.zip` (arm64 + x64), and a Windows program
 directory `.zip` and `.msi` (x64). All of it packages the GUI (`kurier-app`), the one binary with
@@ -113,8 +113,8 @@ Flatpak but ships no format of its own.
 
 Everything is unsigned, which is a legitimate deliverable rather than a placeholder (gjsify ADR
 0024 § A13) — see the comment above the macOS/Windows packaging steps in
-[ci.yml](.github/workflows/ci.yml) for where `--sign`/`--notarize` would attach once a signing
-identity exists. `workflow_dispatch` on [release.yml](.github/workflows/release.yml) re-cuts
+[release.yml](.github/workflows/release.yml) for where `--sign`/`--notarize` would attach once a signing
+identity exists. `workflow_dispatch` on that workflow re-cuts
 assets for an existing tag without moving it.
 
 ## Development
