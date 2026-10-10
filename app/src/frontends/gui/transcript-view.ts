@@ -535,7 +535,7 @@ function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
     case 'thought':
       // Proportional and dim: the body of a thought is commentary on the answer, and a command is
       // not prose. See `.kurier-thought` and the `monospace` name class.
-      return buildDisclosure('dialog-information-symbolic', item, CSS.thought);
+      return buildThoughtCard(buildDisclosure('dialog-information-symbolic', item, CSS.thought));
     case 'tool': {
       // A payload is what the disclosure opens onto, so a line without one is not a disclosure.
       if (item.detail !== null) return buildDisclosure(TOOL_FALLBACK_ICON, item, CSS.mono);
@@ -649,6 +649,16 @@ function buildNote(text: string): Gtk.Widget {
  * the same head is returned as a plain row and no chevron is drawn at all — a disclosure that opens
  * onto nothing is a control that points at nothing, and this file's own header forbids those.
  */
+/** A thought in the tool cards' frame, one step quieter (`.kurier-thought-card`); still the same disclosure. */
+function buildThoughtCard(disclosure: Gtk.Widget): Gtk.Widget {
+  const card = new Gtk.Box({
+    orientation: Gtk.Orientation.VERTICAL,
+    cssClasses: ['card', CSS.toolCard, CSS.thoughtCard],
+  });
+  card.append(disclosure);
+  return card;
+}
+
 function buildDisclosure(iconName: string, item: DisclosureItem, bodyClass: string): Gtk.Widget {
   // The expander draws its own chevron, so the icon here is the *kind* — a tool call, a thought —
   // not the open/closed state. Verified to exist with `Gtk.IconTheme.has_icon`; a name the theme

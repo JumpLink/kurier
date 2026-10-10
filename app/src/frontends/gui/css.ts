@@ -222,6 +222,13 @@ export const APP_CSS = `
 .kurier-tool-card {
   padding: 6px 10px;
 }
+
+/* A thought in the same frame as a tool card, quieter: no shadow and a fainter fill, so the answer and the
+   tool calls stay the louder things in the column. The body's own dimming is \`.kurier-thought\`. */
+.kurier-thought-card {
+  box-shadow: none;
+  background-color: alpha(@window_fg_color, 0.03);
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
@@ -246,6 +253,7 @@ export const CSS = {
   openRow: 'kurier-open-row',
   pill: 'kurier-pill',
   toolCard: 'kurier-tool-card',
+  thoughtCard: 'kurier-thought-card',
   dim: DIM,
   title: TITLE,
   mono: MONO,
