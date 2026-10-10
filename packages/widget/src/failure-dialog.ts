@@ -162,7 +162,7 @@ export class FailureDialog {
    * **One response, so pressing Close and being closed are the same call.** `scripts/probes/
    * alert-dialog-close.mjs` (case 1) measures that an external `close()` emits `closed` and then
    * `response("close")` — the same pair, with the same argument, that the response button produces.
-   * There is nothing else this dialog can be dismissed *with*, so `KU_APP_DISMISS_FAILURE` calls this
+   * There is nothing else this dialog can be dismissed *with*, so `LOTSE_APP_DISMISS_FAILURE` calls this
    * and the screenshot is of a dismissed dialog rather than of a dialog that vanished.
    *
    * **The reverse is not true, and it is worth knowing why.** `Adw.AlertDialog` has no callable

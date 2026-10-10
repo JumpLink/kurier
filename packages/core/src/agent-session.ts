@@ -202,7 +202,7 @@ export interface AgentSessionOptions {
   /**
    * The agent a stored session names, on the copy that held it (`resolveRecorded`). Asked on the first
    * prompt of such a session, never on selecting it. Absent means every session uses `command` — which
-   * is also how a pinned dev agent (`KU_APP_AGENT`) wins over a fixture record naming another agent.
+   * is also how a pinned dev agent (`LOTSE_APP_AGENT`) wins over a fixture record naming another agent.
    */
   readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
   /** ISO clock, injected so a test can pin the transcript's timestamps. */
@@ -395,7 +395,7 @@ export class AgentSession {
   }
 
   /**
-   * True once the gate has been asked anything this window — a real request, or `KU_APP_PERMISSION`'s
+   * True once the gate has been asked anything this window — a real request, or `LOTSE_APP_PERMISSION`'s
    * staged one.
    *
    * **A surface needs this and nothing else can give it to the surface.** Whether a question is on
@@ -1028,7 +1028,7 @@ export class AgentSession {
   }
 
   /**
-   * Ask the gate a fixture question and answer it, for `KU_APP_PERMISSION`.
+   * Ask the gate a fixture question and answer it, for `LOTSE_APP_PERMISSION`.
    *
    * **It goes through `#ask` and `answerFor`, not around them** — same desk, same projection, same
    * decision logic — so a screenshot of the staged dialog is a screenshot of the gate's behaviour. It
@@ -1289,20 +1289,20 @@ export class AgentSession {
   }
 
   /**
-   * `KU_APP_CONFIG`: set one option the way a person picking it would, once the agent is bound.
+   * `LOTSE_APP_CONFIG`: set one option the way a person picking it would, once the agent is bound.
    *
    * **Through `setConfigOption`, not around it.** The hook exists because the devtools plane cannot
    * operate a dropdown (see `hooks.ts`), so the screenshot has to be of the real path or it proves
    * nothing — same argument as `stagePermissionRequest` and the same gate it goes through.
    *
    * **It sends the prompt first if no turn has run, because there is no agent before one.** The
-   * process starts on the first prompt (plan §6), so `KU_APP_CONFIG` alone would have no agent to ask.
-   * `KU_APP_PROMPT` supplies the prompt, so the hook adds no text of its own.
+   * process starts on the first prompt (plan §6), so `LOTSE_APP_CONFIG` alone would have no agent to ask.
+   * `LOTSE_APP_PROMPT` supplies the prompt, so the hook adds no text of its own.
    */
   async stageConfigOption(controlId: string, value: string, prompt?: string): Promise<void> {
     if (this.#agentSession === null) {
       if (!this.#session && !this.#pending) {
-        this.#events.onNotice?.('KU_APP_CONFIG: no session is open, so there is no option to set');
+        this.#events.onNotice?.('LOTSE_APP_CONFIG: no session is open, so there is no option to set');
         return;
       }
       await this.prompt(prompt ?? 'Answer with one short sentence.');

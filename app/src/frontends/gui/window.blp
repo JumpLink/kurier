@@ -56,7 +56,7 @@ template $LotseMainWindow: Adw.ApplicationWindow {
           };
 
           // **New chat lives in the sidebar's bar, where the list it adds to is.** `win.new-chat` is the
-          // one entry point: this button, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate the action that
+          // one entry point: this button, `<Ctrl>n` and `LOTSE_APP_NEW_CHAT` all activate the action that
           // `MainWindow` installs, so a screenshot of the hook is a screenshot of the button's own path.
           [start]
           Gtk.Button {

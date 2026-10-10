@@ -19,7 +19,7 @@
  * **What is here, in one line:** `configRowInput` (what to draw), `configSelection` (which value a
  * dropdown row means), `configRequest` (what goes on the wire), `configAfterSet` (what the answer did
  * to the row), `isConfigChange` (whether this is a change at all) and `parseConfigOptionSpec` (the one
- * format `KU_APP_CONFIG` is read in).
+ * format `LOTSE_APP_CONFIG` is read in).
  *
  * **The agent's `currentValue` is the only truth.** Every view here is built from the last list the
  * agent reported — from `session/new`, from `session/load`/`session/resume`, from a
@@ -324,7 +324,7 @@ export function applyConfigUpdate(
 const MODE_CONTROL_ID = 'mode';
 
 /**
- * `KU_APP_CONFIG`'s one format: `configId=valueId`.
+ * `LOTSE_APP_CONFIG`'s one format: `configId=valueId`.
  *
  * **Both halves are required, and neither is guessed.** A control id alone says which option to set
  * and not to what, and a value id alone cannot be resolved — a hook that picked the other half would

@@ -1,7 +1,7 @@
 /**
  * From "which agent" to the `AgentCommand` that starts it — pure over detections.
  *
- * Three questions, kept apart: an **explicit** id (`--agent`, `KU_APP_AGENT`) wins and is the launcher as
+ * Three questions, kept apart: an **explicit** id (`--agent`, `LOTSE_APP_AGENT`) wins and is the launcher as
  * written; **no choice** goes through `resolveAgent` (the setting, else host install, else the bundled copy); a **recorded**
  * agent (resume, cancel) is the session's own id, never a re-resolution to some other agent.
  *

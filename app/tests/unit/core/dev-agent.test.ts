@@ -32,11 +32,11 @@ export default async () => {
     });
 
     await it('takes an override, for a checkout that is not this one', async () => {
-      expect(standInScriptPath({ KU_STANDIN_AGENT: '/tmp/agent.mjs' })).toBe('/tmp/agent.mjs');
+      expect(standInScriptPath({ LOTSE_STANDIN_AGENT: '/tmp/agent.mjs' })).toBe('/tmp/agent.mjs');
     });
 
     await it('ignores a blank override rather than spawning nothing', async () => {
-      expect(standInScriptPath({ KU_STANDIN_AGENT: '  ' }).endsWith('stand-in-agent.mjs')).toBe(true);
+      expect(standInScriptPath({ LOTSE_STANDIN_AGENT: '  ' }).endsWith('stand-in-agent.mjs')).toBe(true);
     });
 
     await it('builds a command that is a program and nothing else', async () => {

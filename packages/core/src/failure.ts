@@ -59,7 +59,7 @@
  * one, and neither is told something false.
  *
  * **A refusal is not written to the transcript.** The transcript is a record of what happened, and no
- * turn ran: an entry here would be a fabricated event, the same rule that keeps `KU_APP_PERMISSION`'s
+ * turn ran: an entry here would be a fabricated event, the same rule that keeps `LOTSE_APP_PERMISSION`'s
  * staged request out of the history (`AgentSession.stagePermissionRequest`). Both refusals are
  * therefore *shown* — a dialog, and the caption under the entry — and neither is recorded.
  */

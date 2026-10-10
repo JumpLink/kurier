@@ -675,7 +675,7 @@ export class LotseChat extends Adw.Bin {
   /**
    * Send a prompt as the composer would, draft cleared first.
    *
-   * For a host control that is not the entry — kurier's `KU_APP_THINKING`, a `lotse serve` task.
+   * For a host control that is not the entry — kurier's `LOTSE_APP_THINKING`, a `lotse serve` task.
    * The guard `#onSend` applies is the *entry's* (an empty line is not a prompt); a caller that has
    * a sentence in hand has already passed it.
    */

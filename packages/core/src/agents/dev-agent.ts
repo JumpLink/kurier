@@ -9,15 +9,15 @@
  * with no marker that it is a fixture. A test also pins that table's ids to exactly `['opencode']`.
  *
  * So it is reachable the only other way this surface reaches anything a pointer cannot:
- * **`KU_APP_AGENT=stand-in`**, read once at startup (`gui/hooks.ts`). That is the same mechanism
- * `KU_APP_SESSION` uses to open a session without a click, and it means the stand-in costs nothing in
+ * **`LOTSE_APP_AGENT=stand-in`**, read once at startup (`gui/hooks.ts`). That is the same mechanism
+ * `LOTSE_APP_SESSION` uses to open a session without a click, and it means the stand-in costs nothing in
  * the shipped surface: no launcher, no menu entry, no way to pick it by accident.
  *
  * The command line for a person is in `AGENTS.md`, because a fixture that cannot be run by hand is a
  * fixture nobody runs:
  *
  * ```sh
- * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
+ * KURIER_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
  *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  * ```
  *
@@ -35,7 +35,7 @@ import { DEFAULT_AGENT, findLauncher, launcherIds, requireLauncher } from './lau
 import { describeResolved, type ResolvedAgent, type ResolvedSource } from './resolve.ts';
 import type { AgentCommand } from './stdio.ts';
 
-/** The name `KU_APP_AGENT` takes for the fixture. */
+/** The name `LOTSE_APP_AGENT` takes for the fixture. */
 export const STAND_IN_AGENT_ID = 'stand-in';
 
 /** Where the fixture lives, relative to the repository root. */
@@ -44,7 +44,7 @@ export const STAND_IN_SCRIPT = 'scripts/stand-in-agent.mjs';
 /**
  * Where the fixture's source is, as an absolute path.
  *
- * **`KU_STANDIN_AGENT` overrides the guess.** The fallback derives the repository root from this
+ * **`LOTSE_STANDIN_AGENT` overrides the guess.** The fallback derives the repository root from this
  * module's own location — the bundle lives in `app/dist/`, so the script is two levels up — which is
  * right for a checkout and meaningless for an installed app. That is fine: an installed app has no
  * fixture, and the override is how somebody points at a copy outside the repository (a second checkout,
@@ -52,7 +52,7 @@ export const STAND_IN_SCRIPT = 'scripts/stand-in-agent.mjs';
  * wrong guess surfaces as a sentence on screen, not a crash.
  */
 export function standInScriptPath(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env['KU_STANDIN_AGENT']?.trim();
+  const override = env['LOTSE_STANDIN_AGENT']?.trim();
   if (override) return override;
   return join(dirname(fileURLToPath(import.meta.url)), '..', '..', STAND_IN_SCRIPT);
 }
@@ -108,6 +108,6 @@ export function chooseAgent(
   return {
     command: requireLauncher(DEFAULT_AGENT),
     source: 'host',
-    note: `KU_APP_AGENT=${wanted} is not an agent launcher — using ${DEFAULT_AGENT}. Try one of: ${launcherIds().join(', ')}`,
+    note: `LOTSE_APP_AGENT=${wanted} is not an agent launcher — using ${DEFAULT_AGENT}. Try one of: ${launcherIds().join(', ')}`,
   };
 }

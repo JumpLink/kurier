@@ -27,29 +27,29 @@
  *
  * | Variable                   | Default | What it does                                                         |
  * | -------------------------- | ------- | -------------------------------------------------------------------- |
- * | `KU_STANDIN_DELAY_MS`      | `350`   | Pause between streamed notifications. `0` makes a turn instant.       |
- * | `KU_STANDIN_CHUNKS`        | `4`     | How many of the answer's 4 sentences to stream. More is not more.     |
- * | `KU_STANDIN_ECHO`          | `1`     | Echo the prompt as `user_message_chunk`, as every real agent does.     |
- * | `KU_STANDIN_HANG`          | unset   | **Never** end the turn on its own — Stop has something to stop.       |
- * | `KU_STANDIN_EXIT_MID_TURN` | unset   | **Exit the process** partway through, answering nothing.               |
- * | `KU_STANDIN_PERMISSION`    | unset   | **Ask** `session/request_permission` mid-turn, and wait for the answer. |
- * | `KU_STANDIN_CONFIG`        | unset   | Report a model / effort / mode row and answer `session/set_config_option`. |
- * | `KU_STANDIN_CONFIG_MODELS` | `3`     | How many models the list holds. `400` is the real size, and needs search.  |
- * | `KU_STANDIN_CONFIG_REFUSE`  | unset   | Refuse every configuration change — the fail-closed state.                  |
- * | `KU_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
- * | `KU_STANDIN_USAGE`          | unset   | Push a `usage_update` after the answer, cost and all.                     |
- * | `KU_STANDIN_AUTH`           | unset   | Refuse `session/load` with `-32000` — trap 1, the auth dialog.        |
- * | `KU_STANDIN_PROMPT_AUTH`    | unset   | Refuse `session/prompt` with the same `-32000` — issue #2, the model dialog. |
- * | `KU_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
+ * | `LOTSE_STANDIN_DELAY_MS`      | `350`   | Pause between streamed notifications. `0` makes a turn instant.       |
+ * | `LOTSE_STANDIN_CHUNKS`        | `4`     | How many of the answer's 4 sentences to stream. More is not more.     |
+ * | `LOTSE_STANDIN_ECHO`          | `1`     | Echo the prompt as `user_message_chunk`, as every real agent does.     |
+ * | `LOTSE_STANDIN_HANG`          | unset   | **Never** end the turn on its own — Stop has something to stop.       |
+ * | `LOTSE_STANDIN_EXIT_MID_TURN` | unset   | **Exit the process** partway through, answering nothing.               |
+ * | `LOTSE_STANDIN_PERMISSION`    | unset   | **Ask** `session/request_permission` mid-turn, and wait for the answer. |
+ * | `LOTSE_STANDIN_CONFIG`        | unset   | Report a model / effort / mode row and answer `session/set_config_option`. |
+ * | `LOTSE_STANDIN_CONFIG_MODELS` | `3`     | How many models the list holds. `400` is the real size, and needs search.  |
+ * | `LOTSE_STANDIN_CONFIG_REFUSE`  | unset   | Refuse every configuration change — the fail-closed state.                  |
+ * | `LOTSE_STANDIN_CONFIG_PUSH`    | `1`     | Push `config_option_update` after a *model* change, as `opencode` does.    |
+ * | `LOTSE_STANDIN_USAGE`          | unset   | Push a `usage_update` after the answer, cost and all.                     |
+ * | `LOTSE_STANDIN_AUTH`           | unset   | Refuse `session/load` with `-32000` — trap 1, the auth dialog.        |
+ * | `LOTSE_STANDIN_PROMPT_AUTH`    | unset   | Refuse `session/prompt` with the same `-32000` — issue #2, the model dialog. |
+ * | `LOTSE_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
  *
  * ```sh
- * KURIER_SESSIONS_FILE=<file> KU_APP_SESSION=<id> KU_APP_AGENT=stand-in \
+ * KURIER_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
  *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  *
  * # the configuration row, and the three states only this fixture can produce
- * KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_MODELS=400 KU_APP_CONFIG=model=openrouter/vendor/model-012
- * KU_STANDIN_CONFIG=1 KU_APP_CONFIG=effort=high        # the push arm: no update, the answer carries it
- * KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 KU_APP_CONFIG=mode=plan   # the refusal
+ * LOTSE_STANDIN_CONFIG=1 LOTSE_STANDIN_CONFIG_MODELS=400 LOTSE_APP_CONFIG=model=openrouter/vendor/model-012
+ * LOTSE_STANDIN_CONFIG=1 LOTSE_APP_CONFIG=effort=high        # the push arm: no update, the answer carries it
+ * LOTSE_STANDIN_CONFIG=1 LOTSE_STANDIN_CONFIG_REFUSE=1 LOTSE_APP_CONFIG=mode=plan   # the refusal
  * ```
  *
  * Exit code 0 on a normal shutdown, 3 for the deliberate mid-turn exit, so a test can tell them apart.
@@ -57,7 +57,7 @@
 
 import { createInterface } from 'node:readline';
 
-const DELAY_MS = number('KU_STANDIN_DELAY_MS', 350);
+const DELAY_MS = number('LOTSE_STANDIN_DELAY_MS', 350);
 /**
  * How many of the answer's four sentences to stream. Default 4, i.e. all of them.
  *
@@ -67,24 +67,24 @@ const DELAY_MS = number('KU_STANDIN_DELAY_MS', 350);
  * The knob is for a *shorter* reply: a turn that is still arriving, where the newest bubble is below
  * the fold. It was 5 against a list of four, which read as a knob that grew and could not.
  */
-const CHUNKS = number('KU_STANDIN_CHUNKS', 4);
-const HANG = flag('KU_STANDIN_HANG');
-const EXIT_MID_TURN = flag('KU_STANDIN_EXIT_MID_TURN');
-const PERMISSION = flag('KU_STANDIN_PERMISSION');
-const ECHO = flag('KU_STANDIN_ECHO', true);
-const CONFIG = flag('KU_STANDIN_CONFIG');
-const CONFIG_MODELS = number('KU_STANDIN_CONFIG_MODELS', 3);
-const CONFIG_REFUSE = flag('KU_STANDIN_CONFIG_REFUSE');
-const CONFIG_PUSH = flag('KU_STANDIN_CONFIG_PUSH', true);
-const USAGE = flag('KU_STANDIN_USAGE');
-const AUTH = flag('KU_STANDIN_AUTH');
-const PROMPT_AUTH = flag('KU_STANDIN_PROMPT_AUTH');
-const NO_RESUME = flag('KU_STANDIN_NO_RESUME');
+const CHUNKS = number('LOTSE_STANDIN_CHUNKS', 4);
+const HANG = flag('LOTSE_STANDIN_HANG');
+const EXIT_MID_TURN = flag('LOTSE_STANDIN_EXIT_MID_TURN');
+const PERMISSION = flag('LOTSE_STANDIN_PERMISSION');
+const ECHO = flag('LOTSE_STANDIN_ECHO', true);
+const CONFIG = flag('LOTSE_STANDIN_CONFIG');
+const CONFIG_MODELS = number('LOTSE_STANDIN_CONFIG_MODELS', 3);
+const CONFIG_REFUSE = flag('LOTSE_STANDIN_CONFIG_REFUSE');
+const CONFIG_PUSH = flag('LOTSE_STANDIN_CONFIG_PUSH', true);
+const USAGE = flag('LOTSE_STANDIN_USAGE');
+const AUTH = flag('LOTSE_STANDIN_AUTH');
+const PROMPT_AUTH = flag('LOTSE_STANDIN_PROMPT_AUTH');
+const NO_RESUME = flag('LOTSE_STANDIN_NO_RESUME');
 
 /**
  * The configuration this script offers, built once here and then rewritten by every set.
  *
- * **`null` when `KU_STANDIN_CONFIG` is unset, and that is a state worth having.** An agent with no
+ * **`null` when `LOTSE_STANDIN_CONFIG` is unset, and that is a state worth having.** An agent with no
  * configuration answers `session/new` with `configOptions: null` rather than an empty list, and the row
  * has to draw nothing for both. Assigned at the top rather than in a handler: `let` has a temporal dead
  * zone, and building it further down meant the first `session/new` could land before it existed.
@@ -176,7 +176,7 @@ let nextRequestId = 1_000_000;
  * styling and focus rules that go with it — pass against a stand-in that never sent one.
  *
  * Resolves with whatever came back, `null` for an error answer — **including a `cancelled` outcome,
- * which is a real answer and not a failure here.** That is the point: `KU_STANDIN_PERMISSION=1` plus
+ * which is a real answer and not a failure here.** That is the point: `LOTSE_STANDIN_PERMISSION=1` plus
  * an Escape on the dialog must end the turn cleanly, and a fixture that treated `cancelled` as an
  * error would hide exactly the behaviour this exists to look at.
  */
@@ -211,17 +211,17 @@ function askPermission(sessionId) {
 /**
  * The options this permission request carries, on the wire in the order a real agent would send them.
  *
- * **The knob is for the *order* and for the *set*, not for whether "always" exists.** `KU_STANDIN_PERMISSION_ONCE=1`
+ * **The knob is for the *order* and for the *set*, not for whether "always" exists.** `LOTSE_STANDIN_PERMISSION_ONCE=1`
  * sends only the two `*_once` kinds — which is what an agent that offers no lasting grant looks like,
- * and the one shape kurier's dialog has no `reject` to fall back on in a two-allow list. `KU_STANDIN_PERMISSION_ALWAYS_FIRST=1`
+ * and the one shape kurier's dialog has no `reject` to fall back on in a two-allow list. `LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST=1`
  * lists the two `*_always` options *first*, the order that used to decide where libadwaita put the
  * focus, so a screenshot can show kurier's order winning rather than the agent's.
  *
  * Default all four, in the order a real agent sends them (`opencode acp` included), so the plain
- * `KU_STANDIN_PERMISSION=1` photographs the dialog kurier actually shows. `reject_always` never goes
+ * `LOTSE_STANDIN_PERMISSION=1` photographs the dialog kurier actually shows. `reject_always` never goes
  * missing from the default: without a rejecting option the dialog has nothing safe to focus, and that
- * is a state worth being able to reach — which is what `KU_STANDIN_PERMISSION_ONCE=1` plus
- * `KU_STANDIN_PERMISSION_NO_REJECT=1` is for.
+ * is a state worth being able to reach — which is what `LOTSE_STANDIN_PERMISSION_ONCE=1` plus
+ * `LOTSE_STANDIN_PERMISSION_NO_REJECT=1` is for.
  */
 function permissionOptions() {
   const allowOnce = { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' };
@@ -236,11 +236,11 @@ function permissionOptions() {
     name: 'Always decline in this session',
     kind: 'reject_always',
   };
-  if (flag('KU_STANDIN_PERMISSION_ONCE')) return [allowOnce, rejectOnce];
-  if (flag('KU_STANDIN_PERMISSION_ALWAYS_FIRST')) {
+  if (flag('LOTSE_STANDIN_PERMISSION_ONCE')) return [allowOnce, rejectOnce];
+  if (flag('LOTSE_STANDIN_PERMISSION_ALWAYS_FIRST')) {
     return [allowAlways, rejectAlways, allowOnce, rejectOnce];
   }
-  if (flag('KU_STANDIN_PERMISSION_NO_REJECT')) return [allowOnce, allowAlways];
+  if (flag('LOTSE_STANDIN_PERMISSION_NO_REJECT')) return [allowOnce, allowAlways];
   return [allowOnce, allowAlways, rejectOnce, rejectAlways];
 }
 
@@ -332,7 +332,7 @@ async function runTurn(id, sessionId, prompt) {
       // against `opencode acp` 2.0.19 with no login: the anonymous default model
       // `opencode/fledge-alpha-free` is geo-blocked from Germany (HTTP 403), and opencode reports any
       // provider 403 on `session/prompt` as `-32000 "Authentication required: provider authentication
-      // required"` — the same class and the same code as the login trap this script's `KU_STANDIN_AUTH`
+      // required"` — the same class and the same code as the login trap this script's `LOTSE_STANDIN_AUTH`
       // produces at `session/load`. Nothing on the wire distinguishes them except that one has a prompt
       // behind it, which is what `failureKind`'s `promptSent` reads.
       //
@@ -431,7 +431,7 @@ function updateFor(step) {
  * The three options this script offers: a model, a thought level, a mode.
  *
  * **The measured three, because a fixture that offered one option would leave the row's hard cases
- * untested.** `KU_STANDIN_CONFIG_MODELS` sets how many models the list holds: 3 keeps a screenshot
+ * untested.** `LOTSE_STANDIN_CONFIG_MODELS` sets how many models the list holds: 3 keeps a screenshot
  * readable, and 400 is the size `opencode acp` 2.0.19 actually reports and the one the dropdown's
  * search field exists for.
  */
@@ -511,7 +511,7 @@ function modeId() {
  *
  * **Three refusals, all of them real behaviours an agent has:**
  *
- * - `KU_STANDIN_CONFIG_REFUSE=1` answers an error for every set, which is the state that is otherwise
+ * - `LOTSE_STANDIN_CONFIG_REFUSE=1` answers an error for every set, which is the state that is otherwise
  *   unreachable against a real agent and the one the "a refusal does not move the row" rule is about;
  * - an unknown `configId` or a value outside the option's list is an error, as `opencode` 2.0.19 does;
  * - a non-string value is refused, because `opencode` implements no boolean options — which is why
@@ -540,7 +540,7 @@ function setConfigOption(sessionId, params, id) {
   ];
   reply(id, { configOptions });
   // The push is the same split the real agent makes: opencode announces a *model* change with a
-  // `config_option_update` and answers the rest with the list. `KU_STANDIN_CONFIG_PUSH=0` turns it off,
+  // `config_option_update` and answers the rest with the list. `LOTSE_STANDIN_CONFIG_PUSH=0` turns it off,
   // so a surface that only listened for the answer and one that only listened for the notification can
   // both be exercised — the row must work either way, because which one an agent sends is not ours to
   // choose.

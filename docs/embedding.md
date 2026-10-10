@@ -204,5 +204,5 @@ For a host that handles client or personal data, the rule is yours to enforce:
 - [`@lotse/widget`](../packages/widget/README.md): every option and member.
 - [`@lotse/core`](../packages/core/README.md): agent resolution, session, login, view models.
 - [login.md](login.md): how the in-app login works, and what was measured.
-- [dev-fixtures.md](dev-fixtures.md): stand-in agent and the `KU_APP_*` hooks, for screenshots and tests.
+- [dev-fixtures.md](dev-fixtures.md): stand-in agent and the `LOTSE_APP_*` hooks, for screenshots and tests.
 - [design/README.md](design/README.md): what each state looks like.

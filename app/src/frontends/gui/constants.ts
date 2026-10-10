@@ -28,10 +28,10 @@ export const APP_VERSION = '0.1.1';
 /**
  * The env prefix for the dev hooks, without a trailing underscore.
  *
- * `KU_` rather than `KURIER_` on purpose: these are read by hand while developing, and the short
- * form is what fits in a `gjsify run … KU_APP_SESSION=…` line without wrapping.
+ * `LOTSE_APP_` rather than `LOTSE_` on purpose: a hook is read by hand while developing and never
+ * by someone running the app, so it stays apart from the knobs a person may set.
  */
-export const DEV_HOOK_PREFIX = 'KU_APP';
+export const DEV_HOOK_PREFIX = 'LOTSE_APP';
 
 /**
  * The window's *default* size, in logical pixels — a default, not a floor.

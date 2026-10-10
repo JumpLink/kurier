@@ -815,7 +815,7 @@ export default async () => {
       expect(line?.text).toContain('agent-gone');
     });
 
-    await it('the staged request for KU_APP_PERMISSION goes through the same gate', async () => {
+    await it('the staged request for LOTSE_APP_PERMISSION goes through the same gate', async () => {
       // Not a dialog built for a screenshot: the real ask, with all four option kinds on the wire, so
       // what a screenshot shows is the gate's behaviour rather than a fixture's convenience. All four
       // reach the surface, in `orderOptions`' order — the `*_always` kinds are relayed, not filtered.
@@ -1597,7 +1597,7 @@ export default async () => {
     });
 
     await it('stageConfigOption sends the prompt that starts the agent, then sets through the real path', async () => {
-      // `KU_APP_CONFIG` goes through this, because the process starts on the first prompt (plan §6) and
+      // `LOTSE_APP_CONFIG` goes through this, because the process starts on the first prompt (plan §6) and
       // an option cannot be set on an agent that does not exist yet.
       const h = harness();
       await h.session.stageConfigOption('mode', 'plan', 'hi');

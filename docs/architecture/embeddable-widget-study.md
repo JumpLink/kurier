@@ -68,8 +68,8 @@ split of `window.ts` came out with five deltas worth recording.
   `hook-value.ts` and every GLib timer are app-only, and they reach the chat through
   `stagePermissionRequest()`, `stageConfigOption()`, `openModelDropdown()`, `dismissPermission()`,
   `closeFailure()` and friends — the same calls a pointer makes, which is the rule
-  `AGENTS.md#the-states-only-a-hook-can-reach` already set. `KU_APP_PERMISSION`'s polling loop and
-  its `KU_APP_*` log lines did not move.
+  `AGENTS.md#the-states-only-a-hook-can-reach` already set. `LOTSE_APP_PERMISSION`'s polling loop and
+  its `LOTSE_APP_*` log lines did not move.
 - **`win.login` stayed an app action.** It is a menu entry, and a menu is the host's; the widget
   exposes `hasLogin` and `openLogin()` and holds the dialog.
 - **Two deliberate reach-ins beside the barrel, both for measurements**: `@lotse/widget/tool-line`

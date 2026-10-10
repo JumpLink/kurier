@@ -381,7 +381,7 @@ export default async () => {
     });
   });
 
-  await describe('parseConfigOptionSpec — KU_APP_CONFIG’s one format', async () => {
+  await describe('parseConfigOptionSpec — LOTSE_APP_CONFIG’s one format', async () => {
     await it('reads configId=valueId', async () => {
       expect(parseConfigOptionSpec('mode=plan')).toStrictEqual({ controlId: 'mode', value: 'plan' });
       expect(parseConfigOptionSpec('model=openrouter/openai/gpt-6.1-sol')).toStrictEqual({

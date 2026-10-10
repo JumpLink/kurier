@@ -1,7 +1,7 @@
 # Logging in to a provider from kurier
 
 Status: **the core, `lotse login` and the window's dialog exist.** The window offers **Log in…** on the
-auth dialog (`KU_APP_LOGIN=1` opens it for a screenshot) and restarts the agent after a login. Measured on
+auth dialog (`LOTSE_APP_LOGIN=1` opens it for a screenshot) and restarts the agent after a login. Measured on
 opencode 2.0.22, 2026-10-04.
 
 ## Why this is not the old "no in-window login"

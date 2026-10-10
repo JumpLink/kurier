@@ -73,7 +73,7 @@ const settingsNotes: string[] = [];
  * Which agent this window will start on its first prompt.
  *
  * **Resolved once, here, and handed to the window as an `AgentCommand`.** The alternative — the window
- * reading `KU_APP_AGENT` itself — would put an environment lookup and a fallback rule in a widget file,
+ * reading `LOTSE_APP_AGENT` itself — would put an environment lookup and a fallback rule in a widget file,
  * and `hooks.ts` exists precisely so that every environment read happens once at startup and can be
  * reasoned about as a whole. An unknown id prints its line here, where a person watching the terminal
  * will see it, and falls back rather than refusing to start. With no hook the agent is resolved as the CLI
@@ -94,13 +94,13 @@ const agent = chooseAgent(hooks.agent, () => {
   }
   return found;
 });
-// `KU_APP_NO_AGENT` beats `KU_APP_AGENT`: it forces the nothing-found resolution for the empty state.
+// `LOTSE_APP_NO_AGENT` beats `LOTSE_APP_AGENT`: it forces the nothing-found resolution for the empty state.
 const noAgent = hooks.noAgent === true || nothingFound;
 const emptyView = noAgent ? emptyStateView({ agent: null }) : null;
 
 /**
  * The bundled-agent notice, read once: nothing seen yet (or a file that could not be read, which shows it
- * again) and the copy that runs. `KU_APP_NOTICE` forces the bundled condition — the copy does not exist
+ * again) and the copy that runs. `LOTSE_APP_NOTICE` forces the bundled condition — the copy does not exist
  * outside a Flatpak.
  */
 const noticesPath = paths.noticesFile;
@@ -115,7 +115,7 @@ if (agent.note) console.log(`kurier: ${agent.note}`);
 const sandboxed = isSandboxed(currentSandboxFacts());
 
 /**
- * Where a new chat runs. `KU_APP_CWD` is the dev hook that pins it (a screenshot must not show a real
+ * Where a new chat runs. `LOTSE_APP_CWD` is the dev hook that pins it (a screenshot must not show a real
  * directory name), `KURIER_CWD` is the same override for a person; `resolveCwd` decides the rest.
  */
 const facts = gatherCwdFacts(process.env);
@@ -159,7 +159,7 @@ const status = await runAdwaitaApp({
           }
         : {}),
       newChat: cwd ? { cwd, home: facts.home } : null,
-      // **Only when no agent is pinned.** `KU_APP_AGENT` means "this agent, for everything in this window"
+      // **Only when no agent is pinned.** `LOTSE_APP_AGENT` means "this agent, for everything in this window"
       // — a fixture record naming `opencode` must be answered by the stand-in, not start a real one.
       ...(hooks.agent
         ? {}

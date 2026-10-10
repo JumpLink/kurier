@@ -114,7 +114,7 @@ export class PreferencesDialog {
   }
 
   /**
-   * Choose a row by key, the way a click on it does — `KU_APP_PREFERENCES_AGENT` calls this. Only
+   * Choose a row by key, the way a click on it does — `LOTSE_APP_PREFERENCES_AGENT` calls this. Only
    * `'chose'` means a write happened.
    */
   select(key: string): SelectOutcome {

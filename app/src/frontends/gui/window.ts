@@ -101,13 +101,13 @@ import { SessionList } from './session-list.ts';
 import Template from './window.blp';
 
 /**
- * How often `KU_APP_PERMISSION` reconsiders, and how long it waits for a real request before it
+ * How often `LOTSE_APP_PERMISSION` reconsiders, and how long it waits for a real request before it
  * stages one of its own.
  *
  * **A poll, not a single timeout, because "has a real request arrived yet" is not knowable in
  * advance.** The agent's own question lands somewhere after the prompt goes out, and where depends on
- * the agent: against the stand-in it is `KU_STANDIN_DELAY_MS × (chunks + the opening beats)` — over
- * three seconds at the defaults, and longer the moment somebody sets `KU_STANDIN_DELAY_MS=900`. A
+ * the agent: against the stand-in it is `LOTSE_STANDIN_DELAY_MS × (chunks + the opening beats)` — over
+ * three seconds at the defaults, and longer the moment somebody sets `LOTSE_STANDIN_DELAY_MS=900`. A
  * fixed delay either fires before the real question (and the fixture is what gets photographed) or
  * far after it. Polling is what makes "the agent's question wins" true rather than approximately true,
  * and the cost is one timer that says nothing.
@@ -162,7 +162,7 @@ export interface MainWindowOptions {
    * error page instead of killing the app before there is a window to say why.
    */
   readonly loadSessions: () => readonly SessionRecord[];
-  /** Which agent to start on the first prompt. Resolved in `main.ts`: `KU_APP_AGENT`, else the available setting, else host install, else bundled. */
+  /** Which agent to start on the first prompt. Resolved in `main.ts`: `LOTSE_APP_AGENT`, else the available setting, else host install, else bundled. */
   readonly agent: AgentCommand;
   /** Which copy `agent` is — what a new conversation's record names. */
   readonly agentSource?: AgentSource;
@@ -175,7 +175,7 @@ export interface MainWindowOptions {
   readonly createSession?: (record: SessionRecord) => void;
   /**
    * The agent a stored session names, on the copy that held it — `resolveRecorded`. Left out when
-   * `KU_APP_AGENT` pins an agent, so a fixture record naming `opencode` is still answered by the stand-in.
+   * `LOTSE_APP_AGENT` pins an agent, so a fixture record naming `opencode` is still answered by the stand-in.
    */
   readonly resolveAgent?: (id: string, source: AgentSource | undefined) => Promise<RecordedResolution>;
   /**
@@ -257,12 +257,12 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** The records the sidebar lists, newest first — the list a new conversation is added to. */
   #records: SessionRecord[] = [];
   readonly #loadSessions: () => readonly SessionRecord[];
-  /** The `KU_APP_NEW_CHAT` poll, so a close cannot fire it into a window that is gone. */
+  /** The `LOTSE_APP_NEW_CHAT` poll, so a close cannot fire it into a window that is gone. */
   #newChatSource: number | null = null;
   #midTurnSource: number | null = null;
   /** True between "a close was requested" and "the agent has ended", so a second close is not blocked. */
   #closing = false;
-  /** The `KU_APP_PERMISSION` staging timer, so a close cannot fire it into a window that is gone. */
+  /** The `LOTSE_APP_PERMISSION` staging timer, so a close cannot fire it into a window that is gone. */
   #permissionSource: number | null = null;
   /** How many times the staging poll has fired. See `PERMISSION_STAGE_POLL_MS`. */
   #permissionTicks = 0;
@@ -271,7 +271,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   #rememberNotice: ((id: NoticeView['id']) => void) | undefined;
 
   /**
-   * `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`, and the one timer that runs all
+   * `LOTSE_APP_DISMISS_FAILURE`, `LOTSE_APP_CHOOSE_MODEL` and `LOTSE_APP_SWITCH`, and the one timer that runs all
    * three.
    *
    * **One state object and one timer for the failure-dialog hooks, because they are one photograph.**
@@ -409,7 +409,7 @@ export class MainWindow extends Adw.ApplicationWindow {
 
   /**
    * The Preferences entry: `app.preferences`, `<Ctrl>comma`, and a primary menu in the content header.
-   * The action is the one entry point, so the menu, the accelerator and `KU_APP_PREFERENCES` all run the
+   * The action is the one entry point, so the menu, the accelerator and `LOTSE_APP_PREFERENCES` all run the
    * same call.
    */
   #installPreferences(app: Adw.Application, actions: PreferencesActions): void {
@@ -440,7 +440,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /**
-   * `win.new-chat`: the sidebar button, `<Ctrl>n` and `KU_APP_NEW_CHAT` all activate this one action.
+   * `win.new-chat`: the sidebar button, `<Ctrl>n` and `LOTSE_APP_NEW_CHAT` all activate this one action.
    * Window-scoped rather than `app.`: what it resets is this window's composer. Disabled when no
    * directory could be found, so the button is insensitive rather than pointing at nothing.
    */
@@ -651,32 +651,34 @@ export class MainWindow extends Adw.ApplicationWindow {
    * through the widget's own method rather than around it, which is the same rule they already followed
    * for the composer: a screenshot is of the surface, never of a re-implementation of it.
    *
-   * `KU_APP_SESSION` is the first one acted on: it opens the session exactly as a click would, so
+   * `LOTSE_APP_SESSION` is the first one acted on: it opens the session exactly as a click would, so
    * the collapsed content pane and its back button are reachable without a pointer.
    */
   #applyDevHooks(hooks: LotseHooks): void {
     if (hooks.session !== undefined) {
       const record = this.#sessions.select(hooks.session);
       if (record) this.#open(record);
-      else console.log(`kurier: KU_APP_SESSION=${hooks.session} — no such session in the list`);
+      else console.log(`kurier: LOTSE_APP_SESSION=${hooks.session} — no such session in the list`);
     }
     if (hooks.config !== undefined) {
       const spec = parseConfigOptionSpec(hooks.config);
       if (!spec) {
         // A hook that cannot be parsed is a typo, and a typo that silently did nothing is how a surface
         // ends up with a screenshot nobody can account for. Named loudly, with the format.
-        console.log(`kurier: KU_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`);
+        console.log(
+          `kurier: LOTSE_APP_CONFIG=${hooks.config} — not in "configId=valueId" form, not acted on`,
+        );
       } else if (!this.#chat.hasChat) {
-        console.log('kurier: KU_APP_CONFIG — no session is open, so there is no agent to ask');
+        console.log('kurier: LOTSE_APP_CONFIG — no session is open, so there is no agent to ask');
       } else {
         console.log(
-          `kurier: KU_APP_CONFIG — setting ${spec.controlId} to ${spec.value} through the real path`,
+          `kurier: LOTSE_APP_CONFIG — setting ${spec.controlId} to ${spec.value} through the real path`,
         );
         // Through `stageConfigOption`, so the prompt that starts the agent, the `session/load` that
         // binds it and the `session/set_config_option` that sets the value are all the real ones. A hook
         // that set the option itself would photograph a state the window cannot reach.
         //
-        // **Applied before `KU_APP_THINKING`, and that order decides what happens when both are set.**
+        // **Applied before `LOTSE_APP_THINKING`, and that order decides what happens when both are set.**
         // `stageConfigOption` starts the agent itself when there is none — an option can only be set on
         // a live agent, and the agent starts on the first prompt (plan §6). So this hook sends the
         // prompt, and the `thinking` hook below finds a turn already in flight and does nothing. That is
@@ -689,8 +691,8 @@ export class MainWindow extends Adw.ApplicationWindow {
       // agent's own mid-turn question, or a real agent's — is the better thing to photograph, and it
       // arrives a moment after the prompt goes out. So this asks again every
       // `PERMISSION_STAGE_POLL_MS` and only stages its fixture request if the gate has not been asked
-      // by then; with `KU_STANDIN_PERMISSION=1` the agent's question wins and this one never appears.
-      // Staging straight away would mean the fixture always won, which would make `KU_APP_PERMISSION`
+      // by then; with `LOTSE_STANDIN_PERMISSION=1` the agent's question wins and this one never appears.
+      // Staging straight away would mean the fixture always won, which would make `LOTSE_APP_PERMISSION`
       // untestable against a real agent.
       // A GLib timeout rather than `setTimeout`: the staging must happen on the GTK main loop, and a
       // pending timer must die with the window instead of firing into a window that is gone.
@@ -716,14 +718,14 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     if (hooks.noticeDismiss === true) {
       if (this.#notice) {
-        console.log('kurier: KU_APP_NOTICE_DISMISS — pressing the banner’s Got it');
+        console.log('kurier: LOTSE_APP_NOTICE_DISMISS — pressing the banner’s Got it');
         this._noticeBanner.emit('button-clicked');
       } else {
-        console.log('kurier: KU_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
+        console.log('kurier: LOTSE_APP_NOTICE_DISMISS — no notice is showing, nothing to dismiss');
       }
     }
     if (hooks.debug) console.log('kurier: verbose dev logging on');
-    // `KU_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
+    // `LOTSE_APP_THINKING` sends a prompt, because this is the step that has a turn to send. It is a real
     // turn against whatever agent was selected — no staged fake stream — because a fake one would test
     // the staging code instead of the window. The prompt defaults to a fixture sentence rather than to
     // anything from the session file: a screenshot must not carry a real conversation out of it.
@@ -733,12 +735,12 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (unavailable) {
         // The composer refuses to send here, so the hook does too: a hook that could send where a person
         // cannot would photograph a window that does not exist.
-        console.log(`kurier: KU_APP_THINKING — not sent: ${unavailable}`);
+        console.log(`kurier: LOTSE_APP_THINKING — not sent: ${unavailable}`);
       } else if (!this.#chat.hasChat) {
-        console.log('kurier: KU_APP_THINKING — no session is open, so there is nowhere to send it');
+        console.log('kurier: LOTSE_APP_THINKING — no session is open, so there is nowhere to send it');
       } else {
         console.log(
-          `kurier: KU_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
+          `kurier: LOTSE_APP_THINKING — sending to ${this.#openRecord?.id ?? 'a new chat, which this creates'}`,
         );
         this.#chat.clearDraft();
         this.#chat.prompt(prompt);
@@ -750,32 +752,32 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#applyFailureHooks(hooks);
     this.#applyPreferencesHooks(hooks);
     if (hooks.onboarding === true) {
-      console.log('kurier: KU_APP_ONBOARDING — staging the provider onboarding page');
+      console.log('kurier: LOTSE_APP_ONBOARDING — staging the provider onboarding page');
       this.#chat.stageOnboarding();
     }
     if (hooks.login === true) {
-      console.log('kurier: KU_APP_LOGIN — opening the login dialog');
+      console.log('kurier: LOTSE_APP_LOGIN — opening the login dialog');
       this.#chat.openLogin();
     }
   }
 
   /**
-   * `KU_APP_NEW_CHAT`: press New chat — through `win.new-chat`, the action the button and `<Ctrl>n` run.
+   * `LOTSE_APP_NEW_CHAT`: press New chat — through `win.new-chat`, the action the button and `<Ctrl>n` run.
    *
-   * **After the running turn, not during it.** Combined with `KU_APP_THINKING` the point is to photograph
+   * **After the running turn, not during it.** Combined with `LOTSE_APP_THINKING` the point is to photograph
    * the empty composer *after* a chat exists, and a New chat in the middle of the first answer would
    * photograph a half-streamed one. Nothing running: it fires at once.
    */
   #applyNewChatHook(hooks: LotseHooks): void {
     if (hooks.newChat !== true) return;
     const press = (): void => {
-      console.log('kurier: KU_APP_NEW_CHAT — activating win.new-chat');
+      console.log('kurier: LOTSE_APP_NEW_CHAT — activating win.new-chat');
       // The action itself, not `this.activate_action(…)`: on a window GJS resolves that name to
       // `Gio.ActionGroup`'s, which takes the name *without* the `win.` prefix and returns nothing — the
       // prefixed spelling is a silent no-op (measured: the first version of this hook did nothing and
       // logged success). `activate` on the action is what the button's `action-name` ends up calling.
       const action = this.lookup_action('new-chat');
-      if (!action) console.log('kurier: KU_APP_NEW_CHAT — no such action on this window');
+      if (!action) console.log('kurier: LOTSE_APP_NEW_CHAT — no such action on this window');
       else action.activate(null);
     };
     if (!this.#chat.turnRunning) {
@@ -791,7 +793,7 @@ export class MainWindow extends Adw.ApplicationWindow {
   }
 
   /**
-   * `KU_APP_NEW_CHAT_MIDTURN`: press New chat once the running turn has streamed something and is still
+   * `LOTSE_APP_NEW_CHAT_MIDTURN`: press New chat once the running turn has streamed something and is still
    * going — the one-keystroke path that used to leave the old answer streaming into the empty pane.
    * Through the same action as the button. Polls, because the turn starts a moment after the hook runs.
    */
@@ -800,24 +802,24 @@ export class MainWindow extends Adw.ApplicationWindow {
     this.#midTurnSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MIDTURN_HOOK_STEP_MS, () => {
       if (!this.#chat.turnRunning || this.#chat.streamed === 0) return GLib.SOURCE_CONTINUE;
       this.#midTurnSource = null;
-      console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
+      console.log('kurier: LOTSE_APP_NEW_CHAT_MIDTURN — activating win.new-chat with the turn still running');
       const action = this.lookup_action('new-chat');
-      if (!action) console.log('kurier: KU_APP_NEW_CHAT_MIDTURN — no such action on this window');
+      if (!action) console.log('kurier: LOTSE_APP_NEW_CHAT_MIDTURN — no such action on this window');
       else action.activate(null);
       return GLib.SOURCE_REMOVE;
     });
   }
 
-  /** `KU_APP_PREFERENCES` opens the dialog through its action; `KU_APP_PREFERENCES_AGENT` also chooses a row. */
+  /** `LOTSE_APP_PREFERENCES` opens the dialog through its action; `LOTSE_APP_PREFERENCES_AGENT` also chooses a row. */
   #applyPreferencesHooks(hooks: LotseHooks): void {
     if (hooks.preferences !== true && hooks.preferencesAgent === undefined) return;
     const dialog = this.#preferences;
     const app = this.application;
     if (!dialog || !app) {
-      console.log('kurier: KU_APP_PREFERENCES — this window has no preferences dialog');
+      console.log('kurier: LOTSE_APP_PREFERENCES — this window has no preferences dialog');
       return;
     }
-    console.log('kurier: KU_APP_PREFERENCES — opening the dialog through app.preferences');
+    console.log('kurier: LOTSE_APP_PREFERENCES — opening the dialog through app.preferences');
     app.activate_action('preferences', null);
     const key = hooks.preferencesAgent;
     if (key === undefined) return;
@@ -831,12 +833,12 @@ export class MainWindow extends Adw.ApplicationWindow {
         failed: `choosing ${key} did not save — see the dialog`,
         missing: `no row ${key} in the dialog`,
       };
-      console.log(`kurier: KU_APP_PREFERENCES_AGENT — ${said[outcome]}`);
+      console.log(`kurier: LOTSE_APP_PREFERENCES_AGENT — ${said[outcome]}`);
     });
   }
 
   /**
-   * Arm `KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL` and `KU_APP_SWITCH`.
+   * Arm `LOTSE_APP_DISMISS_FAILURE`, `LOTSE_APP_CHOOSE_MODEL` and `LOTSE_APP_SWITCH`.
    *
    * **All three are about controls that nothing outside the process can press.** `ActivateWidget` on the
    * failure dialog's response button reports `true` and dismisses nothing, `Adw.AlertDialog` has no
@@ -877,7 +879,7 @@ export class MainWindow extends Adw.ApplicationWindow {
    * button produces. That is still right on the `'model'` dialog, which has a second response: the
    * dismissal reports `"close"` and never the remedy.
    *
-   * **The other arm is a press, and it goes through the dialog too.** `KU_APP_CHOOSE_MODEL` reaches
+   * **The other arm is a press, and it goes through the dialog too.** `LOTSE_APP_CHOOSE_MODEL` reaches
    * `FailureDialog.chooseModel()` through the widget, which emits the `response` signal libadwaita's
    * own handler answers to — so the modal takes itself down and the dropdown opens in libadwaita's
    * order. Opening the dropdown directly would photograph a popover with the modal still up, which is
@@ -890,7 +892,7 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (!this.#chat.failureShown) return GLib.SOURCE_CONTINUE;
       hooks.waiting = false;
       if (hooks.dismiss) {
-        console.log('kurier: KU_APP_DISMISS_FAILURE — closing the failure dialog');
+        console.log('kurier: LOTSE_APP_DISMISS_FAILURE — closing the failure dialog');
         hooks.dismiss = false;
         this.#chat.closeFailure();
         // **A step of its own, so the walk starts only after the dismissal has had a frame.** The
@@ -902,16 +904,16 @@ export class MainWindow extends Adw.ApplicationWindow {
       if (hooks.chooseModel) {
         // **One press, and the log says whether it happened.** `chooseModelInDialog` answers `false` for
         // a dialog that is not up or that carries no such response — which is the state this run *should*
-        // be in with `KU_STANDIN_CONFIG` unset, and a screenshot in that state has to be recognisable
+        // be in with `LOTSE_STANDIN_CONFIG` unset, and a screenshot in that state has to be recognisable
         // as "the button was never offered" rather than as a broken fixture.
         const pressed = this.#chat.chooseModelInDialog();
         console.log(
-          `kurier: KU_APP_CHOOSE_MODEL — ${
+          `kurier: LOTSE_APP_CHOOSE_MODEL — ${
             pressed ? 'pressing Choose another model' : 'the dialog offers no such button'
           }`,
         );
         hooks.chooseModel = false;
-        // **The timer stops here**, so a `KU_APP_SWITCH` walk in the same run is not photographed over
+        // **The timer stops here**, so a `LOTSE_APP_SWITCH` walk in the same run is not photographed over
         // an open popover: one press is the whole photograph, and the walk would close the session the
         // dropdown is standing in. The popover appears inside that call and paints on the next frame.
         if (pressed) {
@@ -927,23 +929,23 @@ export class MainWindow extends Adw.ApplicationWindow {
     }
     const record = this.#sessions.select(next);
     if (record === undefined) {
-      console.log(`kurier: KU_APP_SWITCH=${next} — no such session in the list, not opened`);
+      console.log(`kurier: LOTSE_APP_SWITCH=${next} — no such session in the list, not opened`);
     } else {
       // `#open`, because that is what a row click does — `SessionList`'s `onOpen` is a closure over
       // this method. A hook that called the widget's agent directly would skip the window's own half
       // and photograph a session the window did not open.
-      console.log(`kurier: KU_APP_SWITCH — opening ${next}`);
+      console.log(`kurier: LOTSE_APP_SWITCH — opening ${next}`);
       this.#open(record);
     }
     return GLib.SOURCE_CONTINUE;
   }
 
   /**
-   * Press Stop once the turn is running, for `KU_APP_STOP`.
+   * Press Stop once the turn is running, for `LOTSE_APP_STOP`.
    *
    * **Once, synchronously, because the turn already exists.** `AgentSession.prompt()` assigns `#turn`
    * *before its first `await`* (`agent-session.ts`; every statement above that one is synchronous),
-   * and `KU_APP_THINKING` calls it immediately above this one — so there is nothing to wait for, and a
+   * and `LOTSE_APP_THINKING` calls it immediately above this one — so there is nothing to wait for, and a
    * poll over an already-set field either fires on its first tick or has already missed the turn.
    *
    * **Through the composer's handler, not the controller.** See `hooks.ts`: the ordering the screenshot
@@ -954,17 +956,17 @@ export class MainWindow extends Adw.ApplicationWindow {
   #applyStopHook(hooks: LotseHooks): void {
     if (hooks.stop !== true && hooks.stopEscape !== true) return;
     if (!this.#chat.hasChat) {
-      console.log('kurier: KU_APP_STOP — no session is open, so there is no turn to stop');
+      console.log('kurier: LOTSE_APP_STOP — no session is open, so there is no turn to stop');
       return;
     }
     // **No timer, and the earlier version had one that could not do anything.** `AgentSession.prompt()`
     // assigns `#turn` *before its first `await`* (`agent-session.ts`, and every statement above that
-    // is synchronous), so by the time `KU_APP_THINKING` has called it — and it is the statement right
+    // is synchronous), so by the time `LOTSE_APP_THINKING` has called it — and it is the statement right
     // above this one — `turnRunning` is already true. A poll over that either fires on its first tick
     // or has already missed the turn, which is why the version this replaces gave up on tick 2 and left
     // its own deadline unreachable. One check, and the log says what it did.
     if (!this.#chat.turnRunning) {
-      console.log('kurier: KU_APP_STOP — no turn is running, so nothing was stopped');
+      console.log('kurier: LOTSE_APP_STOP — no turn is running, so nothing was stopped');
       return;
     }
     if (hooks.stopEscape === true) {
@@ -972,18 +974,18 @@ export class MainWindow extends Adw.ApplicationWindow {
       // id `'close'`, `decideFromView` maps that to `not-answered: dismissed`, and `answerFor` sends
       // `cancelled` — so `dismissPermission('dismissed')` is literally what Escape does, and the turn
       // keeps running afterwards, which is the difference from Stop that `dismissed` names.
-      console.log('kurier: KU_APP_STOP_ESCAPE — dismissing the open permission dialog as Escape does');
+      console.log('kurier: LOTSE_APP_STOP_ESCAPE — dismissing the open permission dialog as Escape does');
       this.#chat.dismissPermission('dismissed');
       this.#chat.closePermission();
     }
     if (hooks.stop === true) {
-      console.log('kurier: KU_APP_STOP — pressing Stop');
+      console.log('kurier: LOTSE_APP_STOP — pressing Stop');
       this.#chat.stop();
     }
   }
 
   /**
-   * Put a fixture permission request through the **real** gate, for `KU_APP_PERMISSION`.
+   * Put a fixture permission request through the **real** gate, for `LOTSE_APP_PERMISSION`.
    *
    * **Nothing here builds a dialog.** It asks the same `AgentSession` the agent's own requests go
    * through, which means what a screenshot shows is the gate's behaviour and not a picture of one: the
@@ -1002,12 +1004,14 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   #stagePermission(): void {
     if (!this.#chat.hasChat) {
-      console.log('kurier: KU_APP_PERMISSION — no session is open, so there is nothing to ask about');
+      console.log('kurier: LOTSE_APP_PERMISSION — no session is open, so there is nothing to ask about');
       return;
     }
-    console.log('kurier: KU_APP_PERMISSION — staging a fixture request through the real gate');
+    console.log('kurier: LOTSE_APP_PERMISSION — staging a fixture request through the real gate');
     void this.#chat.stagePermissionRequest().then((answer) => {
-      console.log(`kurier: KU_APP_PERMISSION — the staged question was answered ${JSON.stringify(answer)}`);
+      console.log(
+        `kurier: LOTSE_APP_PERMISSION — the staged question was answered ${JSON.stringify(answer)}`,
+      );
     });
   }
 }

@@ -98,7 +98,7 @@ Planned; steps 1 to 8 are done.
    **What stayed in the app**, and why: `window.ts` (the shell — the header bar, the notice banner and
    the `Adw.Bin` the widget sits in), `window.blp`, `session-list.ts` (one app's sidebar and its date
    grouping; a host embeds one chat, or brings its own list), `preferences.ts` (this app's settings
-   file), `hooks.ts` and `hook-value.ts` (the `KU_APP_*` dev fixtures, an app's own test surface — the
+   file), `hooks.ts` and `hook-value.ts` (the `LOTSE_APP_*` dev fixtures, an app's own test surface — the
    widget exposes the methods they drive, such as `stagePermissionRequest()` and `openModelDropdown()`,
    and the GLib timers that call them stay here). Two idle pages are app copy, so they are built in
    `window.blp` as top-level `Adw.StatusPage` objects and handed to the widget as `closedPage` and
@@ -116,7 +116,7 @@ Planned; steps 1 to 8 are done.
    `unknown` and shows the ordinary chat, so the page fails closed into the behaviour that existed before; a turn that
    then fails on a login still gets the auth dialog with **Log in…**. After a successful login the agent restarts and
    the page gives way to the chat. Nothing reads or keeps a credential; the page only counts providers. The kurier
-   app itself does not opt in. Dev hook: `KU_APP_ONBOARDING=1` (`docs/dev-fixtures.md`). No connected-state signal was
+   app itself does not opt in. Dev hook: `LOTSE_APP_ONBOARDING=1` (`docs/dev-fixtures.md`). No connected-state signal was
    added; `probeConnections` is exported for a host that wants one.
 7. API docs. **Done:** a README for each package ([core](../../packages/core/README.md),
    [widget](../../packages/widget/README.md)) and the host guide [docs/embedding.md](../embedding.md). The examples are

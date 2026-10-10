@@ -122,7 +122,7 @@ export class TranscriptView {
    * `changed` synchronously, so a follow that lands short can install its own retry idle from inside the
    * previous one, and a removal that leaves the number behind is the next `source_remove`'s target. GLib
    * is loud about that — `Source ID 21 was not found when attempting to remove it`, measured on a
-   * stand-in turn at `KU_STANDIN_DELAY_MS=50`, before `#scrollToEnd` started clearing the field.
+   * stand-in turn at `LOTSE_STANDIN_DELAY_MS=50`, before `#scrollToEnd` started clearing the field.
    */
   #scrollSource: number | null = null;
   /**
@@ -130,7 +130,7 @@ export class TranscriptView {
    *
    * **This is the flag that fixes the defect, and it exists because the previous version's comment
    * promised a retry that nothing performed.** `setEntries` runs from the window's constructor —
-   * `#applyDevHooks` opens `KU_APP_SESSION`, and a click can land before the first frame — so the
+   * `#applyDevHooks` opens `LOTSE_APP_SESSION`, and a click can land before the first frame — so the
    * scrolled window is not allocated yet, `upper` and `page_size` are both `0`, and the one idle that
    * used to do the scrolling read them, found no end, and gave up silently.
    *

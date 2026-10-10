@@ -327,10 +327,10 @@ export class Composer {
    * `onStop` already and could call it; calling *that* would be a second way to press Stop, and the two
    * would drift the moment the button's handler grew a step — which it has, twice: the dialog teardown
    * with `turn-cancelled` before the cancel, and the clear-draft that follows. Emitting the signal goes
-   * through the one handler a person's click goes through, so a screenshot of `KU_APP_STOP` is a
+   * through the one handler a person's click goes through, so a screenshot of `LOTSE_APP_STOP` is a
    * screenshot of the surface rather than of a re-implementation of it.
    *
-   * **A no-op when the button is not Stop.** `KU_APP_STOP` fires on the first tick that finds a running
+   * **A no-op when the button is not Stop.** `LOTSE_APP_STOP` fires on the first tick that finds a running
    * turn, and the turn may have settled in the meantime; clicking a Send button instead would send a
    * prompt, which is not what the hook asked for. The action check is the guard, and it is the same
    * `composerView` answer the button was last rendered from.
