@@ -1,6 +1,6 @@
 {
   "name": "kurier",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -123,6 +123,41 @@
       },
       "releases": [
         {
+          "version": "0.1.1",
+          "date": "2026-10-10",
+          "description": [
+            {
+              "p": "The first release with installable packages. Kurier can now log you in to your model providers itself, and the Flatpak brings its own copy of OpenCode.",
+              "translatorHint": "Release notes for version 0.1.1 - opening line: packages exist now, login from the app, bundled OpenCode in the Flatpak. Keep \"OpenCode\" and \"Flatpak\" as they are."
+            },
+            {
+              "ul": [
+                {
+                  "item": "Log in to a model provider from Kurier, with a browser sign-in or an API key, for every provider the agent offers. No terminal needed.",
+                  "translatorHint": "Release notes for version 0.1.1 - logging in to providers from the app, by browser sign-in or API key"
+                },
+                {
+                  "item": "The Flatpak includes OpenCode, which runs with its own settings and login, separate from any OpenCode already on your computer, and has network access to reach its provider.",
+                  "translatorHint": "Release notes for version 0.1.1 - the Flatpak bundles OpenCode with its own home directory and network access. Keep \"OpenCode\" and \"Flatpak\" as they are."
+                },
+                {
+                  "item": "A clearer message when your account has no credit left, instead of a message that looks like a failed login.",
+                  "translatorHint": "Release notes for version 0.1.1 - a distinct message for an account without credit"
+                },
+                {
+                  "item": "Fixes for Windows and macOS: agents installed as command shims are found, and the agent's working directory is handled correctly.",
+                  "translatorHint": "Release notes for version 0.1.1 - Windows and macOS fixes"
+                },
+                {
+                  "item": "Packages for Debian and Ubuntu (.deb), Fedora (.rpm), AppImage, macOS, Windows and Flatpak. They are not signed yet.",
+                  "translatorHint": "Release notes for version 0.1.1 - the package formats now offered, with an honest note that they are unsigned. Keep the file extensions and format names as they are."
+                }
+              ],
+              "translatorHint": "Release notes for version 0.1.1 - the list of what changed"
+            }
+          ]
+        },
+        {
           "version": "0.1.0",
           "date": "2026-10-01",
           "description": [
@@ -226,7 +261,7 @@
             {
               "type": "git",
               "url": "https://github.com/JumpLink/kurier.git",
-              "tag": "v0.1.0",
+              "tag": "v0.1.1",
               "x-checker-data": {
                 "type": "git",
                 "tag-pattern": "^v(\\d+\\.\\d+\\.\\d+)$",

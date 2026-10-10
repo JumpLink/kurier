@@ -23,7 +23,7 @@ export const APP_ID = 'eu.jumplink.Kurier';
 export const APP_NAME = 'kurier';
 
 /** Read from the package so the about dialog cannot drift from the installed version. */
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.1.1';
 
 /**
  * The env prefix for the dev hooks, without a trailing underscore.

@@ -28,7 +28,7 @@ import type {
 } from './types.ts';
 
 /** What kurier calls itself in `initialize.clientInfo`. */
-export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: '0.1.0' };
+export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: '0.1.1' };
 
 /**
  * The capabilities kurier announces. Both file-system flags are `false` and `terminal` is
