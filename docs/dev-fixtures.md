@@ -254,7 +254,7 @@ Not a sixth pointer-only control in the table above, but the same reason: radio 
 # 360 px: with GJSIFY_DEVTOOLS=1, resize afterwards:
 #   gdbus call --session --dest eu.jumplink.Lotse --object-path /eu/jumplink/Lotse/devtools \
 #     --method org.gjsify.Devtools.ResizeWindow 360 600
-GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json LOTSE_APP_AGENT=stand-in LOTSE_APP_PREFERENCES_AGENT=opencode:bundled \
+GJSIFY_DEVTOOLS=1 LOTSE_SETTINGS_FILE=/tmp/x/settings.json LOTSE_APP_AGENT=stand-in LOTSE_APP_PREFERENCES_AGENT=opencode:bundled \
   ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
 
@@ -272,26 +272,26 @@ Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo r
 
 ## First run and New chat
 
-**First run is an empty `KURIER_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `lotse start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `LOTSE_APP_NEW_CHAT` all activate that one action.
+**First run is an empty `LOTSE_SESSIONS_FILE`** (the window opens on the `new` page with a live composer, and no process until a prompt is sent). The first prompt connects, sends `session/new` for the resolved cwd, writes the record (`conversationRecord`, shared with `lotse start`: title from the prompt, `agent`, `agentSource`, `cwd`, `reattach`) and then prompts; the sidebar gets the row on top and marks it. **New chat** is `win.new-chat`: the button in the sidebar header bar, `<Ctrl>n` and `LOTSE_APP_NEW_CHAT` all activate that one action.
 
-**The cwd** is `KURIER_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
+**The cwd** is `LOTSE_CWD` → the directory kurier was started from (inside a Flatpak: the host shell's, asked once before the window exists, up to 5 s) → `$HOME`; one that is not an absolute existing directory falls through (`packages/core/src/cwd.ts`). The window shows it as one dim line under the composer, home as `~`. The host question is not measured here — this machine is not a Flatpak — only its pure half and the argv are tested.
 
 - `LOTSE_APP_NEW_CHAT=1` — press New chat through `win.new-chat`. With a turn running it waits for the turn to end, so `LOTSE_APP_THINKING=1 LOTSE_APP_PROMPT=… LOTSE_APP_NEW_CHAT=1` photographs the empty composer *after* a chat exists. The action is activated with `lookup_action('new-chat').activate(null)`: `this.activate_action('win.new-chat', null)` resolves to `Gio.ActionGroup`'s on a window, takes no prefix, returns nothing and did nothing (measured).
 - `LOTSE_APP_NEW_CHAT_MIDTURN=1` — press New chat **while the turn is streaming**: polls (50 ms) until the agent has said something and the turn is still running, then activates `win.new-chat`. New chat stops the turn the way Stop does (`session/cancel`; an open permission settles `cancelled`, `turn-cancelled`), the turn ends `idle` (never `Stopped.` on the new chat), and anything the old turn still says goes to its own record and never to the visible pane — the same holds for opening another row mid-turn (`bind`). After the agent has exited (`gone`), New chat retires the dead handle (awaiting its `close()`) so the next prompt starts a fresh agent; a record that cannot be written after `session/new` says so (`unsavedMessage`: not saved, why, press New chat).
   ```sh
-  GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
+  GJSIFY_DEVTOOLS=1 LOTSE_SESSIONS_FILE=/tmp/x/sessions.json LOTSE_SETTINGS_FILE=/tmp/x/settings.json \
     LOTSE_APP_AGENT=stand-in LOTSE_APP_CWD=/tmp/x/project LOTSE_STANDIN_DELAY_MS=1500 \
     LOTSE_APP_THINKING=1 LOTSE_APP_PROMPT='Say hello.' LOTSE_APP_NEW_CHAT_MIDTURN=1 \
     ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
   ```
-- `LOTSE_APP_CWD=<path>` — pin the cwd so a screenshot never shows a private path; beats `KURIER_CWD`. `LOTSE_APP_THINKING` + `LOTSE_APP_PROMPT` also send into the pending chat.
+- `LOTSE_APP_CWD=<path>` — pin the cwd so a screenshot never shows a private path; beats `LOTSE_CWD`. `LOTSE_APP_THINKING` + `LOTSE_APP_PROMPT` also send into the pending chat.
 - The stand-in answers `session/new` with `ses_standin_0001`, then `…_2`, `…_3`: two chats in one window must not collide in the store.
 - A session opened from the list is reattached on the copy of the agent its record names (`resolveRecorded`), asked on its first prompt. **Not wired with `LOTSE_APP_AGENT`**: that pins one agent for the whole window, otherwise a fixture record naming `opencode` would start a real one.
 
 ```sh
 # first run, a prompt, then the empty composer again — synthetic file, pinned cwd
 mkdir -p /tmp/x/project
-GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
+GJSIFY_DEVTOOLS=1 LOTSE_SESSIONS_FILE=/tmp/x/sessions.json LOTSE_SETTINGS_FILE=/tmp/x/settings.json \
   LOTSE_APP_AGENT=stand-in LOTSE_APP_CWD=/tmp/x/project LOTSE_APP_THINKING=1 LOTSE_APP_PROMPT='Say hello.' LOTSE_APP_NEW_CHAT=1 \
   ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs
 ```
@@ -303,13 +303,13 @@ Two defects found on the way, both fixed: `agentStatus({status: 'none'})` was `a
 The bundled copy exists only inside a Flatpak, so two hooks stand in for it. Both are flags (`0`/`false` = off) and both go through the window's own paths.
 
 - `LOTSE_APP_NOTICE=1` — force the bundled-agent condition: the `Adw.Banner` under the content header shows (fixed English text from `packages/core/src/empty-state.ts`, one **Got it**). Not shown for a host install, with no agent, or once dismissed. The text is kept to three lines at 360 px: `Adw.Banner` ellipsizes beyond that, which cut the statement itself.
-- `LOTSE_APP_NOTICE_DISMISS=1` — press **Got it** by emitting the banner's own `button-clicked`; logs one line. The id lands in `$KURIER_NOTICES_FILE` (default `$XDG_DATA_HOME/kurier/notices.json`, 0600 in 0700, atomic write); a corrupt or unreadable file shows the notice again and never stops startup.
+- `LOTSE_APP_NOTICE_DISMISS=1` — press **Got it** by emitting the banner's own `button-clicked`; logs one line. The id lands in `$LOTSE_NOTICES_FILE` (default `$XDG_DATA_HOME/lotse/notices.json`, 0600 in 0700, atomic write); a corrupt or unreadable file shows the notice again and never stops startup.
 - `LOTSE_APP_NO_AGENT=1` — force the nothing-found resolution (beats `LOTSE_APP_AGENT`): the content pane says "No agent found" with the install command (selectable text, no markup), the docs link and a **Preferences** button (`app.preferences`); Send and the entry are off with the reason under the composer. `lotse start`, `lotse auth` and `lotse agents` print the same remedy (`NO_AGENT_REMEDY`).
 
 ```sh
 # synthetic everything; a missing sessions file is first run
-GJSIFY_DEVTOOLS=1 KURIER_SESSIONS_FILE=/tmp/x/sessions.json KURIER_SETTINGS_FILE=/tmp/x/settings.json \
-  KURIER_NOTICES_FILE=/tmp/x/notices.json LOTSE_APP_CWD=/tmp/x/project LOTSE_APP_AGENT=stand-in \
+GJSIFY_DEVTOOLS=1 LOTSE_SESSIONS_FILE=/tmp/x/sessions.json LOTSE_SETTINGS_FILE=/tmp/x/settings.json \
+  LOTSE_NOTICES_FILE=/tmp/x/notices.json LOTSE_APP_CWD=/tmp/x/project LOTSE_APP_AGENT=stand-in \
   LOTSE_APP_NOTICE=1 ./node_modules/.bin/gjsify run app/dist/lotse-app.gjs.mjs   # or LOTSE_APP_NO_AGENT=1
 ```
 
@@ -428,7 +428,7 @@ dismiss, and the window's single `close()` still takes down whichever dialog is 
 response, so there is one dismissal"; the rule that survives is the stronger one, "the dismissal is the
 response named `close`".
 
-*The GUI run recipe — detached start, `GJSIFY_DEVTOOLS=1`, a synthetic `KURIER_SESSIONS_FILE`,
+*The GUI run recipe — detached start, `GJSIFY_DEVTOOLS=1`, a synthetic `LOTSE_SESSIONS_FILE`,
 `LOTSE_APP_SESSION` — is in `AGENTS.md` § Run / build / test, where it belongs: it is how the work is
 run, not a fixture.*
 
@@ -436,7 +436,7 @@ run, not a fixture.*
 
 **The GUI is looked at, not believed:** start it detached (a foreground GJS process is killed by the
 agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on `/eu/jumplink/Lotse/devtools`
-(`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>` so no real conversation ends up in a
+(`Screenshot`, `DumpTree`), `LOTSE_SESSIONS_FILE=<synthetic file>` so no real conversation ends up in a
 screenshot, and `LOTSE_APP_SESSION=<id>` to open a session without a pointer. GTK behaviour a comment
 relies on gets a probe in `scripts/probes/` that prints the numbers the comment quotes.
 

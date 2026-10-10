@@ -142,7 +142,7 @@ export default async () => {
     const BUNDLED: AgentCommand = {
       ...OPENCODE,
       program: '/app/extra/agents/opencode/package/bin/opencode',
-      env: { XDG_CONFIG_HOME: '/data/kurier/agents/opencode/config' },
+      env: { XDG_CONFIG_HOME: '/data/lotse/agents/opencode/config' },
       bundled: true,
     };
 
@@ -169,7 +169,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'bundled',
-          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$KURIER_BLANKED"\n',
+          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$LOTSE_BLANKED"\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -177,7 +177,7 @@ export default async () => {
             title: 'fake',
             program,
             args: [],
-            env: { XDG_CONFIG_HOME: config, KURIER_BLANKED: '' },
+            env: { XDG_CONFIG_HOME: config, LOTSE_BLANKED: '' },
             bundled: true,
           },
           onStderr: () => {},
@@ -429,7 +429,7 @@ export default async () => {
     await it('passes the rc path in an env var, not a positional, which the program owns', async () => {
       // `$0` is the inner script and `$1` is the agent; the rc path needs its own channel.
       const { outer } = shapeOf(toHostCommand(OPENCODE, SANDBOXED));
-      expect(outer).toContain('KURIER_RC=');
+      expect(outer).toContain('LOTSE_RC=');
     });
 
     await it('accepts a capture only if it holds a slash, and keeps the login PATH otherwise', async () => {
@@ -448,9 +448,9 @@ export default async () => {
       await withTempDir((dir) => {
         const home = join(dir, 'home');
         mkdirSync(home, { recursive: true });
-        writeHomeFile(home, '.bashrc', 'case $- in *i*) ;; *) return;; esac\nexport KURIER_RC_RAN=1\n');
+        writeHomeFile(home, '.bashrc', 'case $- in *i*) ;; *) return;; esac\nexport LOTSE_RC_RAN=1\n');
         const run = (flags: string): string =>
-          spawnSync('/bin/bash', [...flags.split(' '), '-c', 'printf %s "${KURIER_RC_RAN:-no}"'], {
+          spawnSync('/bin/bash', [...flags.split(' '), '-c', 'printf %s "${LOTSE_RC_RAN:-no}"'], {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
             timeout: 10_000,
@@ -611,7 +611,7 @@ export default async () => {
         // path is untouched either way: macOS and Linux never set PATHEXT, so these candidates
         // are never walked there.
         writeFileSync(join(dir, 'opencode.CMD'), '@echo off\n');
-        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         // Lower-cased on both sides, not `toBe`: the returned string is the candidate built from
         // PATHEXT's own casing (conventionally uppercase, `.CMD`), so the exact casing is not part
         // of the contract `which` makes.
@@ -625,7 +625,7 @@ export default async () => {
       await withTempDir((dir) => {
         writeFileSync(join(dir, 'opencode'), '');
         writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
-        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         expect(which('opencode', env, NOT_SANDBOXED)).toBe(join(dir, 'opencode'));
       });
     });
@@ -633,7 +633,7 @@ export default async () => {
     await it('is unaffected when PATHEXT is unset, so macOS/Linux behaviour is unchanged', async () => {
       await withTempDir((dir) => {
         writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
-        const env = { PATH: dir, KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         expect(which('opencode', env, NOT_SANDBOXED)).toBe(null);
       });
     });
@@ -777,7 +777,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'echoer',
-          '#!/bin/sh\nprintf "ARGV:%s|%s\\n" "$1" "$2"\nprintf "CWD:%s\\n" "$(pwd)"\nprintf "ENV:%s\\n" "$KURIER_TEST_VAR"\n',
+          '#!/bin/sh\nprintf "ARGV:%s|%s\\n" "$1" "$2"\nprintf "CWD:%s\\n" "$(pwd)"\nprintf "ENV:%s\\n" "$LOTSE_TEST_VAR"\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -786,7 +786,7 @@ export default async () => {
             program,
             args: ['one', 'two'],
             cwd: dir,
-            env: { KURIER_TEST_VAR: 'present' },
+            env: { LOTSE_TEST_VAR: 'present' },
           },
           onStderr: () => {},
           sandboxFacts: NOT_SANDBOXED,
@@ -851,7 +851,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'late',
-          '#!/bin/sh\n( sleep 0.4; printf "LATE:%s\\n" "$KURIER_TEST_VAR" ) &\nprintf "EARLY\\n"\nexit 0\n',
+          '#!/bin/sh\n( sleep 0.4; printf "LATE:%s\\n" "$LOTSE_TEST_VAR" ) &\nprintf "EARLY\\n"\nexit 0\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -859,7 +859,7 @@ export default async () => {
             title: 'late',
             program,
             args: [],
-            env: { KURIER_TEST_VAR: 'after-exit' },
+            env: { LOTSE_TEST_VAR: 'after-exit' },
           },
           onStderr: () => {},
           sandboxFacts: NOT_SANDBOXED,

@@ -202,7 +202,7 @@ export function saveSettings(path: string, settings: Settings): { readonly backu
 /**
  * Write the settings: a sibling temp file, fsync, rename — the session store's recipe, so a crash leaves
  * the old file or the new one. File `0600`, a directory kurier creates `0700`. An existing directory is
- * left alone: `KURIER_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
+ * left alone: `LOTSE_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
  */
 export function writeSettings(path: string, settings: Settings): void {
   writePrivateFile(path, `${JSON.stringify(settings, null, 2)}\n`, 'settings');

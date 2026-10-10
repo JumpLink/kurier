@@ -96,12 +96,12 @@ export default async () => {
   await describe('writeNotices', async () => {
     await it('round-trips, 0600 in a 0700 directory it created, and leaves no temp file', async () => {
       await withTempDir((dir) => {
-        const file = join(dir, 'kurier', 'notices.json');
+        const file = join(dir, 'lotse', 'notices.json');
         writeNotices(file, markSeen(DEFAULT_NOTICES, 'bundled-agent'));
         expect(readNotices(file).notices.seen[0]).toBe('bundled-agent');
         expect(statSync(file).mode & 0o777).toBe(0o600);
-        expect(statSync(join(dir, 'kurier')).mode & 0o777).toBe(0o700);
-        expect(readdirSync(join(dir, 'kurier')).join(',')).toBe('notices.json');
+        expect(statSync(join(dir, 'lotse')).mode & 0o777).toBe(0o700);
+        expect(readdirSync(join(dir, 'lotse')).join(',')).toBe('notices.json');
         expect(readFileSync(file, 'utf8').includes('bundled-agent')).toBe(true);
       });
     });

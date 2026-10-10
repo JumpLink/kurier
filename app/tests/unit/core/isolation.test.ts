@@ -28,12 +28,12 @@ function mode(path: string): number {
 export default async () => {
   await describe('isolationDirs', async () => {
     await it('is <dataDir>/agents/<id>/{home,config,data,state,cache}', async () => {
-      expect(isolationDirs('/synthetic/data/kurier', 'opencode')).toStrictEqual({
-        home: '/synthetic/data/kurier/agents/opencode/home',
-        config: '/synthetic/data/kurier/agents/opencode/config',
-        data: '/synthetic/data/kurier/agents/opencode/data',
-        state: '/synthetic/data/kurier/agents/opencode/state',
-        cache: '/synthetic/data/kurier/agents/opencode/cache',
+      expect(isolationDirs('/synthetic/data/lotse', 'opencode')).toStrictEqual({
+        home: '/synthetic/data/lotse/agents/opencode/home',
+        config: '/synthetic/data/lotse/agents/opencode/config',
+        data: '/synthetic/data/lotse/agents/opencode/data',
+        state: '/synthetic/data/lotse/agents/opencode/state',
+        cache: '/synthetic/data/lotse/agents/opencode/cache',
       });
     });
 
@@ -47,14 +47,14 @@ export default async () => {
     });
 
     await it('never lands on an agent-owned directory, whatever the data directory', async () => {
-      const dirs = Object.values(isolationDirs('/synthetic/data/kurier', 'opencode'));
+      const dirs = Object.values(isolationDirs('/synthetic/data/lotse', 'opencode'));
       for (const dir of dirs) expect(dir.includes('/.config/opencode')).toBe(false);
     });
   });
 
   await describe('isolationEnv', async () => {
     await it('names HOME, all four XDG directories and the npm cache, inside the isolation root', async () => {
-      const dirs = isolationDirs('/synthetic/data/kurier', 'opencode');
+      const dirs = isolationDirs('/synthetic/data/lotse', 'opencode');
       expect(isolationEnv(dirs)).toStrictEqual({
         HOME: dirs.home,
         XDG_CONFIG_HOME: dirs.config,
@@ -74,20 +74,20 @@ export default async () => {
   await describe('prepareIsolation', async () => {
     await it('creates the root, HOME and the four directories, all 0700', async () => {
       await withTempDir((dir) => {
-        const dirs = isolationDirs(join(dir, 'kurier'), 'opencode');
+        const dirs = isolationDirs(join(dir, 'lotse'), 'opencode');
         prepareIsolation(isolationEnv(dirs));
         for (const path of [dirs.home, dirs.config, dirs.data, dirs.state, dirs.cache]) {
           expect(existsSync(path)).toBe(true);
           expect(mode(path)).toBe(0o700);
         }
-        expect(mode(join(dir, 'kurier', 'agents', 'opencode'))).toBe(0o700);
-        expect(mode(join(dir, 'kurier', 'agents'))).toBe(0o700);
+        expect(mode(join(dir, 'lotse', 'agents', 'opencode'))).toBe(0o700);
+        expect(mode(join(dir, 'lotse', 'agents'))).toBe(0o700);
       });
     });
 
     await it('is idempotent and tightens a directory that was looser', async () => {
       await withTempDir((dir) => {
-        const dirs = isolationDirs(join(dir, 'kurier'), 'opencode');
+        const dirs = isolationDirs(join(dir, 'lotse'), 'opencode');
         prepareIsolation(isolationEnv(dirs));
         prepareIsolation(isolationEnv(dirs));
         expect(mode(dirs.config)).toBe(0o700);

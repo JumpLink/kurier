@@ -24,7 +24,7 @@ only needs two callbacks (step 4). `@lotse/acp` (the protocol layer) comes in tr
 
 ## 2. Give kurier its own data directory
 
-Kurier writes inside **one directory you choose**. It never reads `HOME`, `XDG_*` or `KURIER_*` for this:
+Kurier writes inside **one directory you choose**. It never reads `HOME`, `XDG_*` or `LOTSE_*` for this:
 the directory arrives as a `LotsePaths` value.
 
 ```ts
@@ -43,7 +43,7 @@ its whole private state under `<dataDir>/agents/<id>/{home,config,data,state,cac
 `XDG_*` point there, so it never reads or writes the person's own `~/.config`, `~/.claude` or login.
 Moving `dataDir` moves all of it.
 
-`lotsePaths()` (XDG plus `KURIER_*` overrides) belongs to kurier's app, not to the packages — build your
+`lotsePaths()` (XDG plus `LOTSE_*` overrides) belongs to kurier's app, not to the packages — build your
 own value.
 
 ## 3. Choose the agent

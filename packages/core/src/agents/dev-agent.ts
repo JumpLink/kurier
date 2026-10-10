@@ -17,7 +17,7 @@
  * fixture nobody runs:
  *
  * ```sh
- * KURIER_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
+ * LOTSE_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
  *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  * ```
  *

@@ -51,12 +51,12 @@ export default async () => {
     });
 
     await it('honors a Windows-style ; separated PATH', async () => {
-      // KURIER_TEST_ASSUME_EXECUTABLE decouples PATH-splitting from the executable-bit check, so
+      // LOTSE_TEST_ASSUME_EXECUTABLE decouples PATH-splitting from the executable-bit check, so
       // this test exercises the ";" split on every platform, including GJS, without depending on
       // chmod semantics.
       await withTempDir(async (dir) => {
         writeFileSync(join(dir, 'prog'), '');
-        const env = { PATH: `/nonexistent-dir;${dir}`, KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: `/nonexistent-dir;${dir}`, LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         expect(which('prog', env)).toBe(join(dir, 'prog'));
       });
     });
@@ -184,13 +184,13 @@ export default async () => {
   await describe('lotse agents — the setting lines', async () => {
     await it('names the setting and where the file is', async () => {
       const lines = settingsReport(
-        '/synthetic/config/kurier/settings.json',
+        '/synthetic/config/lotse/settings.json',
         { version: 1, agent: { id: 'opencode', source: 'bundled' } },
         null,
       );
       expect(lines).toStrictEqual([
         'setting: the bundled opencode',
-        'settings file: /synthetic/config/kurier/settings.json',
+        'settings file: /synthetic/config/lotse/settings.json',
       ]);
     });
 

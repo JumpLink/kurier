@@ -98,7 +98,7 @@ state are in [docs/design/](docs/design/README.md).
 ## Where your data lives
 
 Kurier keeps one record per session — which agent, which directory, the transcript, whether it is
-bound to anything else — at `$XDG_DATA_HOME/kurier/sessions.json` (mode `0600`), written
+bound to anything else — at `$XDG_DATA_HOME/lotse/sessions.json` (mode `0600`), written
 atomically. Never inside this repository: **this repository is public**, and `.gitignore` is only
 the second line of defence, not the first.
 

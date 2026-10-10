@@ -79,12 +79,12 @@ fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/R
 host install, else the first bundled copy (`agents/detect.ts`, pure over facts gathered by
 `probe.ts`). The catalog's `env` is flags only, never a credential.
 The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `app/src/core/settings.ts`, in
-`$XDG_CONFIG_HOME/kurier/settings.json` (`KURIER_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
+`$XDG_CONFIG_HOME/lotse/settings.json` (`LOTSE_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
 precedence is `--agent` (CLI) / `LOTSE_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
 `lotse agents --use <id>[:bundled|host]|none` writes it.
 The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time kurier starts, and a settings file kurier could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `LOTSE_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
-An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `lotse start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `LOTSE_APP_AGENT` pins one; hooks `LOTSE_APP_NEW_CHAT`/`LOTSE_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
+An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `LOTSE_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `lotse start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `LOTSE_APP_AGENT` pins one; hooks `LOTSE_APP_NEW_CHAT`/`LOTSE_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
 With no `--agent` (CLI) or `LOTSE_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
 `toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `HOME` and `XDG_*` under
@@ -121,9 +121,14 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
 ## Privacy — this repo is PUBLIC
 
 - The session file holds **the text of a person's conversations with an agent**. It lives at
-  `$XDG_DATA_HOME/kurier/sessions.json`, mode `0600` in a `0700` directory, **never** inside the
+  `$XDG_DATA_HOME/lotse/sessions.json`, mode `0600` in a `0700` directory, **never** inside the
   repository. `.gitignore` is the second line of defence; not writing there is the first, and it
   lives in `app/src/core/paths.ts`. Backup tier: `state` — declared in `.werkstatt-state.json`.
+  **Through 0.1.1 that directory was `kurier`**, so both entry points resolve their paths through
+  `migratedPaths()` (`app/src/core/migrate.ts`), which renames each old directory once if the new
+  name is free, never merges two of them, and keeps using the old one — out loud — when the move
+  fails. Every `LOTSE_*` knob also answers to its `KURIER_*` spelling (`envKnob`), new name wins,
+  and a pinned path turns the move off.
 - There is **no `secret` tier, and adding one needs a reason.** kurier stores no credential:
   `lotse auth` runs the agent's own login. The agent keeps its credentials and kurier never reads them
   back; a pasted API key (`lotse login`, login dialog) is held in memory for one call, never written. Do not

@@ -66,7 +66,7 @@ Planned; steps 1 to 8 are done.
 1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers (done, below).
 2. Make paths and settings injectable. **Done:** `LotsePaths` (`packages/core/src/paths.ts` since step 3: data and config dir plus the
    sessions, settings and notices files; a bundled agent's `HOME`/`XDG_*` follow `dataDir`) is built once at the
-   app and CLI entry (`lotsePaths()`, defaults and `KURIER_*` knobs unchanged) and passed down; a host builds
+   app and CLI entry (`lotsePaths()`, defaults and `LOTSE_*` knobs unchanged) and passed down; a host builds
    its own with `lotsePathsUnder(root)`.
 3. Create `@lotse/core`. **Done:** `packages/core` (LGPL) holds the agents, the session, the turn, the
    login, the failure classification and the view-model files, with `data/bundled-agents.json`,
@@ -78,7 +78,7 @@ Planned; steps 1 to 8 are done.
    goes unchanged into `session/new` and the reattach of a stored session. Absent means `[]` in `session/new`
    and nothing added to a reattach, as before; there is no CLI flag and no GUI setting.
 
-   **What stayed in `app/src/core`**, and why: `paths.ts` (the XDG and `KURIER_*` resolver — an app's own
+   **What stayed in `app/src/core`**, and why: `paths.ts` (the XDG and `LOTSE_*` resolver — an app's own
    environment, while the `LotsePaths` *shape* moved), `settings.ts` and `settings-view.ts` (one app's
    settings file; a host has its own), `notices.ts` (same, with `NOTICE_IDS` and `noticeDue` moved),
    `session-groups.ts` and `private-file.ts`. `frontends/*` is surface code and was never a candidate.

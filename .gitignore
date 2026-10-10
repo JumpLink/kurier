@@ -21,7 +21,7 @@ package-lock.json
 
 # ─── Local state — NEVER commit ───────────────────────────────────────────
 # Defence in depth only. The real guarantee is that no session data is ever WRITTEN here:
-# kurier's store lives at $XDG_DATA_HOME/kurier/sessions.json, outside the repo, by
+# kurier's store lives at $XDG_DATA_HOME/lotse/sessions.json, outside the repo, by
 # construction (see app/src/core/store.ts). This repository is PUBLIC.
 lotse-data/
 *.sessions.json

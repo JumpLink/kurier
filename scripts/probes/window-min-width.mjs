@@ -383,11 +383,11 @@ const sidebar = new Gtk.ListBox();
 for (const name of ['Refactor the parser', 'Release notes draft', 'Old experiment']) {
   sidebar.append(new Gtk.Label({ label: name, xalign: 0 }));
 }
-const sidebarPage = new Adw.NavigationPage({ title: 'kurier', child: sidebar });
+const sidebarPage = new Adw.NavigationPage({ title: 'lotse', child: sidebar });
 
 const split = new Adw.NavigationSplitView({
   sidebar: sidebarPage,
-  content: new Adw.NavigationPage({ title: 'kurier', child: content }),
+  content: new Adw.NavigationPage({ title: 'lotse', child: content }),
   minSidebarWidth: 260,
   maxSidebarWidth: 340,
 });

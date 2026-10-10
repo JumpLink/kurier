@@ -231,7 +231,7 @@ export interface LotseHooks extends FrameworkHooks {
   /**
    * `LOTSE_APP_CWD` — where a new chat runs, **instead of asking the host or reading the process cwd**.
    * A screenshot shows this path under the composer, and the real one is a private directory name, so
-   * every screenshot run pins a synthetic one. It beats `KURIER_CWD`; a path that does not exist falls
+   * every screenshot run pins a synthetic one. It beats `LOTSE_CWD`; a path that does not exist falls
    * through to the next candidate like any other (`core/cwd.ts`).
    */
   cwd?: string;

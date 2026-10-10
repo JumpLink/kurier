@@ -42,7 +42,7 @@ Curlew backend later.
    call — a source that suddenly floods must not become a stream of questions nobody reads.
 3. **Tasks are configuration, not code.** A task names its triggers, its prefilter, its profile,
    the MCP servers its sessions may reach, a prompt template and the rights level it asks for.
-   Tasks live in a private, gitignored configuration under `$XDG_CONFIG_HOME/kurier/`. kurier's
+   Tasks live in a private, gitignored configuration under `$XDG_CONFIG_HOME/lotse/`. kurier's
    code knows no particular task, no person and no address. Example tasks in this repository use
    synthetic values only.
 

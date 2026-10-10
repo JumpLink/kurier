@@ -69,7 +69,7 @@ For a conversation with state — persistence, reattach, permission questions, c
 A bundled agent's `HOME` and `XDG_*` directories follow `dataDir` (see `isolationDirs` below), so moving
 `dataDir` moves the agent's whole private state with it.
 
-`lotsePaths()` — the XDG and `KURIER_*` resolver — is **not** exported: which directory a command-line
+`lotsePaths()` — the XDG and `LOTSE_*` resolver — is **not** exported: which directory a command-line
 tool writes to is that tool's decision, and it lives in the app (`app/src/core/paths.ts`). A host builds
 its own `LotsePaths`, normally with `lotsePathsUnder`.
 

@@ -40,7 +40,7 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
   shape of problem this package exists to end. `packages/core/src/auth.ts` now holds the plan, the
   sentences and the two-handshake flow, with `runLogin` and `open` injected per surface.
 - **Three files on the "stays" list were split, not kept whole.** The `LotsePaths` *shape* is core and
-  the XDG/`KURIER_*` resolver is the app's (`paths.ts` both sides); `AgentChoice` and `describeChoice`
+  the XDG/`LOTSE_*` resolver is the app's (`paths.ts` both sides); `AgentChoice` and `describeChoice`
   are core and the settings file is the app's; `NOTICE_IDS` and `noticeDue` are core and the notices file
   is the app's. In each case the decision is shared and the file handling is one app's.
 - **The tests stayed in `app/tests/unit/core/`** with their imports repointed at the barrel, as the

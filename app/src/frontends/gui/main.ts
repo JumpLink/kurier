@@ -41,8 +41,8 @@ import {
   resolveDefaultWithNote,
   resolveRecorded,
 } from '@lotse/core';
+import { migratedPaths } from '../../core/migrate.ts';
 import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
-import { lotsePaths } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
 import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
@@ -60,7 +60,15 @@ void Gtk;
  * exist at all, and why a state that only a click can reach is a state nobody has checked.
  */
 const hooks = readHooks();
-const paths = lotsePaths();
+
+/**
+ * The paths — and, on the first run after the rename, the move from the ones kurier wrote
+ * (`core/migrate.ts`). A note per directory that was not already in place, printed like the
+ * settings notes below, because a person whose conversations just moved deserves to be told, and a
+ * person whose move *failed* deserves to be told more.
+ */
+const { paths, notes: migrationNotes } = migratedPaths();
+for (const note of migrationNotes) console.log(`lotse: ${note}`);
 
 /**
  * What the settings said about themselves: an unreadable file, or a choice that is not available here.
@@ -116,10 +124,10 @@ const sandboxed = isSandboxed(currentSandboxFacts());
 
 /**
  * Where a new chat runs. `LOTSE_APP_CWD` is the dev hook that pins it (a screenshot must not show a real
- * directory name), `KURIER_CWD` is the same override for a person; `resolveCwd` decides the rest.
+ * directory name), `LOTSE_CWD` is the same override for a person; `resolveCwd` decides the rest.
  */
 const facts = gatherCwdFacts(process.env);
-const cwd = resolveCwd({ ...process.env, ...(hooks.cwd ? { KURIER_CWD: hooks.cwd } : {}) }, facts);
+const cwd = resolveCwd({ ...process.env, ...(hooks.cwd ? { LOTSE_CWD: hooks.cwd } : {}) }, facts);
 
 const status = await runAdwaitaApp({
   applicationId: APP_ID,

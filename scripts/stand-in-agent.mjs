@@ -43,7 +43,7 @@
  * | `LOTSE_STANDIN_NO_RESUME`      | unset   | Offer neither `loadSession` nor `resume` — trap 2, the refusal dialog. |
  *
  * ```sh
- * KURIER_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
+ * LOTSE_SESSIONS_FILE=<file> LOTSE_APP_SESSION=<id> LOTSE_APP_AGENT=stand-in \
  *   ./node_modules/.bin/gjsify workspace lotse-cli start:app
  *
  * # the configuration row, and the three states only this fixture can produce

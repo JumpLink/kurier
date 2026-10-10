@@ -26,10 +26,14 @@ import {
   sessionsCommand,
   startCommand,
 } from './frontends/cli/index.ts';
-import { lotsePaths } from './core/paths.ts';
+import { migratedPaths } from './core/migrate.ts';
 
-// The one place the process environment becomes paths; everything below is handed them.
-const paths = lotsePaths();
+// The one place the process environment becomes paths; everything below is handed them. The
+// one-time move from the directories kurier wrote happens here too (`core/migrate.ts`), and its
+// notes go to stderr: a directory that moved — or could not be moved — is something *about* the
+// answer, never the answer a pipe is reading.
+const { paths, notes } = migratedPaths();
+for (const note of notes) console.error(`lotse: ${note}`);
 
 function reportError(err: unknown): void {
   console.error(err instanceof Error ? err.message : String(err));

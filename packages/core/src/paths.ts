@@ -1,10 +1,10 @@
 /**
  * Where kurier keeps things — the shape, not the policy.
  *
- * Core never reads `HOME`, `XDG_*` or `KURIER_*`: a `LotsePaths` arrives as an argument, built once
+ * Core never reads `HOME`, `XDG_*` or `LOTSE_*`: a `LotsePaths` arrives as an argument, built once
  * where the process starts. That is what lets a host put kurier's conversation inside its own data
  * directory, and what lets a test point it at a temp dir. The app's own XDG resolver (`lotsePaths`,
- * and the `KURIER_*` overrides) stays in the app, in `app/src/core/paths.ts`, because which directory
+ * and the `LOTSE_*` overrides) stays in the app, in `app/src/core/paths.ts`, because which directory
  * a *CLI* writes to is the CLI's decision.
  *
  * The one promise the app side carries: **nothing is ever written inside the repository.**

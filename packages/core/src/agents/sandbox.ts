@@ -153,9 +153,9 @@ const HOST_OUTER = [
   // because the rc is a person and a person may print: the value taken is whatever came out last,
   // and by construction the `printf` is the last thing the child does. Without the `tail` a chatty
   // rc puts its banner at the FRONT of the capture and the `case` below then rejects the whole
-  // thing. The rc path travels in `KURIER_RC` and not as a positional parameter, because those slots
+  // thing. The rc path travels in `LOTSE_RC` and not as a positional parameter, because those slots
   // are already taken — the inner script is this shell's `$0` and the program is `$1`.
-  '      __k_path=$(KURIER_RC="$__k_rcp" "$__k_sh" -i -c \'. "$KURIER_RC" >/dev/null 2>&1; printf %s "$PATH"\' 2>/dev/null | tail -n 1)',
+  '      __k_path=$(LOTSE_RC="$__k_rcp" "$__k_sh" -i -c \'. "$LOTSE_RC" >/dev/null 2>&1; printf %s "$PATH"\' 2>/dev/null | tail -n 1)',
   // Accept only a value that is non-empty AND contains a `/` — i.e. at least one path-shaped entry.
   // Measured: a "is every character `:` or `/`" test rejects a perfectly good PATH, because an entry
   // like `/home/pascal/.local/bin` is mostly letters. A rejected capture leaves the login PATH in

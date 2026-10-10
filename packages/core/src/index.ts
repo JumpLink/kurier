@@ -19,7 +19,9 @@
  */
 
 // ── Where kurier keeps things ────────────────────────────────────────────────────────────────────
-// The shape, and the layout a host gets. The app's own XDG/`KURIER_*` resolver stays in the app.
+// The shape, and the layout a host gets. The app's own XDG/`LOTSE_*` resolver stays in the app,
+// and `envKnob` is how both sides read a knob under its new name and its old one.
+export { envKnob } from './env.ts';
 export { lotsePathsUnder, type LotsePaths } from './paths.ts';
 
 // ── Which agent, and where its private HOME goes ─────────────────────────────────────────────────

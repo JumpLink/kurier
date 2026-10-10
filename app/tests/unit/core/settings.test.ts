@@ -205,7 +205,7 @@ export default async () => {
 
     await it('the file is 0600 and a directory it creates is 0700', async () => {
       await withTempDir(async (dir) => {
-        const sub = join(dir, 'fresh', 'kurier');
+        const sub = join(dir, 'fresh', 'lotse');
         const file = join(sub, 'settings.json');
         writeSettings(file, BUNDLED);
         expect(statSync(file).mode & 0o777).toBe(0o600);

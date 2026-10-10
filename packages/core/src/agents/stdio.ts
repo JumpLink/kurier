@@ -544,10 +544,10 @@ export function probeAccepts(answer: string): boolean {
 }
 
 function isExecutable(candidate: string, env: NodeJS.ProcessEnv): boolean {
-  // `KURIER_TEST_ASSUME_EXECUTABLE=1` skips the mode check so a Windows checkout without Unix
+  // `LOTSE_TEST_ASSUME_EXECUTABLE=1` skips the mode check so a Windows checkout without Unix
   // execute bits still exercises the PATH walk. It is a test seam, not a way to weaken the real
   // answer: nothing in the CLI sets it.
-  const mode = env['KURIER_TEST_ASSUME_EXECUTABLE'] === '1' ? constants.F_OK : constants.X_OK;
+  const mode = env['LOTSE_TEST_ASSUME_EXECUTABLE'] === '1' ? constants.F_OK : constants.X_OK;
   try {
     accessSync(candidate, mode);
     return true;
