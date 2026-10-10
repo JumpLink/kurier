@@ -227,7 +227,7 @@ export const APP_CSS = `
    numeric for the same reason \`.kurier-session-title\` is — the two are one scale, and \`bold\` is a
    step off it. */
 .kurier-pill {
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
   font-size: 0.8em;
   font-weight: 600;
@@ -257,9 +257,16 @@ export const APP_CSS = `
 
    The padding is one step under the bubble's 10/14, which puts this window's insets on one scale. */
 .kurier-tool-card {
-  padding: 8px 12px;
+  padding: 10px 12px;
   box-shadow: none;
   background-color: alpha(@window_fg_color, 0.05);
+}
+
+/* An empty-state page's icon, smaller than Adw.StatusPage's 128 px (96 px under \`compact\`): these pages
+   say "nothing yet", and a hero-sized glyph says more than that. 64 px is the size the theme itself
+   uses for its in-app empty lists. */
+.kurier-calm image.icon {
+  -gtk-icon-size: 64px;
 }
 
 /* A thought in the same frame as a tool card, one step quieter again, so the answer stays the loudest
@@ -312,6 +319,7 @@ export const CSS = {
   toolCard: 'kurier-tool-card',
   toolTitle: 'kurier-tool-title',
   toolStatus: 'kurier-tool-status',
+  calm: 'kurier-calm',
   thoughtCard: 'kurier-thought-card',
   dim: DIM,
   title: TITLE,

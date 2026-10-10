@@ -148,6 +148,11 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               // header reads as a layout bug rather than as a deliberate empty state.
               vexpand: true;
 
+              styles [
+                "compact",
+                "kurier-calm",
+              ]
+
               // The one action of the page. `win.new-chat` is the same action as the sidebar's `+` and
               // `<Ctrl>n`, so the button adds no path of its own.
               child: Gtk.Button {
@@ -173,6 +178,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
             };
           }
@@ -185,6 +191,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
 
               child: Gtk.Box {
@@ -273,6 +280,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
             };
           }
@@ -305,7 +313,8 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               ellipsize: middle;
               margin-start: 16;
               margin-end: 16;
-              margin-bottom: 8;
+              margin-top: 4;
+              margin-bottom: 12;
 
               styles [
                 "dim-label",
