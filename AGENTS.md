@@ -68,7 +68,16 @@ lotse cancel <id>                         # session/cancel
 lotse auth [--agent opencode]             # trap 1's way out
 lotse login [provider] [--method id]       # login, no terminal (docs/login.md)
 lotse agents                              # launchers, SOURCE, what lotse would use
+lotse serve [--once] [--quiet]            # scheduled tasks, a long-running service (ADR 0003)
+lotse questions [--all] [--json]          # what the tasks' agents are waiting on
+lotse answer <id> <text..>                # yes/no or a reply; resumes the session
 ```
+
+**`serve` is [ADR 0003](docs/adr/0003-serve-tasks-questions-channel.md), read it before touching
+`packages/core/src/serve/`**; the person's guide is [docs/serve.md](docs/serve.md). Tasks live in
+`$XDG_CONFIG_HOME/lotse/tasks.json` (never in the repo, `examples/tasks.example.json` is the shape), read
+once at start: a changed file or prompt file stops `serve` rather than reloading. Pure logic in core, GI
+only in `app/src/core/desktop-channel.ts`, which `serve.ts` imports lazily so `answer` stays GI-free.
 
 **Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
 `packages/core/data/bundled-agents.json` under `BUNDLED_PREFIX` (`agents/catalog.ts` there, the one place the
@@ -159,7 +168,7 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
    holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
    `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
    says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
-   lotse could pick. **`lotse serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
+   lotse could pick. **`lotse serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md), built per [ADR 0003](docs/adr/0003-serve-tasks-questions-channel.md), `serve/gate.ts`):
    its gate answers `allow_once` only for a question the person answered yes or an area the person
    released in the task configuration, and that policy only narrows what the owning app allows. It
    strips every `*_always` option and never selects one; a yes mints one single-use token bound to
@@ -355,42 +364,12 @@ read (see [refs/acp/SOURCE.md](refs/acp/SOURCE.md)).
 
 ## Packaging
 
-**The `gjsify.flatpak` block in `package.json` is the source of truth** — the desktop entry, the
-AppStream metainfo, the manifest and `flathub.json` are all generated from it, so hand-editing
-`data/*` is lost on the next run:
-
-```bash
-npm run packaging:validate   # THE gate: desktop-file-validate + appstreamcli validate --no-net
-npm run packaging:install    # the four files into $XDG_DATA_HOME (or DESTDIR/PREFIX)
-```
-
-The `gjsify flatpak init` invocation that regenerates them:
-[data/README.md](data/README.md#regenerating-the-four-files).
-
-`flatpak-builder --show-manifest` only *prints* the manifest — it parses, it does not validate, so
-a green run of it says nothing. The two real validators are `desktop-file-validate` and
-`appstreamcli validate`, wired into `packaging:validate` because easy6502 gates its `meson test`
-the same way. `packaging:install` installs metadata only: `bin/lotse-app` is produced by
-`gjsify ship`, not by this script.
-
-**Three finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
-reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them lotse
-cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
-this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
-`--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).
-
-`packages/core/src/agents/sandbox.ts` is what crosses the boundary, and it is a **no-op outside a Flatpak**:
-it rewrites an `AgentCommand` into `flatpak-spawn --host …`, and outside a sandbox it returns the very
-same object. **Four things about it are measured rather than assumed, each with a test, and each one
-bites a different way** — `/.flatpak-info` and not `FLATPAK_ID` decides whether to rewrite at all; the
-agent's PATH comes from the person's own `~/.zshrc`/`~/.bashrc` because the session bus PATH does not
-have it; the protocol pipes are parked on fds 3/4 so a shell banner cannot land in the JSON-RPC stream;
-and ending the agent is SIGTERM to a `flatpak-spawn` that forwards it, never SIGKILL, which is what
-`killGraceMs` is for. The measurements and the known limits are in
-[data/README.md](data/README.md#what-it-does-to-start-the-agent-and-what-it-cannot-do) — read them
-before changing `sandbox.ts`.
-
-Full details, including the placeholder icons and the build inputs: [data/README.md](data/README.md).
+**The `gjsify.flatpak` block in `package.json` is the source of truth**: desktop entry, metainfo,
+manifest and `flathub.json` are generated from it, so a hand edit of `data/*` is lost.
+`npm run packaging:validate` is THE gate (`--show-manifest` only prints). Three finish-args are not
+free (`--talk-name=org.freedesktop.Flatpak` + `--filesystem=host` make the sandbox close to
+decorative; `--share=network` is for the bundled agent), and `packages/core/src/agents/sandbox.ts`
+rests on four measured facts — read [data/README.md](data/README.md) before changing either.
 
 ## The project rule that came out of a mismeasurement
 
@@ -418,6 +397,7 @@ looked like two bugs: [docs/toolchain-traps.md](docs/toolchain-traps.md#nodechil
 ## What is deliberately not here yet
 
 A web surface (**not** adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot (becomes a Curlew
-backend) · `lotse serve`, MCP wiring against the real apps and the principal policy (decided in
+backend) · the XMPP channel for `lotse serve` (the `Channel` seam is there, curlew is not wired) · MCP
+wiring against the real apps and the principal policy beyond one task's rights (decided in
 [ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md), not built) · troedler integration ·
 a Claude Code adapter (decided, not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).

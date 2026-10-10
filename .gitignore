@@ -25,6 +25,8 @@ package-lock.json
 # construction (see app/src/core/store.ts). This repository is PUBLIC.
 lotse-data/
 *.sessions.json
+# `lotse serve` tasks — they live in $XDG_CONFIG_HOME/lotse/; examples/tasks.example.json is the shape.
+tasks.json
 sessions.json
 
 # Editor / OS

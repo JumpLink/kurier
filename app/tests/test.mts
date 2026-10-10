@@ -53,6 +53,13 @@ import loginController from './unit/core/login-controller.test.ts';
 import loginApi from './unit/core/login-api.test.ts';
 import server from './unit/core/server.test.ts';
 
+import serveSchedule from './unit/serve/schedule.test.ts';
+import serveConfig from './unit/serve/config.test.ts';
+import serveQuestions from './unit/serve/questions.test.ts';
+import serveGate from './unit/serve/gate.test.ts';
+import serveState from './unit/serve/serve-state.test.ts';
+import serveRunner from './unit/serve/runner.test.ts';
+
 import hookValue from './unit/gui/hook-value.test.ts';
 import toolLine from './unit/gui/tool-line.test.ts';
 
@@ -106,6 +113,12 @@ run({
   loginController,
   loginApi,
   server,
+  serveSchedule,
+  serveConfig,
+  serveQuestions,
+  serveGate,
+  serveState,
+  serveRunner,
   hookValue,
   toolLine,
   smoke,
