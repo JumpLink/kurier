@@ -103,6 +103,7 @@ export function parseLoginPolicy(value: unknown): LoginPolicy {
   return { excluded, preferred: value['preferred'] as string[], europe: new Set(europe as string[]) };
 }
 
+/** The shipped login policy (`data/login-providers.json`): providers kurier hides (with the reason), features first, and marks European. */
 export const LOGIN_POLICY: LoginPolicy = parseLoginPolicy(raw);
 
 function parseField(value: unknown): LoginField | null {

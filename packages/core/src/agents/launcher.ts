@@ -15,14 +15,18 @@
 import { OPENCODE_COMMAND } from './opencode.ts';
 import type { AgentCommand } from './stdio.ts';
 
+/** The agent commands kurier knows how to start from the person's PATH. Only opencode today. */
 export const LAUNCHERS: readonly AgentCommand[] = [OPENCODE_COMMAND];
 
+/** The adapter id used when nothing else chose one. */
 export const DEFAULT_AGENT = OPENCODE_COMMAND.id;
 
+/** The ids of `LAUNCHERS`, for an error message or a menu. */
 export function launcherIds(): string[] {
   return LAUNCHERS.map((entry) => entry.id);
 }
 
+/** The launcher with this id, or `undefined`. */
 export function findLauncher(id: string): AgentCommand | undefined {
   return LAUNCHERS.find((entry) => entry.id === id);
 }
