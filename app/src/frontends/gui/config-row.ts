@@ -35,6 +35,12 @@
  * width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
  * `Adw.NavigationSplitView`'s, not kurier's content's.
  *
+ * **What the cap does not do is make a dropdown narrow.** `Adw.Clamp` caps a *natural* width; the
+ * minimum passes straight through, so a clamp around a dropdown whose longest value is 32 characters
+ * measures the dropdown's own 287 px (the probe prints both). The row asks for 293 and the floor is
+ * 360, so this costs nothing today — but a control that has to fit a narrow pane needs an ellipsis,
+ * not a clamp.
+ *
  * **Every label that could carry an agent's words says `useMarkup: false` in the constructor.** Not a
  * flag set later: Pango parses on assignment, so a `set_use_markup(false)` after the text is in arrives
  * too late (measured, `css.ts`; the plan §12 lists this as the most likely way a surface becomes the

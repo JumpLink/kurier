@@ -110,10 +110,13 @@ KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 \
 
 **One line while the three controls fit, a line each when they do not, and the row raises no floor.** The
 controls sit in a `Gtk.FlowBox` (`max-children-per-line: 3`) with each dropdown inside an `Adw.Clamp` that
-caps what it asks for (`CONFIG_CONTROL_WIDTH_PX`), so a long model id cannot force a wrap. Measured with the
-real widgets in the 720 px content clamp: one line at 1024 and 720, three lines at 500 and 360, and the
-window still stops at 360 — so the floor is `Adw.NavigationSplitView`'s and not kurier's content's
-(`scripts/probes/window-min-width.mjs` prints the sweep).
+caps what it asks for (`CONFIG_CONTROL_WIDTH_PX`), so a long model id cannot force a wrap. The row sits on
+the composer's card rather than in a strip of its own, so the width cap around it is the composer's clamp.
+Measured with the real widgets: one line at 1024 and 720, three lines at 500 and 360, and the window still
+stops at 360 — so the floor is `Adw.NavigationSplitView`'s and not kurier's content's. The row's own
+minimum is 293 px with a 32-character model id, which is where "raises no floor" comes from rather than
+from the clamp: a clamp caps a natural width and passes the minimum through
+(`scripts/probes/window-min-width.mjs` prints both, and the sweep).
 
 What the row may show and when is decided in `app/src/core/config-row.ts` and tested on both runtimes;
 the widget only renders.
@@ -357,6 +360,11 @@ gjs -m scripts/probes/window-min-width.mjs 320    # what a different floor does
 ```
 
 Pass a number to reproduce a different floor, or nothing to see what the window does without one.
+
+**Run it on a headless mutter, not on the desktop session.** `set_default_size` on a mapped window is a
+request, and this machine's session compositor granted none of them: the sweep printed the window's
+two-pane minimum seven times, which reads like a layout that refuses to be narrow. The probe's own header
+has the `dbus-run-session`/`mutter --headless` invocation and the numbers that come out of it.
 
 ## Probes
 
