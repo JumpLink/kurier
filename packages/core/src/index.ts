@@ -1,15 +1,15 @@
 /**
- * `@kurier/core` — kurier without a surface.
+ * `@lotse/core` — lotse without a surface.
  *
- * Layer 2, between the protocol (`@kurier/acp`) and whatever is rendering: which agent to start
+ * Layer 2, between the protocol (`@lotse/acp`) and whatever is rendering: which agent to start
  * and how to start it, the session a prompt turn runs in, the view models a chat is drawn from,
  * and the provider login. The CLI, the Adwaita window and an embedded widget are three consumers
  * of the same code, which is the whole reason this package exists — see
- * [ADR 0001](../../../docs/adr/0001-kurier-as-an-embeddable-widget.md).
+ * [ADR 0001](../../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
  *
  * **Nothing here knows a toolkit.** No `gi://`, no yargs, no widget: the pieces that need a
- * decision take it as an argument. Paths arrive as a `KurierPaths`, the agent choice as an
- * `AgentChoice`, the permission answer as a `ClientGate`. That is what lets a host put kurier's
+ * decision take it as an argument. Paths arrive as a `LotsePaths`, the agent choice as an
+ * `AgentChoice`, the permission answer as a `ClientGate`. That is what lets a host put lotse's
  * conversation in its own data directory, and what keeps every file in here testable on Node as
  * well as on GJS.
  *
@@ -18,9 +18,11 @@
  * a promise to the widget and to any host; an internal helper stays internal.
  */
 
-// ── Where kurier keeps things ────────────────────────────────────────────────────────────────────
-// The shape, and the layout a host gets. The app's own XDG/`KURIER_*` resolver stays in the app.
-export { kurierPathsUnder, type KurierPaths } from './paths.ts';
+// ── Where lotse keeps things ────────────────────────────────────────────────────────────────────
+// The shape, and the layout a host gets. The app's own XDG/`LOTSE_*` resolver stays in the app,
+// and `envKnob` is how both sides read a knob under its new name and its old one.
+export { envKnob } from './env.ts';
+export { lotsePathsUnder, type LotsePaths } from './paths.ts';
 
 // ── Which agent, and where its private HOME goes ─────────────────────────────────────────────────
 export { describeChoice, type AgentChoice, type AgentChoiceSource } from './agents/choice.ts';
@@ -109,7 +111,7 @@ export {
   type OpenAgentOptions,
   type TurnOptions,
 } from './run.ts';
-export type { McpServer } from '@kurier/acp';
+export type { McpServer } from '@lotse/acp';
 export {
   AgentSession,
   type AgentSessionEvents,
@@ -132,7 +134,7 @@ export {
   type ConversationInput,
 } from './conversation.ts';
 
-// ── The login an agent asks for, and the login kurier can arrange ────────────────────────────────
+// ── The login an agent asks for, and the login lotse can arrange ────────────────────────────────
 export {
   arrangeAuth,
   authPlan,

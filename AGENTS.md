@@ -1,9 +1,9 @@
-# AGENTS.md — kurier
+# AGENTS.md — lotse
 
-Operating guide for AI agents in the **kurier** repo. Follows the [agents.md](https://agents.md/)
+Operating guide for AI agents in the **lotse** repo. Follows the [agents.md](https://agents.md/)
 convention; the human overview is [README.md](README.md). This repo is a submodule of
 **werkstatt**, whose [AGENTS.md](../../AGENTS.md) carries the broader workspace rules — this file
-is the kurier-specific layer and wins where they differ.
+is the lotse-specific layer and wins where they differ.
 
 ## What this is
 
@@ -13,19 +13,19 @@ their sessions, and binds them to a surface. Runs on **GJS via gjsify**, like po
 beifahrer.
 
 No agent of its own, no model of its own, no policy engine of its own — ACP brings that in as the
-standard protocol instead of kurier's own invention. `session/request_permission` is the policy
+standard protocol instead of lotse's own invention. `session/request_permission` is the policy
 layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `session/new` with
-`mcpServers` lets the agent reach kurier's own MCP servers without a line of suite-specific code.
+`mcpServers` lets the agent reach lotse's own MCP servers without a line of suite-specific code.
 
 ## Package layout — and the one rule that holds it together
 
 | Package | Contains | May import |
 |---|---|---|
-| `@kurier/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
-| `@kurier/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@kurier/acp`, `node:fs` — no `gi://`, no agent adapter |
-| `@kurier/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@kurier/acp`, `@kurier/session`, `node:*` — no `gi://`, no yargs, no widget |
-| `@kurier/widget` | **The chat surface, as a widget.** `KurierChat` (`chat.ts` + `chat.blp`) — one conversation: transcript (`transcript-view.ts`, `tool-line.ts`), composer (`composer.ts`, `config-row.ts`), the approval dialog (`permission-dialog.ts` + `permission-body.blp`), the failure and login dialogs, self-installed CSS | `@kurier/core`, `@kurier/session`, `gi://` (GTK 4, Adw 1) — no app, no decisions of its own |
-| `kurier-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita shell in `src/frontends/gui/` (its own bundle) around one `KurierChat` | all of the above; `gi://` only under `frontends/gui/` |
+| `@lotse/acp` | **Pure.** The ACP wire types against `refs/acp/schema.v1.json`, the JSON-RPC codec (`jsonrpc.ts`), the `Transport` seam (`transport.ts`), the client session lifecycle (`client.ts`), the gate that answers what an agent may ask of a client (`gate.ts`) | nothing |
+| `@lotse/session` | The model (`SessionRecord`, transcript, resume binding, principal, scope) and a JSON file store | `@lotse/acp`, `node:fs` — no `gi://`, no agent adapter |
+| `@lotse/core` | Everything decision-shaped that is not a surface: the agents (`agents/*`, with `data/bundled-agents.json`), the session controller (`agent-session.ts`), one turn (`run.ts`, `turn.ts`), the login (`auth.ts`, `login/*`), the failure classification (`failure.ts`) and the view-model files the widget will need | `@lotse/acp`, `@lotse/session`, `node:*` — no `gi://`, no yargs, no widget |
+| `@lotse/widget` | **The chat surface, as a widget.** `LotseChat` (`chat.ts` + `chat.blp`) — one conversation: transcript (`transcript-view.ts`, `tool-line.ts`), composer (`composer.ts`, `config-row.ts`), the approval dialog (`permission-dialog.ts` + `permission-body.blp`), the failure and login dialogs, self-installed CSS | `@lotse/core`, `@lotse/session`, `gi://` (GTK 4, Adw 1) — no app, no decisions of its own |
+| `lotse-cli` (`app/`) | yargs CLI, the terminal permission gate, the XDG path resolver, the settings and notices files, and the Adwaita shell in `src/frontends/gui/` (its own bundle) around one `LotseChat` | all of the above; `gi://` only under `frontends/gui/` |
 
 **`packages/acp` does not know that subprocesses exist.** No `spawn`, no `node:child_process`, no
 `gi://`, no dependencies at all — the transport is an injected interface (`Transport` in
@@ -36,38 +36,38 @@ the same protocol code run as the Node unit test and the GJS integration test.
 LGPL and holds what a *host* would need; `app/src/core` is AGPL and holds what is true of **this** app
 only — the XDG resolver (`paths.ts`), the settings file (`settings.ts`, `settings-view.ts`), the notices
 file (`notices.ts`), `session-groups.ts`, `private-file.ts`. Three of those are split on purpose: the
-`KurierPaths` shape, `AgentChoice`/`describeChoice` and `NOTICE_IDS`/`noticeDue` are decisions and live in
+`LotsePaths` shape, `AgentChoice`/`describeChoice` and `NOTICE_IDS`/`noticeDue` are decisions and live in
 the package, while reading and writing one app's file stays here. Before adding to `app/src/core`, ask
 whether a host would want it; if yes it belongs one level down. [ADR
-0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) records what stayed and why.
+0001](docs/adr/0001-lotse-as-an-embeddable-widget.md) records what stayed and why.
 
-**The app imports `@kurier/core`, never a file inside it** — and the same for `@kurier/widget`. Each
+**The app imports `@lotse/core`, never a file inside it** — and the same for `@lotse/widget`. Each
 package's `src/index.ts` is a deliberate barrel, so what is public is a decision somebody made rather than
 whatever a consumer reached for; a new export is one line there. The widget also exports `./tool-line` and
 `./permission-dialog`, both **for measurements, not for hosts** (a Node-capable unit test, the focus probe).
 The unit tests live in `app/tests/unit/` and import the barrels like any other consumer — one runner
 (`app/tests/test.mts`) is what keeps the dual GJS + Node run working.
 
-**`app/src/frontends/gui/` is the shell around one `KurierChat`.** Window, sidebar, menu, Preferences and
-the `KU_APP_*` hooks are this app's; the transcript, composer, dialogs and chat states are the widget's,
+**`app/src/frontends/gui/` is the shell around one `LotseChat`.** Window, sidebar, menu, Preferences and
+the `LOTSE_APP_*` hooks are this app's; the transcript, composer, dialogs and chat states are the widget's,
 reached only through its getters and methods. The two idle pages are built in `window.blp` and handed in as
 `closedPage`/`noAgentPage` — their copy belongs to whatever surrounds a chat. **No named imports from a
 `.blp`, anywhere**: [docs/toolchain-traps.md](docs/toolchain-traps.md#named-imports-from-a-blp).
 
-`@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
-`KurierPaths` (`app/src/core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)`
-from `@kurier/core` for a host), a test passes a temp dir.
+`@lotse/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
+`LotsePaths` (`app/src/core/paths.ts`, passed to the commands and the window; `lotsePathsUnder(root)`
+from `@lotse/core` for a host), a test passes a temp dir.
 
 ## The CLI
 
 ```bash
-kurier start [prompt..] --agent opencode   # new session, one prompt turn
-kurier sessions [--all] [--long]           # kurier's own records, one principal
-kurier resume <id> [prompt..]              # reattach, then optionally one turn
-kurier cancel <id>                         # session/cancel
-kurier auth [--agent opencode]             # trap 1's way out
-kurier login [provider] [--method id]       # login, no terminal (docs/login.md)
-kurier agents                              # launchers, SOURCE, what kurier would use
+lotse start [prompt..] --agent opencode   # new session, one prompt turn
+lotse sessions [--all] [--long]           # lotse's own records, one principal
+lotse resume <id> [prompt..]              # reattach, then optionally one turn
+lotse cancel <id>                         # session/cancel
+lotse auth [--agent opencode]             # trap 1's way out
+lotse login [provider] [--method id]       # login, no terminal (docs/login.md)
+lotse agents                              # launchers, SOURCE, what lotse would use
 ```
 
 **Host before bundled, and the bundled copy is off PATH.** A Flatpak build unpacks the agents in
@@ -79,18 +79,18 @@ fetched at *install* time, and `apply_extra` can write only `/app/extra` (data/R
 host install, else the first bundled copy (`agents/detect.ts`, pure over facts gathered by
 `probe.ts`). The catalog's `env` is flags only, never a credential.
 The person's choice (`{id, source}`, so "bundled opencode" ≠ "my opencode") is `app/src/core/settings.ts`, in
-`$XDG_CONFIG_HOME/kurier/settings.json` (`KURIER_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
-precedence is `--agent` (CLI) / `KU_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
+`$XDG_CONFIG_HOME/lotse/settings.json` (`LOTSE_SETTINGS_FILE`), 0600/0700, an allowlist that accepts no secret;
+precedence is `--agent` (CLI) / `LOTSE_APP_AGENT` (GUI dev hook) > setting > host > bundled, and a setting that names something
 unavailable is reported (`note`), never skipped silently; a corrupt file falls back to defaults and says so.
-`kurier agents --use <id>[:bundled|host]|none` writes it.
-The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time kurier starts, and a settings file kurier could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `KU_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
-An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `KURIER_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `kurier start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `KU_APP_AGENT` pins one; hooks `KU_APP_NEW_CHAT`/`KU_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
-With no `--agent` (CLI) or `KU_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
+`lotse agents --use <id>[:bundled|host]|none` writes it.
+The GUI writes it from Preferences (`<Ctrl>comma`); a change applies the next time lotse starts, and a settings file lotse could not read is never destroyed by a save (`saveDecision`). The dialog's rows, its Flatpak async path and the hooks `LOTSE_APP_PREFERENCES[_AGENT]`: docs/dev-fixtures.md#the-preferences-dialog.
+An empty session file opens on a live composer: the first prompt sends `session/new` (cwd: `LOTSE_CWD` → host cwd → `$HOME`), writes the record through the same `conversationRecord` as `lotse start`, and New chat is `win.new-chat` (`<Ctrl>n`). A stored session reattaches on the copy its record names (`agentSource`) unless `LOTSE_APP_AGENT` pins one; hooks `LOTSE_APP_NEW_CHAT`/`LOTSE_APP_CWD` are in docs/dev-fixtures.md#first-run-and-new-chat. A bundled agent earns a one-time banner (`notices.json`), no agent at all an empty state naming the remedy; hooks in docs/dev-fixtures.md#the-bundled-agent-notice-and-the-no-agent-page.
+With no `--agent` (CLI) or `LOTSE_APP_AGENT` (GUI), every command and the window use that resolution; `resume` and `cancel`
 use the agent the session recorded. A **bundled copy runs inside the sandbox** (`AgentCommand.bundled`;
 `toHostCommand` leaves it alone, the host cannot see `/app/extra`) with its own `HOME` and `XDG_*` under
 `<data dir>/agents/<id>/` (`isolation.ts`, 0700), because `--filesystem=host` puts the person's real
-`~/.config/opencode` in reach and its login must not be shared; `kurier auth` logs in there too.
-The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
+`~/.config/opencode` in reach and its login must not be shared; `lotse auth` logs in there too.
+The two copies keep separate histories, so `lotse start` records `SessionRecord.agentSource`
 (`host`|`bundled`; **absent = host**, the old records) and `resolveRecorded` resumes on that copy — a copy
 that is gone is an error naming why, never a fall to the other. The window resolves with
 `gatherResolveContext(paths, false)`: no `--version` spawn, so it never waits on a child before it appears.
@@ -98,11 +98,11 @@ that is gone is an error naming why, never a fall to the other. The window resol
 **One turn, not a REPL**, and that is a decision rather than a missing feature. A REPL needs
 somewhere to put the approval surface, and the plan puts the surface in a later slice; a REPL now
 would either prompt on a stdin that is also carrying the questions, or pretend the gate is not
-there. `kurier start` with no prompt opens a session and stops, which is how you get an id for
-`kurier resume`.
+there. `lotse start` with no prompt opens a session and stops, which is how you get an id for
+`lotse resume`.
 
 - **stdout is the answer, stderr is everything about it.** The agent's message goes to stdout so
-  `kurier start "…"` pipes somewhere useful; progress, notices, tool questions, thought chunks and
+  `lotse start "…"` pipes somewhere useful; progress, notices, tool questions, thought chunks and
   the agent's own log lines go to stderr. A model's private reasoning is never on stdout.
 - **Ctrl-C is the protocol's cancellation, not a kill**: `session/cancel` goes out, the agent stops
   cleanly and answers the turn with `cancelled`, and the transcript ends where the work ended.
@@ -121,18 +121,23 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
 ## Privacy — this repo is PUBLIC
 
 - The session file holds **the text of a person's conversations with an agent**. It lives at
-  `$XDG_DATA_HOME/kurier/sessions.json`, mode `0600` in a `0700` directory, **never** inside the
+  `$XDG_DATA_HOME/lotse/sessions.json`, mode `0600` in a `0700` directory, **never** inside the
   repository. `.gitignore` is the second line of defence; not writing there is the first, and it
   lives in `app/src/core/paths.ts`. Backup tier: `state` — declared in `.werkstatt-state.json`.
-- There is **no `secret` tier, and adding one needs a reason.** kurier stores no credential:
-  `kurier auth` runs the agent's own login. The agent keeps its credentials and kurier never reads them
-  back; a pasted API key (`kurier login`, login dialog) is held in memory for one call, never written. Do not
+  **Through 0.1.1 that directory was `kurier`**, so both entry points resolve their paths through
+  `migratedPaths()` (`app/src/core/migrate.ts`), which renames each old directory once if the new
+  name is free, never merges two of them, and keeps using the old one — out loud — when the move
+  fails. Every `LOTSE_*` knob also answers to its `KURIER_*` spelling (`envKnob`), new name wins,
+  and a pinned path turns the move off.
+- There is **no `secret` tier, and adding one needs a reason.** lotse stores no credential:
+  `lotse auth` runs the agent's own login. The agent keeps its credentials and lotse never reads them
+  back; a pasted API key (`lotse login`, login dialog) is held in memory for one call, never written. Do not
   put a token in a session record, in a launcher `env`, or in any file here — there is no file here
   with a safe place for it.
 - Test fixtures are **synthetic only**. A real session id, a real prompt or a real model reply from
   a machine's history never goes into a test.
 - The transcript is a *record of what happened*, not a re-derivation of it. The agent's own
-  `session/load` is the authority on history; kurier's copy exists so `kurier sessions` can show
+  `session/load` is the authority on history; lotse's copy exists so `lotse sessions` can show
   something without spawning a process. Do not add filtering to it as "protection" — a filter with
   no gate behind it is a policy in the wrong place.
 
@@ -150,11 +155,11 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
    — Escape, Stop, a closing window, an agent that died, a closed dialog. Never "auto-allow because the
    agent asked". **`allow_always`/`reject_always` are passed through**, not filtered: the **agent**
    remembers an "always" (ACP has no `allowed_always` — the answer is `selected` plus the agent's own
-   option id, and it decides whether to ask again), while kurier stores no policy at all. What still
+   option id, and it decides whether to ask again), while lotse stores no policy at all. What still
    holds is everything about *how* the choice is made: no allow option holds the focus in any frame, only
    `allow_once` is `SUGGESTED`, the terminal's `y` takes `allow_once` when both allows are offered *and
    says so on the prompt line*, and there is **no timeout** — a diff takes longer than any deadline
-   kurier could pick. **`kurier serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
+   lotse could pick. **`lotse serve` amends this** ([ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md)):
    its gate answers `allow_once` only for a question the person answered yes or an area the person
    released in the task configuration, and that policy only narrows what the owning app allows. It
    strips every `*_always` option and never selects one; a yes mints one single-use token bound to
@@ -163,12 +168,12 @@ packages under `packages/*` follow the same split. No SPDX headers in sources.
 3. **`fs/read_text_file` and `fs/write_text_file` are answered `false`** in the capability
    announcement, and answered a refusal error if an agent asks anyway. The agent gets no file
    access through that channel at all. File access is a decision, not a default — these two may be
-   enabled later for a **canvas surface**, where kurier would hold the real buffer and hand it over
+   enabled later for a **canvas surface**, where lotse would hold the real buffer and hand it over
    deliberately rather than proxying a path the agent named.
 4. **`_meta` is passed through, never parsed.** `opencode acp` sends
    `_meta: {"opencode/child-session-updates": true}` and a `sessionCapabilities.fork` marker the v1
    schema does not define. Unknown `_meta` must never be an error — otherwise every agent with an
-   extension kurier doesn't know breaks.
+   extension lotse doesn't know breaks.
 
 Plus two more that are in the code, not just the plan: **no central capability registry** (not
 even in gjsify — it would be exactly the gate beifahrer forbids, one level up and worse because it
@@ -181,12 +186,12 @@ free).
 
 **Trap 1 — `authMethods` is real and interactive.** Measured against `opencode acp` 2.0.19 (the
 `authMethods` entry is in the handshake below): no `type` tag, and a `description` the schema does not
-define. Without `kurier auth` the first
+define. Without `lotse auth` the first
 session dies on an error message instead of on code. `classifyAuthMethods` (`gate.ts`) reads this
 as the protocol's *agent* auth method: it means the client has to arrange the login itself, which
-is what `kurier auth` runs outside the ACP channel.
+is what `lotse auth` runs outside the ACP channel.
 
-**What to do about it is decided once, in `@kurier/core`'s `auth.ts`** — `authPlan` (which of the two
+**What to do about it is decided once, in `@lotse/core`'s `auth.ts`** — `authPlan` (which of the two
 paths the methods allow), `describeAuthMethods` (the handshake notice), `loginCommandFor` (the program,
 the bundled copy's own) and `arrangeAuth` (ask the agent, run the login, **ask it again** — the second
 handshake is the agent's own yes rather than an exit code read as one). A surface passes in only what
@@ -210,11 +215,11 @@ inside one GJS process with no Node in the chain — is in
 gjsify install                                  # never npm install
 gjsify foreach -A check                          # type-check everything
 node scripts/check-schema.mjs                    # the code against refs/acp/schema.v1.json
-gjsify workspace kurier-cli build                # → app/dist/kurier.gjs.mjs
-gjsify workspace kurier-cli test                 # @gjsify/unit, on gjs AND node
-gjsify workspace kurier-cli test:real-agent      # the real stdio chain against a real agent
-gjsify run app/dist/kurier.gjs.mjs <command>
-gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.mjs (GTK, separate bundle)
+gjsify workspace lotse-cli build                # → app/dist/lotse.gjs.mjs
+gjsify workspace lotse-cli test                 # @gjsify/unit, on gjs AND node
+gjsify workspace lotse-cli test:real-agent      # the real stdio chain against a real agent
+gjsify run app/dist/lotse.gjs.mjs <command>
+gjsify workspace lotse-cli build:app            # → app/dist/lotse-app.gjs.mjs (GTK, separate bundle)
 ```
 
 **GTK behaviour setup:** [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd) — GUI is looked at, not believed: start detached, dev tools, synthetic sessions.
@@ -222,22 +227,22 @@ gjsify workspace kurier-cli build:app            # → app/dist/kurier-app.gjs.m
 ### Watching a turn without a model
 
 `scripts/stand-in-agent.mjs` is a real ACP peer over stdio — real framing, real method names, the
-`fork` marker `opencode acp` sends and the v1 schema does not define — and `KU_APP_AGENT=stand-in`
+`fork` marker `opencode acp` sends and the v1 schema does not define — and `LOTSE_APP_AGENT=stand-in`
 selects it: it is reachable through the dev hooks and **not** in `LAUNCHERS`, which is the table of
 programs a person installs.
 
 **Every knob, every recipe and every measured GTK fact is in
 [docs/dev-fixtures.md](docs/dev-fixtures.md)** — the stand-in's turn knobs, its three permission-option
 knobs, the config row's four values and its two known limits, the per-session option cache, the failure
-knobs (`KU_STANDIN_AUTH` / `KU_STANDIN_PROMPT_AUTH` / `KU_STANDIN_NO_RESUME` / `KU_STANDIN_USAGE`), and
+knobs (`LOTSE_STANDIN_AUTH` / `LOTSE_STANDIN_PROMPT_AUTH` / `LOTSE_STANDIN_NO_RESUME` / `LOTSE_STANDIN_USAGE`), and
 [the two kinds of GTK probe](docs/dev-fixtures.md#probes) with the commands that print the numbers. Two
 rules that change behaviour stay here:
 
-- **`KU_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed sentences, so its default is `4`
+- **`LOTSE_STANDIN_CHUNKS` takes a prefix** of the stand-in's four fixed sentences, so its default is `4`
   and a value above it is the same four sentences. It is a knob for a *shorter* answer — a reply still
   arriving, where the newest bubble is below the fold — and the default was `5` against a list of four,
   which read as a knob that could grow and could not.
-- **A hook set to `0` or `false` is off**, in kurier and in the stand-in alike, so there is one rule
+- **A hook set to `0` or `false` is off**, in lotse and in the stand-in alike, so there is one rule
   for "is this on" in the repo. The reading rules are in `frontends/gui/hook-value.ts`, not in
   `hooks.ts`: `readHooks` imports the framework's reader, whose barrel imports `Adw`, so a test that
   imported it could not run on Node at all — and the rules (unset, empty, `0` and `false` are off; a
@@ -247,8 +252,8 @@ rules that change behaviour stay here:
 
 ### The states only a hook can reach
 
-**Five pointer-only controls, and a hook for each** — `KU_APP_STOP`, `KU_APP_STOP_ESCAPE`,
-`KU_APP_DISMISS_FAILURE`, `KU_APP_CHOOSE_MODEL`, `KU_APP_SWITCH=id[,id…]`, what each does and the
+**Five pointer-only controls, and a hook for each** — `LOTSE_APP_STOP`, `LOTSE_APP_STOP_ESCAPE`,
+`LOTSE_APP_DISMISS_FAILURE`, `LOTSE_APP_CHOOSE_MODEL`, `LOTSE_APP_SWITCH=id[,id…]`, what each does and the
 measurements that forced a hook rather than a pointer are in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#the-five-pointer-only-controls). What stays here is the rule
 they all follow: every one goes **through the surface** (the composer's own `clicked`,
@@ -257,14 +262,14 @@ the same call a sidebar row makes) rather than around it, so a screenshot is of 
 re-implementation.
 
 **Three dialogs, and only three failures earn one.** Plan §6 asks for the auth trap and the reattach
-refusal to be *shown*, and `@kurier/core`'s `failure.ts` is where that is decided: `failureKind` classifies an error
+refusal to be *shown*, and `@lotse/core`'s `failure.ts` is where that is decided: `failureKind` classifies an error
 by its **type and the turn state** (`RpcError` -32000, `UnsupportedCapabilityError`,
 `FailureContext.promptSent`), never by its wording; `failureNotice` returns a dialog for `auth`, `model`
 and `unsupported` and **`null` for `start`** — a bad command or a handshake timeout is already the
 composer's caption. No failure is written to the transcript: no turn ran, so nothing to record.
 
 **`'auth'` and `'model'` are told apart structurally, because the wire cannot** ([issue
-#2](https://github.com/JumpLink/kurier/issues/2), measured in
+#2](https://github.com/JumpLink/lotse/issues/2), measured in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#ku_standin_prompt_auth1--the-same-error-code-a-different-kind)):
 a **geo-blocked provider 403** reaches `session/prompt` as the login trap's own `-32000`, so matching the
 message is one reword from wrong and matching the code is *already* wrong. What survives is whether a
@@ -290,16 +295,16 @@ takes a modal down rather than leaving it swallowing the close button. Identity 
 ever shown one" flag, because `AgentSession` builds a **new** attachment per failure and a genuine
 second failure has to be shown.
 
-**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@kurier/core`'s `login/`, [docs/login.md](docs/login.md)): the
-agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; kurier
+**Two refusals, two buttons.** `auth` offers **Log in…** (opencode only, `@lotse/core`'s `login/`, [docs/login.md](docs/login.md)): the
+agent's own browser login or an API key (kept by the agent) through a private `opencode serve`, `LoginController` (no widget) under `login-dialog.ts`; lotse
 stores no credential, and `restartAgent()` makes the next prompt read the new one. Without that login (another agent,
-a host opencode in a Flatpak) the dialog names `kurier auth`. `'model'`/`'quota'` offer **Choose another model**: it
+a host opencode in a Flatpak) the dialog names `lotse auth`. `'model'`/`'quota'` offer **Choose another model**: it
 opens the row's dropdown and picks nothing, and `failureAction` withholds either button when the window cannot do it.
 
-**The permission dialog, in two halves.** `KU_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
+**The permission dialog, in two halves.** `LOTSE_STANDIN_PERMISSION=1` is the *agent's* own mid-turn
 `session/request_permission`, carried over the real stdio chain, with **all four option kinds on the
-wire** — so a screenshot shows kurier's ordering, labels, styling and focus rules acting on the full
-set the agent offered, `*_always` included. `KU_APP_PERMISSION=1` is kurier's side: it puts a fixture
+wire** — so a screenshot shows lotse's ordering, labels, styling and focus rules acting on the full
+set the agent offered, `*_always` included. `LOTSE_APP_PERMISSION=1` is lotse's side: it puts a fixture
 request through **the same gate** the agent's requests go through, so a screenshot shows the gate's
 behaviour rather than a dialog built for the screenshot. It is a fallback, not a competitor, and it
 waits by polling for the gate to be asked rather than for a fixed delay (`window.ts`) — a fixed delay
@@ -308,13 +313,13 @@ measured GTK facts behind it are in
 [docs/dev-fixtures.md](docs/dev-fixtures.md#the-permission-dialog); what it does and does not do is
 decided in `packages/core/src/permission.ts` and tested on both runtimes, while the widget only renders.
 
-**Kurier owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
+**Lotse owns the button order** (`orderOptions`): the rank, the three orders it produces and the two
 measured GTK facts that fix them are in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd).
 The rules that survive here: the first added button is the bottom one and the last added is the topmost,
 so **both end slots are a decline**; `buildDialog` names `default_response` explicitly rather than letting
 the add order choose it; and `show()` grabs the focus.
 
-**The button labels** are kurier's four short sentences; the agent's own names are not on them
+**The button labels** are lotse's four short sentences; the agent's own names are not on them
 (captions moved to the body as `agentNames` in [docs/dev-fixtures.md](docs/dev-fixtures.md#gtk-behaviour-moved-from-agentsmd)). A button label must fit one line.
 
 The phone floor is 360 px (`WINDOW_MIN_WIDTH_PX` in `constants.ts`), and it is the width
@@ -330,7 +335,7 @@ question. Both runtimes, as in postbote and beifahrer:
   inconvenient parts (a `_meta` bag it invented, a mid-turn `request_permission`, a paginated
   `session/list`), so a client that only passes against a polite peer is not tested.
 - **GJS**: one integration test that proves the real stdio chain against a real agent
-  (`kurier-cli test:real-agent`).
+  (`lotse-cli test:real-agent`).
 
 If a change makes the Node run impossible, the change is in the wrong file — that dual run is the
 entire point of the `packages/acp` ↔ `app` split.
@@ -365,11 +370,11 @@ The `gjsify flatpak init` invocation that regenerates them:
 `flatpak-builder --show-manifest` only *prints* the manifest — it parses, it does not validate, so
 a green run of it says nothing. The two real validators are `desktop-file-validate` and
 `appstreamcli validate`, wired into `packaging:validate` because easy6502 gates its `meson test`
-the same way. `packaging:install` installs metadata only: `bin/kurier-app` is produced by
+the same way. `packaging:install` installs metadata only: `bin/lotse-app` is produced by
 `gjsify ship`, not by this script.
 
 **Three finish-args are not free.** `--talk-name=org.freedesktop.Flatpak` is the only way a Flatpak can
-reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them kurier
+reach `flatpak-spawn --host`, and `--filesystem=host` is what that then needs — without them lotse
 cannot start the agent it exists to start, and with them the sandbox is close to decorative: treat
 this manifest as *an installer*, not as isolation, and say so to any Flathub reviewer.
 `--share=network` is for the bundled agent, which runs inside the sandbox (data/README.md).
@@ -413,6 +418,6 @@ looked like two bugs: [docs/toolchain-traps.md](docs/toolchain-traps.md#nodechil
 ## What is deliberately not here yet
 
 A web surface (**not** adwaita-web, which is the browser path per beifahrer ADR 0008) · Telegram bot (becomes a Curlew
-backend) · `kurier serve`, MCP wiring against the real apps and the principal policy (decided in
+backend) · `lotse serve`, MCP wiring against the real apps and the principal policy (decided in
 [ADR 0002](docs/adr/0002-assistant-in-continuous-operation.md), not built) · troedler integration ·
 a Claude Code adapter (decided, not built; terms and billing: [docs/claude-code.md](docs/claude-code.md)).

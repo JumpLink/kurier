@@ -28,7 +28,7 @@ using Gtk 4.0;
  * worked. A property in a template goes through GObject rather than the parser, which is what makes
  * the logical names safe on this side of the line.
  */
-template $KurierPermissionBody: Gtk.Box {
+template $LotsePermissionBody: Gtk.Box {
   orientation: vertical;
   spacing: 12;
   margin-start: 6;
@@ -67,7 +67,7 @@ template $KurierPermissionBody: Gtk.Box {
 
   // One row for every path, newline-separated, so several locations read as one list instead of N
   // blocks — and so a path does not become the most prominent thing in the dialog. TypeScript either
-  // fills this with the paths or replaces it with kurier's own "the agent did not say where", and
+  // fills this with the paths or replaces it with lotse's own "the agent did not say where", and
   // shows it either way.
   Gtk.Label locationsLabel {
     use-markup: false;
@@ -78,7 +78,7 @@ template $KurierPermissionBody: Gtk.Box {
   }
 
   // The agent's own names for its options, as one caption line — and only when at least one of them
-  // says something the kurier labels do not. Agent text, so `use-markup: false` like everything else
+  // says something the lotse labels do not. Agent text, so `use-markup: false` like everything else
   // here; and dimmed, because it is metadata about the buttons rather than part of the question. This
   // is where the wording went when it came off the buttons, so nothing the agent told the person is
   // lost. Declared hidden rather than left out for the same reason as the locations row: whether an
@@ -93,7 +93,7 @@ template $KurierPermissionBody: Gtk.Box {
 
   // The raw input, verbatim, scrollable and capped. `editable: false` + `cursor-visible: false`
   // because this is a thing to read; editable text in an approval dialog invites an edit before an
-  // approval, and the answer would then be about a request kurier never received. `max-content-height`
+  // approval, and the answer would then be about a request lotse never received. `max-content-height`
   // is the cap — without it a thousand-line diff makes a dialog whose buttons are below the fold, and
   // `propagate-natural-height` is what lets a short one shrink to its content.
   Gtk.ScrolledWindow {

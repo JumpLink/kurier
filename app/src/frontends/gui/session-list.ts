@@ -1,11 +1,11 @@
 /**
- * The sidebar's session list: kurier's own records, grouped under "Today" / "Yesterday" / "This
+ * The sidebar's session list: lotse's own records, grouped under "Today" / "Yesterday" / "This
  * week" / "Earlier", newest first.
  *
  * **The window never reads the store itself.** It is handed the records, or a failure, by whoever
  * built it — `main.ts` today, a file monitor later. That keeps the one question this widget answers
  * ("what does a list of sessions look like") separate from the one it must not answer ("where do
- * sessions come from"), which is the same split `@kurier/session`'s store makes one layer down.
+ * sessions come from"), which is the same split `@lotse/session`'s store makes one layer down.
  *
  * Three states, one `Gtk.Stack`, and each is a different sentence: a list, **no sessions yet**, and
  * **the session file could not be read**. An empty list for the third would tell a person their
@@ -26,7 +26,7 @@ import Gtk from '@girs/gtk-4.0';
 import Pango from '@girs/pango-1.0';
 import { basename } from 'node:path';
 
-import { labelOf, type SessionRecord } from '@kurier/session';
+import { labelOf, type SessionRecord } from '@lotse/session';
 
 import { GROUP_TITLES, groupByDate, groupOf, timeLabelOf } from '../../core/session-groups.ts';
 import { CSS } from './css.ts';
@@ -251,7 +251,7 @@ function buildRow(record: SessionRecord, now: Date): Gtk.ListBoxRow {
   const title = new Gtk.Label({
     label: labelOf(record),
     xalign: 0,
-    // Ellipsized, not wrapped — see `.kurier-session-title`.
+    // Ellipsized, not wrapped — see `.lotse-session-title`.
     ellipsize: Pango.EllipsizeMode.END,
     cssClasses: [CSS.sessionTitle],
   });

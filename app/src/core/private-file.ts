@@ -1,6 +1,6 @@
 /**
  * The one private-file writer: a sibling temp file, fsync, rename — so a crash leaves the old file or the
- * new one. File `0600`, a directory kurier creates `0700`. An existing directory is left alone: an
+ * new one. File `0600`, a directory lotse creates `0700`. An existing directory is left alone: an
  * override variable may point into a shared one, and narrowing its mode is not ours to do.
  */
 

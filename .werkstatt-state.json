@@ -1,11 +1,12 @@
 {
   "version": 1,
-  "name": "kurier",
+  "name": "lotse",
   "description": "ACP client: starts coding agents as subprocesses, manages their sessions. The repository itself holds no state — the session records live outside it.",
-  "//nichts-im-repo": "The session records are `state`: $XDG_DATA_HOME/kurier/sessions.json, mode 0600 in a 0700 directory, holding the text of a person's conversations with an agent. They are written there by construction (app/src/core/paths.ts resolves the path; packages/session's store takes whatever path it is given and nothing else), never inside this repository. Overridable with KURIER_DATA_DIR / KURIER_SESSIONS_FILE. There is no `secret` tier: kurier stores no credential in Scheibe 1 — `kurier auth` runs the agent's login with inherited stdio and keeps nothing.",
-  "//keine-credentials": "The agent's own credentials live wherever the agent keeps them (for opencode, its own XDG config) and kurier neither reads nor copies them. Do not add a credential to the session record, to a launcher env, or to any kurier file — there is no file here with a safe place for it.",
-  "//einstellungen": "The settings file is `derived`: $XDG_CONFIG_HOME/kurier/settings.json (KURIER_SETTINGS_FILE overrides), mode 0600 in a 0700 directory, outside this repository — a preference, recreated by choosing again (`kurier agents --use <id>`). It names an agent and its source and nothing else; core/settings.ts accepts no other key, so no credential can be in it. Not a path entry because a project manifest resolves against the checkout.",
-  "//hinweise": "The notices file is `derived`: $XDG_DATA_HOME/kurier/notices.json (KURIER_NOTICES_FILE overrides), mode 0600 in a 0700 directory, outside this repository. It lists which one-time notices were dismissed (today only `bundled-agent`) and nothing else; core/notices.ts accepts no other key. Recreated by pressing \"Got it\" again; a missing or corrupt file just shows the notice once more. Not a path entry because a project manifest resolves against the checkout.",
+  "//nichts-im-repo": "The session records are `state`: $XDG_DATA_HOME/lotse/sessions.json, mode 0600 in a 0700 directory, holding the text of a person's conversations with an agent. They are written there by construction (app/src/core/paths.ts resolves the path; packages/session's store takes whatever path it is given and nothing else), never inside this repository. Overridable with LOTSE_DATA_DIR / LOTSE_SESSIONS_FILE. There is no `secret` tier: lotse stores no credential in Scheibe 1 — `lotse auth` runs the agent's login with inherited stdio and keeps nothing.",
+  "//umzug-von-kurier": "Through 0.1.1 those directories were named `kurier`, not `lotse`. The first start after the rename moves each one with a single `rename(2)` if the new name is not already taken (app/src/core/migrate.ts); a move that fails leaves the app reading the old directory and says so. A backup taken before the rename restores to the old path and is adopted on the next start.",
+  "//keine-credentials": "The agent's own credentials live wherever the agent keeps them (for opencode, its own XDG config) and lotse neither reads nor copies them. Do not add a credential to the session record, to a launcher env, or to any lotse file — there is no file here with a safe place for it.",
+  "//einstellungen": "The settings file is `derived`: $XDG_CONFIG_HOME/lotse/settings.json (LOTSE_SETTINGS_FILE overrides), mode 0600 in a 0700 directory, outside this repository — a preference, recreated by choosing again (`lotse agents --use <id>`). It names an agent and its source and nothing else; core/settings.ts accepts no other key, so no credential can be in it. Not a path entry because a project manifest resolves against the checkout.",
+  "//hinweise": "The notices file is `derived`: $XDG_DATA_HOME/lotse/notices.json (LOTSE_NOTICES_FILE overrides), mode 0600 in a 0700 directory, outside this repository. It lists which one-time notices were dismissed (today only `bundled-agent`) and nothing else; core/notices.ts accepts no other key. Recreated by pressing \"Got it\" again; a missing or corrupt file just shows the notice once more. Not a path entry because a project manifest resolves against the checkout.",
   "entries": [
     {
       "path": "node_modules",
@@ -15,7 +16,7 @@
     {
       "path": "app/dist",
       "class": "derived",
-      "recreate": "gjsify workspace kurier-cli build"
+      "recreate": "gjsify workspace lotse-cli build"
     },
     {
       "path": "app/ship",

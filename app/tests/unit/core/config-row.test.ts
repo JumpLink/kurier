@@ -27,8 +27,8 @@ import {
   projectConfigOptions,
   type ConfigRowControl,
   type ConfigRowView,
-} from '@kurier/core';
-import type { SessionConfigOption } from '@kurier/acp/types';
+} from '@lotse/core';
+import type { SessionConfigOption } from '@lotse/acp/types';
 
 import {
   buildManyModelOptions,
@@ -143,8 +143,8 @@ export default async () => {
       expect(emptyConfigRow().visible).toBe(false);
     });
 
-    await it('skips a boolean option — kurier announces no booleans', async () => {
-      // `KURIER_CLIENT_CAPABILITIES` sends `session.configOptions: {}` with no `boolean`, so an agent is
+    await it('skips a boolean option — lotse announces no booleans', async () => {
+      // `LOTSE_CLIENT_CAPABILITIES` sends `session.configOptions: {}` with no `boolean`, so an agent is
       // not entitled to send one and opencode refuses a tagged value outright. The projection still
       // carries booleans (`core/config.ts` checks the protocol boundary); the ROW does not draw them.
       const onlyBoolean = configRowInput({
@@ -224,7 +224,7 @@ export default async () => {
       expect(configRequest(controls[1]!, '')).toBe(null);
     });
 
-    await it('never sends a tagged boolean, because kurier announces no boolean capability', async () => {
+    await it('never sends a tagged boolean, because lotse announces no boolean capability', async () => {
       const toggle = projectConfigOptions([{ id: 'web', name: 'Web', type: 'boolean', currentValue: true }]);
       expect(toggle[0]?.kind).toBe('switch');
       expect(configRequest(toggle[0]!, 'true')).toBe(null);
@@ -329,7 +329,7 @@ export default async () => {
     });
 
     await it('an update that dropped an option drops it from the row', async () => {
-      // The agent's list is the truth in both directions: a control kurier is still drawing for an
+      // The agent's list is the truth in both directions: a control lotse is still drawing for an
       // option the agent no longer offers is a control that points at nothing.
       const next = applyConfigUpdate(MEASURED, {
         sessionUpdate: 'config_option_update',
@@ -381,7 +381,7 @@ export default async () => {
     });
   });
 
-  await describe('parseConfigOptionSpec — KU_APP_CONFIG’s one format', async () => {
+  await describe('parseConfigOptionSpec — LOTSE_APP_CONFIG’s one format', async () => {
     await it('reads configId=valueId', async () => {
       expect(parseConfigOptionSpec('mode=plan')).toStrictEqual({ controlId: 'mode', value: 'plan' });
       expect(parseConfigOptionSpec('model=openrouter/openai/gpt-6.1-sol')).toStrictEqual({

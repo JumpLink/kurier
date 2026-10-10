@@ -1,25 +1,25 @@
 /**
- * `kurier cancel <id>` — ask the agent to stop a turn.
+ * `lotse cancel <id>` — ask the agent to stop a turn.
  *
  * A cancellation needs a *live* session: `session/cancel` is a notification to an agent process
  * that is mid-turn, and there is no queue to put it in. So this command starts the agent, finds
  * out whether it can even reattach the session, and says so plainly if it cannot — instead of
  * writing a cheerful "cancelled" for a turn that is still running somewhere.
  *
- * Ctrl-C inside `kurier start` and `kurier resume` does the same thing without a second process.
+ * Ctrl-C inside `lotse start` and `lotse resume` does the same thing without a second process.
  * This command exists for the case where the first terminal is gone.
  */
 
 import type { CommandModule } from 'yargs';
 
-import { openAgent, type KurierPaths } from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
+import { openAgent, type LotsePaths } from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
 
 import { agentForRecorded } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'cancel <id>',
   describe: 'send session/cancel for a session (Ctrl-C does the same inside a running turn)',
   builder: (yargs) =>
@@ -37,7 +37,7 @@ const command = (paths: KurierPaths): CommandModule => ({
     const record = store.get(id);
     const agentId = pickArgv<string>(raw, 'agent') ?? record?.agent;
     if (!agentId) {
-      err(`no session with id ${id} and no --agent — \`kurier sessions\` lists what kurier has`);
+      err(`no session with id ${id} and no --agent — \`lotse sessions\` lists what lotse has`);
       process.exitCode = 1;
       return;
     }

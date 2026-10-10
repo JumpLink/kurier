@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
+import { AcpClient } from '@lotse/acp/client';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@lotse/session';
 
 import {
   AgentSession,
@@ -15,7 +15,7 @@ import {
   type McpServer,
   type PermissionQuestion,
   type RecordedResolution,
-} from '@kurier/core';
+} from '@lotse/core';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
 
 const SESSION = { id: 'ses_fixture_0001', cwd: '/fixture' };
@@ -134,7 +134,7 @@ function harness(options: HarnessOptions = {}): Harness {
     ...(options.source ? { source: options.source } : {}),
     ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
     ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
-    // The gate kurier passes is the gate the client answers with, so the refusal assertions are about
+    // The gate lotse passes is the gate the client answers with, so the refusal assertions are about
     // the wire and not about a local array — that is what makes guardrail 2 a measurement.
     open: async (openOptions) => {
       opened.push(openOptions.command);
@@ -567,7 +567,7 @@ export default async () => {
     await it('records the history an agent replays on load exactly once, not twice', async () => {
       // `FixtureAgent.loadSession` replays its chunks as `session/update`, and it uses the same
       // `chunks` list for the prompt turn. So one `load` plus one turn would be **two** occurrences of
-      // the word if kurier recorded the replay — and kurier already has that conversation on disk, so
+      // the word if lotse recorded the replay — and lotse already has that conversation on disk, so
       // writing it again is a duplication in the store, not a detail.
       //
       // `reattach` runs before `runTurn` subscribes, which is what makes this one. Measured here rather
@@ -634,7 +634,7 @@ export default async () => {
       const h = harness({ permissionOptions: PERMISSION });
       await h.session.prompt('do a thing');
       const outcome = h.agent.permissionOutcomes[0]?.outcome;
-      // `null` is the one answer any gate may give, and it is `cancelled` — not `reject`, because kurier
+      // `null` is the one answer any gate may give, and it is `cancelled` — not `reject`, because lotse
       // did not pick one of the agent's options on a person's behalf.
       expect(outcome).toStrictEqual({ outcome: 'cancelled' });
     });
@@ -773,7 +773,7 @@ export default async () => {
     await it('an answer that arrives after the Stop cannot turn cancelled into an allow', async () => {
       // The dialog's promise resolves *after* the Stop, with the allowing id. A surface that does that
       // is not misbehaving — GTK settles a dialog in either order while it is being torn down — so the
-      // question is whether the answer kurier already gave can still be an allow. It cannot: the desk
+      // question is whether the answer lotse already gave can still be an allow. It cannot: the desk
       // holds no open question, so the late id lands on nothing and the outcome is already `cancelled`.
       let release: (id: string) => void = () => {};
       const asked = new Promise<void>((resolve) => {
@@ -807,7 +807,7 @@ export default async () => {
       // The transport ends with the question still up: `#reportFailure` is the path that settles it.
       h.agent.vanish();
       await turn;
-      // Nothing goes back over a dead wire — the agent is gone — so the assertion is on kurier's own
+      // Nothing goes back over a dead wire — the agent is gone — so the assertion is on lotse's own
       // record: the question is settled, and the line says `agent-gone` rather than claiming a person
       // refused anything.
       expect(h.session.snapshot.attachment.status).toBe('gone');
@@ -815,7 +815,7 @@ export default async () => {
       expect(line?.text).toContain('agent-gone');
     });
 
-    await it('the staged request for KU_APP_PERMISSION goes through the same gate', async () => {
+    await it('the staged request for LOTSE_APP_PERMISSION goes through the same gate', async () => {
       // Not a dialog built for a screenshot: the real ask, with all four option kinds on the wire, so
       // what a screenshot shows is the gate's behaviour rather than a fixture's convenience. All four
       // reach the surface, in `orderOptions`' order — the `*_always` kinds are relayed, not filtered.
@@ -832,9 +832,9 @@ export default async () => {
     });
 
     await it('an "always allow" pressed on the staged request goes back with that exact id', async () => {
-      // The pass-through end to end, through the controller and over the wire: kurier relays the agent's
+      // The pass-through end to end, through the controller and over the wire: lotse relays the agent's
       // own option id and adds nothing. The agent is what remembers the decision, so this is not a
-      // promise kurier made.
+      // promise lotse made.
       const h = harness({
         onPermission: async () => 'allow-always',
       });
@@ -1235,9 +1235,9 @@ export default async () => {
       // that went wrong half way through.
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
-        // `withAuthHint`'s sentence, which names `kurier auth` — the remedy a window has no terminal
+        // `withAuthHint`'s sentence, which names `lotse auth` — the remedy a window has no terminal
         // for (plan §6, trap 1).
-        expect(attachment.message).toContain('kurier auth');
+        expect(attachment.message).toContain('lotse auth');
         // **And the kind, which is what lets a surface tell this from a bad command.** The message
         // alone cannot: both reach the composer as one caption, and only one of them has a command to
         // run elsewhere. `core/failure.ts` decides the rest from this.
@@ -1247,7 +1247,7 @@ export default async () => {
 
     await it('a bad command is a failure to start, and gets no kind that has a dialog', async () => {
       // The other half of the split: if ENOENT also came out as `auth`, every missing binary would
-      // put a modal naming `kurier auth` on screen, which is a remedy for a problem the person does
+      // put a modal naming `lotse auth` on screen, which is a remedy for a problem the person does
       // not have.
       const h = harness({ failWith: new Error('spawn opencode ENOENT') });
       await h.session.prompt('hello');
@@ -1290,7 +1290,7 @@ export default async () => {
 
   // Issue #2. The same `-32000` as the login trap, but the agent handshook, loaded the session and
   // answered the turn — with a refusal. Nothing on the wire separates it from trap 1 except the prompt
-  // that went out first, and kurier used to show the login dialog here, naming a command that does not
+  // that went out first, and lotse used to show the login dialog here, naming a command that does not
   // help. See `core/failure.ts`.
   await describe('agent-session — the provider refused the turn', async () => {
     await it('is the `model` kind, not the auth trap, and it earns a dialog', async () => {
@@ -1300,7 +1300,7 @@ export default async () => {
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
         expect(attachment.kind).toBe('model');
-        // The dialog a window will put up: a sentence and a button, and **no** `kurier auth` command
+        // The dialog a window will put up: a sentence and a button, and **no** `lotse auth` command
         // line — the `command` field is what `FailureDialog` renders as "Run this in a terminal".
         const notice = failureNotice(attachment.kind);
         expect(notice).not.toBe(null);
@@ -1355,7 +1355,7 @@ export default async () => {
       expect(attachment.status).toBe('failed');
       if (attachment.status === 'failed') {
         expect(attachment.kind).toBe('auth');
-        expect(failureNotice(attachment.kind)?.command).toBe('kurier auth');
+        expect(failureNotice(attachment.kind)?.command).toBe('lotse auth');
       }
     });
   });
@@ -1597,7 +1597,7 @@ export default async () => {
     });
 
     await it('stageConfigOption sends the prompt that starts the agent, then sets through the real path', async () => {
-      // `KU_APP_CONFIG` goes through this, because the process starts on the first prompt (plan §6) and
+      // `LOTSE_APP_CONFIG` goes through this, because the process starts on the first prompt (plan §6) and
       // an option cannot be set on an agent that does not exist yet.
       const h = harness();
       await h.session.stageConfigOption('mode', 'plan', 'hi');

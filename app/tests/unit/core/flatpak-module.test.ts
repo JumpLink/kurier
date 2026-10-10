@@ -1,12 +1,12 @@
 /**
- * The generated Flatpak module for a bundled agent: it must equal what kurier's own manifest ships today
+ * The generated Flatpak module for a bundled agent: it must equal what lotse's own manifest ships today
  * (golden, key order included), and refuse what it cannot pin.
  */
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { BUNDLED_AGENTS, flatpakAgentModule } from '@kurier/core';
-import manifest from '../../../../eu.jumplink.Kurier.json' with { type: 'json' };
+import { BUNDLED_AGENTS, flatpakAgentModule } from '@lotse/core';
+import manifest from '../../../../eu.jumplink.Lotse.json' with { type: 'json' };
 import pkg from '../../../../package.json' with { type: 'json' };
 
 type Named = { name: string };
@@ -16,12 +16,12 @@ const opencode = BUNDLED_AGENTS.find((agent) => agent.id === 'opencode')!;
 
 export default async () => {
   await describe('flatpakAgentModule', async () => {
-    await it("is byte-for-byte the module in kurier's package.json", async () => {
+    await it("is byte-for-byte the module in lotse's package.json", async () => {
       const shipped = pinned((pkg as { gjsify: { flatpak: { modules: unknown } } }).gjsify.flatpak.modules);
       expect(JSON.stringify(flatpakAgentModule(opencode))).toBe(JSON.stringify(shipped));
     });
 
-    await it("is byte-for-byte the module in kurier's generated manifest", async () => {
+    await it("is byte-for-byte the module in lotse's generated manifest", async () => {
       const shipped = pinned((manifest as { modules: unknown }).modules);
       expect(JSON.stringify(flatpakAgentModule(opencode))).toBe(JSON.stringify(shipped));
     });

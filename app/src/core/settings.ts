@@ -3,27 +3,27 @@
  *
  * **No secret can live here, by construction.** `parseSettings` is an allowlist — `version`, `agent`,
  * and inside `agent` an `id` and a `source` — so a `token`, `apiKey` or `password` is rejected as an
- * unknown field (and named as secret-looking, so the message says why). kurier stores no credential
+ * unknown field (and named as secret-looking, so the message says why). lotse stores no credential
  * (AGENTS.md § Privacy); a setting is a preference, and the file is `derived`: choosing again
  * recreates it.
  *
  * **A bad file never stops startup.** `readSettings` returns the defaults plus a `problem` the caller
  * reports; only a write that fails throws, because that one is a person's explicit action.
  *
- * **A file kurier could not read is never destroyed by a save.** `readSettings` also says what kind of
+ * **A file lotse could not read is never destroyed by a save.** `readSettings` also says what kind of
  * problem it was, and `saveDecision` turns that into one of three answers: write, move the old file to
- * `settings.json.bak` first, or refuse (a newer kurier wrote it, or it could not be read at all — in both
- * cases kurier does not know what is in it). `saveSettings` is the one writer that applies it.
+ * `settings.json.bak` first, or refuse (a newer lotse wrote it, or it could not be read at all — in both
+ * cases lotse does not know what is in it). `saveSettings` is the one writer that applies it.
  *
  * `AgentChoice` names a launcher id *and* a source, so "the bundled opencode" and "my opencode" are two
  * different choices: they keep separate logins and histories (`core/agents/isolation.ts`). The choice
- * itself, and `describeChoice`, are in `@kurier/core` with the resolution that reads them; this file is
+ * itself, and `describeChoice`, are in `@lotse/core` with the resolution that reads them; this file is
  * only the file it is kept in.
  */
 
 import { chmodSync, readFileSync, renameSync } from 'node:fs';
 
-import type { AgentChoice } from '@kurier/core';
+import type { AgentChoice } from '@lotse/core';
 
 import { writePrivateFile } from './private-file.ts';
 
@@ -37,7 +37,7 @@ export const SETTINGS_VERSION = 1;
 export const DEFAULT_SETTINGS: Settings = { version: SETTINGS_VERSION, agent: null };
 
 /**
- * What was wrong with a settings file. `newer-version`: a higher `version` number, so a newer kurier wrote
+ * What was wrong with a settings file. `newer-version`: a higher `version` number, so a newer lotse wrote
  * it. `unreadable`: the file exists and could not be read. `invalid`: anything else — bad JSON, an unknown
  * or secret-looking key, a malformed choice, a version that is not a number above this one.
  */
@@ -75,7 +75,7 @@ export function parseSettings(raw: string): ParsedSettings {
     };
   }
   if (!isRecord(value)) return { problem: 'not a settings object', kind: 'invalid' };
-  // A newer kurier may also have added keys, so the kind is decided by the version alone; the message
+  // A newer lotse may also have added keys, so the kind is decided by the version alone; the message
   // still names whichever problem comes first.
   const version = value['version'];
   const kind: SettingsProblemKind =
@@ -85,7 +85,7 @@ export function parseSettings(raw: string): ParsedSettings {
   }
   if (version !== SETTINGS_VERSION) {
     return {
-      problem: `settings version ${JSON.stringify(version)} is not known (this kurier reads version ${SETTINGS_VERSION})`,
+      problem: `settings version ${JSON.stringify(version)} is not known (this lotse reads version ${SETTINGS_VERSION})`,
       kind,
     };
   }
@@ -108,7 +108,7 @@ export function parseSettings(raw: string): ParsedSettings {
 }
 
 /**
- * `<id>`, `<id>:host`, `<id>:bundled` — the spelling `kurier agents --use` takes. A bare id means the
+ * `<id>`, `<id>:host`, `<id>:bundled` — the spelling `lotse agents --use` takes. A bare id means the
  * person's own install. `none` clears the choice (the GUI calls that Automatic). `known` limits the ids a person may *write*; the
  * file itself may still name an id this build lacks, and that is reported at resolution, not here.
  */
@@ -165,8 +165,8 @@ export type SaveDecision = 'write' | 'backup-then-write' | 'refuse';
 
 /**
  * What a save may do to the file it finds, from what `readSettings` said about it. Pure, and the whole of
- * the rule: no problem → write; a file kurier read but did not accept → keep a copy, then write; a file it
- * does not understand (written by a newer kurier) or could not read → leave it alone.
+ * the rule: no problem → write; a file lotse read but did not accept → keep a copy, then write; a file it
+ * does not understand (written by a newer lotse) or could not read → leave it alone.
  */
 export function saveDecision(kind: SettingsProblemKind | null): SaveDecision {
   if (kind === null) return 'write';
@@ -201,8 +201,8 @@ export function saveSettings(path: string, settings: Settings): { readonly backu
 
 /**
  * Write the settings: a sibling temp file, fsync, rename — the session store's recipe, so a crash leaves
- * the old file or the new one. File `0600`, a directory kurier creates `0700`. An existing directory is
- * left alone: `KURIER_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
+ * the old file or the new one. File `0600`, a directory lotse creates `0700`. An existing directory is
+ * left alone: `LOTSE_SETTINGS_FILE` may point into a shared one, and narrowing its mode is not ours to do.
  */
 export function writeSettings(path: string, settings: Settings): void {
   writePrivateFile(path, `${JSON.stringify(settings, null, 2)}\n`, 'settings');

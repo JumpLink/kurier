@@ -14,7 +14,7 @@ import {
   type LoginProvider,
   type LoginSession,
   type OnboardingInput,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const method = (kind: 'oauth' | 'key'): LoginMethod => ({ id: kind, kind, label: kind, fields: [] });
 const provider = (id: string, kinds: ('oauth' | 'key')[], connected = false): LoginProvider => ({

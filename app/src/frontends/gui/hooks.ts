@@ -26,9 +26,9 @@ import { hookFlag, hookList, hookValue } from './hook-value.ts';
 export type FrameworkHooks = AppDevHooks;
 
 /** What this surface adds on top, and why each one exists. */
-export interface KurierHooks extends FrameworkHooks {
+export interface LotseHooks extends FrameworkHooks {
   /**
-   * `KU_APP_SESSION` — open this session id at startup.
+   * `LOTSE_APP_SESSION` — open this session id at startup.
    *
    * Without it the only reachable state is an empty window, because selecting a session needs a
    * click. A surface whose interesting half cannot be opened without a mouse is a surface whose
@@ -37,7 +37,7 @@ export interface KurierHooks extends FrameworkHooks {
   session?: string;
 
   /**
-   * `KU_APP_AGENT` — which agent this window talks to. Unset means what the CLI resolves: the saved setting if available, else the person's own install, else the bundled copy.
+   * `LOTSE_APP_AGENT` — which agent this window talks to. Unset means what the CLI resolves: the saved setting if available, else the person's own install, else the bundled copy.
    *
    * Not an `AgentCommand` and not a path: an *agent id*, resolved in `core/agents/dev-agent.ts`. The
    * two accepted values are a real launcher (`opencode`) and `stand-in`, the dev fixture — and the
@@ -48,7 +48,7 @@ export interface KurierHooks extends FrameworkHooks {
   agent?: string;
 
   /**
-   * `KU_APP_PERMISSION` — put a `session/request_permission` in front of the real gate at startup.
+   * `LOTSE_APP_PERMISSION` — put a `session/request_permission` in front of the real gate at startup.
    *
    * The dialog is the **reason this project exists**: a modal that must appear, must show what the
    * agent wants to do, and must fail closed on Escape. None of that is observable from outside
@@ -57,13 +57,13 @@ export interface KurierHooks extends FrameworkHooks {
    * **It goes through the real path, not around it.** The staged request is handed to the same gate
    * that answers the agent, so what a screenshot shows is the dialog the gate produces — including
    * the fail-closed behaviour, which a dialog built only for the screenshot would not have. It waits
-   * briefly for a *real* request first (see `window.ts`), so `KU_APP_PERMISSION=1` next to a stand-in
+   * briefly for a *real* request first (see `window.ts`), so `LOTSE_APP_PERMISSION=1` next to a stand-in
    * that asks permission itself shows the agent's question rather than this fixture.
    */
   permission?: boolean;
 
   /**
-   * `KU_APP_CONFIG` — set a session config option at startup, **as `configId=valueId`**.
+   * `LOTSE_APP_CONFIG` — set a session config option at startup, **as `configId=valueId`**.
    *
    * For the same reason: a `Gtk.DropDown` is exactly the widget the devtools plane cannot operate —
    * `ActivateWidget` on a combo row reports `true` and changes no selection — and the config row is the
@@ -71,20 +71,20 @@ export interface KurierHooks extends FrameworkHooks {
    *
    * **Both halves are required, and neither is guessed** (`parseConfigOptionSpec` decides it): a
    * control id says which option and not to what, and a value id cannot be resolved on its own. So
-   * `KU_APP_CONFIG=effort=high` sets the effort level to high, and `KU_APP_CONFIG=effort` is refused
+   * `LOTSE_APP_CONFIG=effort=high` sets the effort level to high, and `LOTSE_APP_CONFIG=effort` is refused
    * with a line in the log rather than quietly picking a value.
    *
    * **It goes through the real path and sends a prompt if none has run**, because an option can only be
-   * set on a live agent and kurier starts the agent on the first prompt (plan §6). So the hook sends
-   * `KU_APP_PROMPT` (or a fixture sentence), waits for `session/load` to answer with the options, and
-   * then calls `session/set_config_option` — which is also why it is applied before `KU_APP_THINKING`:
+   * set on a live agent and lotse starts the agent on the first prompt (plan §6). So the hook sends
+   * `LOTSE_APP_PROMPT` (or a fixture sentence), waits for `session/load` to answer with the options, and
+   * then calls `session/set_config_option` — which is also why it is applied before `LOTSE_APP_THINKING`:
    * one prompt, one turn, one set. What a screenshot then shows is the row in the state a person's
    * click produces, not a picture of one.
    */
   config?: string;
 
   /**
-   * `KU_APP_STOP` — press Stop once the turn is running, at the point `KU_APP_THINKING` runs.
+   * `LOTSE_APP_STOP` — press Stop once the turn is running, at the point `LOTSE_APP_THINKING` runs.
    *
    * **Stop is otherwise photographable only by driving the button through `ActivateWidget`, and that is
    * not the same thing.** A stopped turn is one of the five states plan §6 names and the one no env var
@@ -101,7 +101,7 @@ export interface KurierHooks extends FrameworkHooks {
   stop?: boolean;
 
   /**
-   * `KU_APP_STOP_ESCAPE` — dismiss the open permission dialog **the way Escape does**, and stop
+   * `LOTSE_APP_STOP_ESCAPE` — dismiss the open permission dialog **the way Escape does**, and stop
    * nothing else.
    *
    * **Escape's answer is `cancelled` on the wire and `not-answered: dismissed` in the transcript**, and
@@ -118,9 +118,9 @@ export interface KurierHooks extends FrameworkHooks {
   stopEscape?: boolean;
 
   /**
-   * `KU_APP_THINKING` — send a prompt at startup, so a running turn can be reached without a pointer.
+   * `LOTSE_APP_THINKING` — send a prompt at startup, so a running turn can be reached without a pointer.
    *
-   * The turn that follows is a **real** turn against whatever `KU_APP_AGENT` selected: this hook starts
+   * The turn that follows is a **real** turn against whatever `LOTSE_APP_AGENT` selected: this hook starts
    * it, it does not stage a fake one. Against the stand-in agent that is free and repeatable, and
    * against `opencode` it is a model call — which is exactly why the fixture is the default way to look
    * at this state and why the prompt it sends is a fixture prompt rather than anything of the person's.
@@ -128,13 +128,13 @@ export interface KurierHooks extends FrameworkHooks {
   thinking?: boolean;
 
   /**
-   * `KU_APP_PROMPT` — the text `KU_APP_THINKING` sends. Fixed English, synthetic: a screenshot must
+   * `LOTSE_APP_PROMPT` — the text `LOTSE_APP_THINKING` sends. Fixed English, synthetic: a screenshot must
    * not carry a real conversation out of a real session file.
    */
   prompt?: string;
 
   /**
-   * `KU_APP_DISMISS_FAILURE` — press the failure dialog's own Close, once it is up.
+   * `LOTSE_APP_DISMISS_FAILURE` — press the failure dialog's own Close, once it is up.
    *
    * **The second control no outside caller can reach, and the reason is measured.** `ActivateWidget`
    * on the response button of an `Adw.AlertDialog` returns `true` and dismisses nothing — measured on
@@ -145,13 +145,13 @@ export interface KurierHooks extends FrameworkHooks {
    *
    * So the "the person closed it" half of a modal's life is unreachable from outside the process, and
    * with it the question that matters: does the *same* failure come back on the next state move? The
-   * hook answers it the same way `KU_APP_STOP` answers its question — through the surface, not around
+   * hook answers it the same way `LOTSE_APP_STOP` answers its question — through the surface, not around
    * it (`FailureDialog.dismiss()` emits the response libadwaita emits when the button is pressed).
    */
   dismissFailure?: boolean;
 
   /**
-   * `KU_APP_SWITCH` — open these session ids in turn, once a failure is on screen. Comma-separated,
+   * `LOTSE_APP_SWITCH` — open these session ids in turn, once a failure is on screen. Comma-separated,
    * so a walk away and back is one variable: `fixture-1,fixture-2`.
    *
    * **The sidebar row is the third pointer-only control, and unlike the other two it has no keyboard
@@ -165,15 +165,15 @@ export interface KurierHooks extends FrameworkHooks {
    *
    * **A list, not the raw string, because this reader is where a variable's syntax is read** — the
    * same place `'0'` stops meaning on. A bare id is one entry and an entry that is only whitespace is
-   * not an entry, so `KU_APP_SWITCH=,` asks for no session at all rather than for one called `''`.
+   * not an entry, so `LOTSE_APP_SWITCH=,` asks for no session at all rather than for one called `''`.
    */
   switchTo?: string[];
 
   /**
-   * `KU_APP_CHOOSE_MODEL` — press the `'model'` failure dialog's **Choose another model**, once it is up.
+   * `LOTSE_APP_CHOOSE_MODEL` — press the `'model'` failure dialog's **Choose another model**, once it is up.
    *
    * **The fifth pointer-only control, and the one that needed a new hook rather than an old one.**
-   * `KU_APP_DISMISS_FAILURE` presses Close through `FailureDialog.close()`, which is the same call a
+   * `LOTSE_APP_DISMISS_FAILURE` presses Close through `FailureDialog.close()`, which is the same call a
    * dismissal makes. This dialog's other response has no such shortcut: `Adw.AlertDialog` has no
    * callable `response()` at all, and `ActivateWidget` on its button reports `true` and emits nothing
    * (both measured — `scripts/probes/alert-dialog-close.mjs`). So the state only the button reaches —
@@ -188,13 +188,13 @@ export interface KurierHooks extends FrameworkHooks {
   chooseModel?: boolean;
 
   /**
-   * `KU_APP_PREFERENCES` — open the preferences dialog through its own `app.preferences` action.
-   * A flag, so `KU_APP_PREFERENCES=0` leaves it closed.
+   * `LOTSE_APP_PREFERENCES` — open the preferences dialog through its own `app.preferences` action.
+   * A flag, so `LOTSE_APP_PREFERENCES=0` leaves it closed.
    */
   preferences?: boolean;
 
   /**
-   * `KU_APP_PREFERENCES_AGENT` — choose a row in that dialog by key (`auto`, `opencode:host`,
+   * `LOTSE_APP_PREFERENCES_AGENT` — choose a row in that dialog by key (`auto`, `opencode:host`,
    * `opencode:bundled`) through its own handler, and open the dialog first. A combo or radio row is
    * what the devtools plane cannot operate (see above), so this is the only way to photograph the
    * dialog after a choice.
@@ -202,59 +202,59 @@ export interface KurierHooks extends FrameworkHooks {
   preferencesAgent?: string;
 
   /**
-   * `KU_APP_LOGIN` — open the login dialog the way the auth dialog's "Log in…" button does. A flag. It
+   * `LOTSE_APP_LOGIN` — open the login dialog the way the auth dialog's "Log in…" button does. A flag. It
    * runs the real path (a private `opencode serve`, the real provider list), so a screenshot shows what a
    * person sees; the dialog's rows are `Adw.ActionRow`s, which the devtools plane can activate.
    */
   login?: boolean;
 
   /**
-   * `KU_APP_ONBOARDING` — show the provider onboarding page as if no provider were connected and a
-   * login could run (`KurierChat.stageOnboarding`). A flag. The stand-in agent has no login API, so the
+   * `LOTSE_APP_ONBOARDING` — show the provider onboarding page as if no provider were connected and a
+   * login could run (`LotseChat.stageOnboarding`). A flag. The stand-in agent has no login API, so the
    * real probe could never reach this state against it.
    */
   onboarding?: boolean;
 
   /**
-   * `KU_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
-   * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `KU_APP_NEW_CHAT=0` stays where it is.
+   * `LOTSE_APP_NEW_CHAT` — go to the empty composer through the New chat button's own action
+   * (`win.new-chat`), the call a click and `<Ctrl>n` make. A flag, so `LOTSE_APP_NEW_CHAT=0` stays where it is.
    */
   newChat?: boolean;
 
   /**
-   * `KU_APP_NEW_CHAT_MIDTURN` — press New chat **while a turn is streaming**: once the agent has
-   * answered with something, and the turn is still running. Combined with `KU_APP_THINKING` and a slow
-   * stand-in (`KU_STANDIN_DELAY_MS`), it reaches the state `KU_APP_NEW_CHAT` waits its way around.
+   * `LOTSE_APP_NEW_CHAT_MIDTURN` — press New chat **while a turn is streaming**: once the agent has
+   * answered with something, and the turn is still running. Combined with `LOTSE_APP_THINKING` and a slow
+   * stand-in (`LOTSE_STANDIN_DELAY_MS`), it reaches the state `LOTSE_APP_NEW_CHAT` waits its way around.
    */
   newChatMidTurn?: boolean;
 
   /**
-   * `KU_APP_CWD` — where a new chat runs, **instead of asking the host or reading the process cwd**.
+   * `LOTSE_APP_CWD` — where a new chat runs, **instead of asking the host or reading the process cwd**.
    * A screenshot shows this path under the composer, and the real one is a private directory name, so
-   * every screenshot run pins a synthetic one. It beats `KURIER_CWD`; a path that does not exist falls
+   * every screenshot run pins a synthetic one. It beats `LOTSE_CWD`; a path that does not exist falls
    * through to the next candidate like any other (`core/cwd.ts`).
    */
   cwd?: string;
 
-  /** `KU_APP_NOTICE` — force the bundled-agent condition, so the privacy banner can be photographed outside a Flatpak. */
+  /** `LOTSE_APP_NOTICE` — force the bundled-agent condition, so the privacy banner can be photographed outside a Flatpak. */
   notice?: boolean;
 
-  /** `KU_APP_NOTICE_DISMISS` — press the banner's "Got it" through the banner's own `button-clicked`. */
+  /** `LOTSE_APP_NOTICE_DISMISS` — press the banner's "Got it" through the banner's own `button-clicked`. */
   noticeDismiss?: boolean;
 
-  /** `KU_APP_NO_AGENT` — force the nothing-found resolution; beats `KU_APP_AGENT`. */
+  /** `LOTSE_APP_NO_AGENT` — force the nothing-found resolution; beats `LOTSE_APP_AGENT`. */
   noAgent?: boolean;
 }
 
 /**
- * Read `KU_APP_*` at startup.
+ * Read `LOTSE_APP_*` at startup.
  *
  * **The framework's reader is spread in, and it does not read these ten.** `readAppDevHooks` knows
- * `VIEW`, `FILE` and `DEBUG` and nothing else, so kurier's hooks are read here — the earlier version
+ * `VIEW`, `FILE` and `DEBUG` and nothing else, so lotse's hooks are read here — the earlier version
  * of this comment claimed the framework's "empty means unset" and truthiness rules were being used,
- * which was false for every key, and it named `KU_APP_THINKING=0` as the disagreement it prevented
+ * which was false for every key, and it named `LOTSE_APP_THINKING=0` as the disagreement it prevented
  * while being the disagreement: `trimmed()` returns the **string** `'0'`, which is truthy, so
- * `KU_APP_THINKING=0` sent a prompt and `KU_APP_PERMISSION=0` staged a dialog. Both spellings of
+ * `LOTSE_APP_THINKING=0` sent a prompt and `LOTSE_APP_PERMISSION=0` staged a dialog. Both spellings of
  * "off" are now read as off, by `flag` below.
  *
  * **`flag` is the same rule the stand-in agent uses** (`scripts/stand-in-agent.mjs`), copied rather
@@ -263,7 +263,7 @@ export interface KurierHooks extends FrameworkHooks {
  * A dev hook that is read two ways is a hook whose screenshots depend on which reader ran. The rule
  * and its test live in `hook-value.ts`; this function only wires the keys to it.
  */
-export function readHooks(env: Record<string, string | undefined> = process.env): KurierHooks {
+export function readHooks(env: Record<string, string | undefined> = process.env): LotseHooks {
   const framework = readAppDevHooks({ prefix: DEV_HOOK_PREFIX, env });
   return {
     ...framework,
@@ -271,9 +271,9 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     agent: hookValue(env, 'AGENT'),
     permission: hookFlag(env, 'PERMISSION'),
     config: hookValue(env, 'CONFIG'),
-    // Every flag below is a boolean, not the string, so `KU_APP_THINKING=0` reads as off at the call
+    // Every flag below is a boolean, not the string, so `LOTSE_APP_THINKING=0` reads as off at the call
     // site too — the old `!== undefined` in `window.ts` would have accepted the string `'0'` just as
-    // happily. Both Stop hooks are flags for the same reason `THINKING` is: `KU_APP_STOP=0` has to
+    // happily. Both Stop hooks are flags for the same reason `THINKING` is: `LOTSE_APP_STOP=0` has to
     // mean "do not press Stop", or the one hook that changes the state under test would be the one
     // that ignores its own off-switch. **The rules themselves live in `hook-value.ts`**, which has no
     // `gi://` in it and is therefore tested on both runtimes — this function is the wiring.
@@ -284,7 +284,7 @@ export function readHooks(env: Record<string, string | undefined> = process.env)
     // open is the window's `#open`, and the order is the variable's own.
     switchTo: hookList(env, 'SWITCH'),
     // A flag for the same reason `DISMISS_FAILURE` is one: it changes the state under test, so it has to
-    // honour its own off-switch. `KU_APP_CHOOSE_MODEL=0` must leave the dialog up, not press it.
+    // honour its own off-switch. `LOTSE_APP_CHOOSE_MODEL=0` must leave the dialog up, not press it.
     chooseModel: hookFlag(env, 'CHOOSE_MODEL'),
     preferences: hookFlag(env, 'PREFERENCES'),
     preferencesAgent: hookValue(env, 'PREFERENCES_AGENT'),

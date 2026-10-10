@@ -1,14 +1,14 @@
-# @kurier/core
+# @lotse/core
 
-Kurier without a surface: which agent to start and how, the session a prompt turn runs in, the view
+Lotse without a surface: which agent to start and how, the session a prompt turn runs in, the view
 models a chat is drawn from, and the provider login. No `gi://`, no widget, no CLI parser — so it runs
 on GJS and on Node, and a host decides everything that needs deciding.
 
-Licence: **LGPL-3.0-or-later** (`LICENSE`, `COPYING` in this directory). Kurier's apps are AGPL; this
+Licence: **LGPL-3.0-or-later** (`LICENSE`, `COPYING` in this directory). Lotse's apps are AGPL; this
 package is the part a stranger may link into their own application.
 
-If you want the finished GTK4 / libadwaita chat, use [`@kurier/widget`](../widget/README.md) and read
-the [host guide](../../docs/embedding.md). Use `@kurier/core` directly to drive an agent without that
+If you want the finished GTK4 / libadwaita chat, use [`@lotse/widget`](../widget/README.md) and read
+the [host guide](../../docs/embedding.md). Use `@lotse/core` directly to drive an agent without that
 widget, or to build your own surface on the same logic.
 
 ## Install and import
@@ -17,11 +17,11 @@ The package is `private` and not yet on a registry. Take it as a workspace depen
 `packages/` directory) and depend on it by name, as the other packages here do:
 
 ```json
-{ "dependencies": { "@kurier/core": "*", "@kurier/session": "*" } }
+{ "dependencies": { "@lotse/core": "*", "@lotse/session": "*" } }
 ```
 
 ```ts
-import { kurierPathsUnder, AgentSession } from '@kurier/core';
+import { lotsePathsUnder, AgentSession } from '@lotse/core';
 ```
 
 There is **one entry point**: `.` (`src/index.ts`). Nothing else is importable, so everything below is
@@ -31,13 +31,13 @@ the login policy, the free-model list), which the bundler inlines.
 ## Minimal example
 
 Resolve an agent, start it, run one prompt turn (`denyAll` refuses every permission request). Needs
-`@kurier/acp` as well; the file is type-checked in `app/tests/examples/core-turn.ts`.
+`@lotse/acp` as well; the file is type-checked in `app/tests/examples/core-turn.ts`.
 
 ```ts
-import { denyAll } from '@kurier/acp';
-import { gatherResolveContext, kurierPathsUnder, openAgent, resolveDefault, runTurn } from '@kurier/core';
+import { denyAll } from '@lotse/acp';
+import { gatherResolveContext, lotsePathsUnder, openAgent, resolveDefault, runTurn } from '@lotse/core';
 
-const paths = kurierPathsUnder('/path/to/my-app-data');
+const paths = lotsePathsUnder('/path/to/my-app-data');
 const agent = resolveDefault(gatherResolveContext(paths));
 if (!agent) throw new Error('no agent found');
 
@@ -59,25 +59,25 @@ For a conversation with state — persistence, reattach, permission questions, c
 
 ## Public surface
 
-### Where kurier writes
+### Where lotse writes
 
 | Export | What it is |
 |---|---|
-| `KurierPaths` | Every place kurier writes, as one value: `dataDir`, `configDir`, `sessionsFile`, `settingsFile`, `noticesFile`. Core never resolves a directory itself. |
-| `kurierPathsUnder(root)` | The layout for a host: `<root>/data/{sessions,notices}.json`, `<root>/config/settings.json`. |
+| `LotsePaths` | Every place lotse writes, as one value: `dataDir`, `configDir`, `sessionsFile`, `settingsFile`, `noticesFile`. Core never resolves a directory itself. |
+| `lotsePathsUnder(root)` | The layout for a host: `<root>/data/{sessions,notices}.json`, `<root>/config/settings.json`. |
 
 A bundled agent's `HOME` and `XDG_*` directories follow `dataDir` (see `isolationDirs` below), so moving
 `dataDir` moves the agent's whole private state with it.
 
-`kurierPaths()` — the XDG and `KURIER_*` resolver — is **not** exported: which directory a command-line
+`lotsePaths()` — the XDG and `LOTSE_*` resolver — is **not** exported: which directory a command-line
 tool writes to is that tool's decision, and it lives in the app (`app/src/core/paths.ts`). A host builds
-its own `KurierPaths`, normally with `kurierPathsUnder`.
+its own `LotsePaths`, normally with `lotsePathsUnder`.
 
 ### Which agent
 
 | Export | What it is |
 |---|---|
-| `LAUNCHERS`, `DEFAULT_AGENT`, `findLauncher`, `requireLauncher`, `launcherIds` | The agent commands kurier can start from `PATH` (opencode today). |
+| `LAUNCHERS`, `DEFAULT_AGENT`, `findLauncher`, `requireLauncher`, `launcherIds` | The agent commands lotse can start from `PATH` (opencode today). |
 | `AgentCommand` | How one agent process is started: `id`, `title`, `program`, `args`, optional `cwd`, `env`, `bundled`. |
 | `gatherResolveContext(paths, readVersions?, probeHost?)` / `gatherResolveContextAsync(paths)` | Probe this machine once: which agents exist on `PATH`, which bundled copies exist. The async form never blocks, for a sandboxed app. |
 | `resolveDefault(context, setting?)` / `resolveDefaultWithNote` | The agent to start when nobody chose: the setting, else the person's own install, else the bundled copy. `null` means none; the `…WithNote` form also says why a setting was not honoured. |
@@ -104,9 +104,9 @@ its own `KurierPaths`, normally with `kurierPathsUnder`.
 | `installInterruptHandler`, `decideInterrupt` | Ctrl-C for a command-line process: cancel first, then terminate. |
 | `conversationRecord`, `titleFromPrompt`, `unsavedMessage` | Build the `SessionRecord` for a new conversation. |
 
-`AgentSessionOptions.mcpServers` takes `readonly McpServer[]`. Kurier forwards them **unchanged** in
+`AgentSessionOptions.mcpServers` takes `readonly McpServer[]`. Lotse forwards them **unchanged** in
 `session/new` and in the reattach of a stored session, and never reads past `type`. Absent means `[]`
-in `session/new` and nothing added to a reattach. Kurier never edits the agent's own global config for
+in `session/new` and nothing added to a reattach. Lotse never edits the agent's own global config for
 this.
 
 ```ts
@@ -123,15 +123,15 @@ An agent asks `session/request_permission`; the answer is always a person's or a
 | Export | What it is |
 |---|---|
 | `PermissionDesk`, `PermissionQuestion` | One open question, a queue behind it, no memory. Stop, a closing window and a dying agent settle every waiting question as cancelled. |
-| `permissionView`, `PermissionView`, `usableOptions`, `orderOptions`, `optionLabel`, `decideFromView`, `answerFor` | What the dialog shows and how a button press becomes a decision. Only the four standard option kinds are shown; the wording is kurier's, never the agent's. |
+| `permissionView`, `PermissionView`, `usableOptions`, `orderOptions`, `optionLabel`, `decideFromView`, `answerFor` | What the dialog shows and how a button press becomes a decision. Only the four standard option kinds are shown; the wording is lotse's, never the agent's. |
 | `PermissionDecision`, `NotAnsweredReason` | The outcome, including why nothing was answered (`dismissed`, `turn-cancelled`, …). |
 | `terminalGate`, `Terminal` | A command-line gate that asks on a terminal. |
-| `ClientGate` (from `@kurier/acp`) | `{ permission }`. Fail-closed by default (`denyAll`). |
+| `ClientGate` (from `@lotse/acp`) | `{ permission }`. Fail-closed by default (`denyAll`). |
 
 ### Login and auth
 
 Two different things: **auth** is the login the agent's `authMethods` ask for; the **login** is
-kurier's own OAuth / API-key dialog, driven over opencode's HTTP API. Nothing here stores a credential;
+lotse's own OAuth / API-key dialog, driven over opencode's HTTP API. Nothing here stores a credential;
 the agent keeps its own.
 
 | Export | What it is |
@@ -160,9 +160,9 @@ Details and measurements: [docs/login.md](../../docs/login.md).
 | Export | What it is |
 |---|---|
 | `FREE_MODELS`, `FREE_MODEL_IDS`, `FreeModelList` | A maintained list of model ids that are free **and** documented as zero-retention, with the date checked and the source. |
-| `freeModelFirst(values)` | Sort those ids to the top of a model dropdown. Never selects, never hides, never guesses: an id kurier has not heard of is simply not matched. |
+| `freeModelFirst(values)` | Sort those ids to the top of a model dropdown. Never selects, never hides, never guesses: an id lotse has not heard of is simply not matched. |
 
-Free hosted models are time-limited and what you send goes to the provider that hosts them. Kurier
+Free hosted models are time-limited and what you send goes to the provider that hosts them. Lotse
 labels them that way on the onboarding page; treat the same rule as yours (see
 [Privacy](../../docs/embedding.md#privacy-free-hosted-models-never-get-private-data)).
 
@@ -182,5 +182,5 @@ Pure functions from state to "what to draw", tested on Node and GJS. Use them to
 
 ## Related
 
-[`@kurier/widget`](../widget/README.md) · [host guide](../../docs/embedding.md) ·
-[ADR 0001](../../docs/adr/0001-kurier-as-an-embeddable-widget.md) · [login](../../docs/login.md)
+[`@lotse/widget`](../widget/README.md) · [host guide](../../docs/embedding.md) ·
+[ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md) · [login](../../docs/login.md)

@@ -18,7 +18,7 @@
  * **The rounded frame is a `Gtk.Box` with Adwaita's `card` plus one class of our own, not a
  * `Gtk.Frame`.** `GtkFrame` draws a border and a title gap and nothing in Adwaita turns it into the
  * rounded surface this needs. `card` is the toolkit's own name for an inset surface and brings the
- * background, the shadow and both colour schemes with it; `.kurier-composer-frame` only widens the
+ * background, the shadow and both colour schemes with it; `.lotse-composer-frame` only widens the
  * radius and sets the margins that lift the card off the window's edges. Together with the bottom
  * bar's `flat` style (`window.blp`) that is what makes the composer read as one object floating in
  * the pane rather than as a strip welded to the bottom of the window.
@@ -75,7 +75,7 @@ import Adw from '@girs/adw-1';
 import Gdk from '@girs/gdk-4.0';
 import Gtk from '@girs/gtk-4.0';
 
-import { composerView, type ComposerInput } from '@kurier/core';
+import { composerView, type ComposerInput } from '@lotse/core';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
@@ -327,10 +327,10 @@ export class Composer {
    * `onStop` already and could call it; calling *that* would be a second way to press Stop, and the two
    * would drift the moment the button's handler grew a step — which it has, twice: the dialog teardown
    * with `turn-cancelled` before the cancel, and the clear-draft that follows. Emitting the signal goes
-   * through the one handler a person's click goes through, so a screenshot of `KU_APP_STOP` is a
+   * through the one handler a person's click goes through, so a screenshot of `LOTSE_APP_STOP` is a
    * screenshot of the surface rather than of a re-implementation of it.
    *
-   * **A no-op when the button is not Stop.** `KU_APP_STOP` fires on the first tick that finds a running
+   * **A no-op when the button is not Stop.** `LOTSE_APP_STOP` fires on the first tick that finds a running
    * turn, and the turn may have settled in the meantime; clicking a Send button instead would send a
    * prompt, which is not what the hook asked for. The action check is the guard, and it is the same
    * `composerView` answer the button was last rendered from.

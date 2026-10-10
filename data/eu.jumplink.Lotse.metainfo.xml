@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Copyright 2026 Pascal Garber -->
 <component type="desktop-application">
-  <id>eu.jumplink.Kurier</id>
+  <id>eu.jumplink.Lotse</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-or-later</project_license>
-  <name>Kurier</name>
+  <name>Lotse</name>
   <!-- TRANSLATORS: One line, no full stop: what the app does for the person using it -->
   <summary>Start coding agents as subprocesses and drive their sessions</summary>
   <description>
     <!-- TRANSLATORS: Opening paragraph: what the app is and which standard it speaks -->
-    <p>Kurier is a client for the Agent Client Protocol (ACP), the open standard a coding agent speaks over a JSON-RPC connection on stdio. It starts the agent as a subprocess, keeps its session, and shows you what the agent says while it works.</p>
+    <p>Lotse is a client for the Agent Client Protocol (ACP), the open standard a coding agent speaks over a JSON-RPC connection on stdio. It starts the agent as a subprocess, keeps its session, and shows you what the agent says while it works.</p>
     <!-- TRANSLATORS: Second paragraph: the app's own scope versus the agent's -->
-    <p>The agent decides which model does the work; kurier owns the environment around it — which directory the session runs in, what the agent is allowed to do, and which MCP servers it may reach. A session record says what is reachable, never what is allowed, so every request is checked again, every time.</p>
+    <p>The agent decides which model does the work; lotse owns the environment around it — which directory the session runs in, what the agent is allowed to do, and which MCP servers it may reach. A session record says what is reachable, never what is allowed, so every request is checked again, every time.</p>
     <!-- TRANSLATORS: Bullet list of what the app does -->
     <ul>
       <!-- TRANSLATORS: Feature list: the session commands -->
@@ -19,7 +19,7 @@
       <!-- TRANSLATORS: Feature list: streaming a turn and stopping it -->
       <li>Watch one prompt turn stream in, and stop it without killing the session</li>
       <!-- TRANSLATORS: Feature list: the permission gate -->
-      <li>Answer the agent's permission requests yourself — kurier denies by default rather than approving for you</li>
+      <li>Answer the agent's permission requests yourself — lotse denies by default rather than approving for you</li>
       <!-- TRANSLATORS: Feature list: the protocol means no per-agent driver -->
       <li>One agent needs no driver: opencode today, anything that speaks ACP tomorrow</li>
     </ul>
@@ -28,10 +28,10 @@
     <name translate="no">Pascal Garber</name>
     <email>pascal@jumplink.eu</email>
   </developer>
-  <launchable type="desktop-id">eu.jumplink.Kurier.desktop</launchable>
-  <url type="homepage">https://github.com/JumpLink/kurier</url>
-  <url type="bugtracker">https://github.com/JumpLink/kurier/issues</url>
-  <url type="vcs-browser">https://github.com/JumpLink/kurier</url>
+  <launchable type="desktop-id">eu.jumplink.Lotse.desktop</launchable>
+  <url type="homepage">https://github.com/JumpLink/lotse</url>
+  <url type="bugtracker">https://github.com/JumpLink/lotse/issues</url>
+  <url type="vcs-browser">https://github.com/JumpLink/lotse</url>
   <content_rating type="oars-1.1">
     <content_attribute id="social-info">none</content_attribute>
     <content_attribute id="language-humor">none</content_attribute>
@@ -100,7 +100,13 @@
     <kudo>HiDpiIcon</kudo>
   </kudos>
   <provides>
-    <binary>kurier-app</binary>
-    <binary>kurier</binary>
+    <binary>lotse-app</binary>
+    <binary>lotse</binary>
+    <!-- Renamed from Kurier before the first store submission: this component provides everything
+         eu.jumplink.Kurier did, so a review or an installed copy is not orphaned by the rename. -->
+    <id>eu.jumplink.Kurier</id>
   </provides>
+  <replaces>
+    <id>eu.jumplink.Kurier</id>
+  </replaces>
 </component>

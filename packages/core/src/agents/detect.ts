@@ -1,5 +1,5 @@
 /**
- * Which agents are usable, and which one kurier would pick — pure over facts.
+ * Which agents are usable, and which one lotse would pick — pure over facts.
  *
  * The facts are gathered elsewhere (`probe.ts`), so everything here is "facts in, answer out" and a test
  * hands in a synthetic machine. Three sources, and the word is a promise: `host` means a program on the
@@ -71,7 +71,7 @@ export interface Resolution {
 }
 
 /**
- * The agent kurier would use now: the setting if that agent is available, else the first host install,
+ * The agent lotse would use now: the setting if that agent is available, else the first host install,
  * else the first bundled copy, else `null`.
  *
  * A setting names an id *and* a source. `host` is available when the id was found on the person's PATH;
@@ -80,7 +80,7 @@ export interface Resolution {
  * never skipped quietly:** the fallback is chosen and `note` says what was asked and what runs instead.
  *
  * A person's own install comes before the bundled one because it is the one that carries their login and
- * config; kurier cannot tell whether either is logged in and does not try (AGENTS.md § Privacy).
+ * config; lotse cannot tell whether either is logged in and does not try (AGENTS.md § Privacy).
  */
 export function resolveAgent(input: {
   readonly setting: AgentChoice | null;
@@ -111,7 +111,7 @@ export function resolveAgent(input: {
   return {
     detection: fallback,
     note: fallback
-      ? `${asked} — using ${fallback.id} (${fallback.source}) instead; choose again with \`kurier agents --use\``
+      ? `${asked} — using ${fallback.id} (${fallback.source}) instead; choose again with \`lotse agents --use\``
       : `${asked}, and no other agent is available either`,
   };
 }

@@ -1,17 +1,17 @@
-# @kurier/widget
+# @lotse/widget
 
-The chat surface, as a widget another GTK4 / libadwaita app embeds. `KurierChat` is an `Adw.Bin` that
+The chat surface, as a widget another GTK4 / libadwaita app embeds. `LotseChat` is an `Adw.Bin` that
 shows **one conversation**: the transcript, the composer with its model, effort and mode controls, the
 tool and thought cards, the approval dialog, failure notices and the provider login. It owns one agent
-subprocess and renders what `@kurier/core` reports.
+subprocess and renders what `@lotse/core` reports.
 
 Licence: **LGPL-3.0-or-later** (`LICENSE`, `COPYING` in this directory).
 
 The widget draws; every decision (may Send be pressed, what does this failure say, which options may a
-permission dialog show) is made in [`@kurier/core`](../core/README.md). The host brings the window, the
+permission dialog show) is made in [`@lotse/core`](../core/README.md). The host brings the window, the
 session list, the menu and the preferences. The full walkthrough, from data directory to shutdown, is
 the [host guide](../../docs/embedding.md); the design of the split is
-[ADR 0001](../../docs/adr/0001-kurier-as-an-embeddable-widget.md).
+[ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
 
 Requires GJS with GTK 4 and libadwaita, and an ACP agent (opencode today) on `PATH` or bundled.
 
@@ -20,15 +20,15 @@ Requires GJS with GTK 4 and libadwaita, and an ACP agent (opencode today) on `PA
 The packages are `private` and not yet on a registry; depend on them as a workspace:
 
 ```json
-{ "dependencies": { "@kurier/widget": "*", "@kurier/core": "*", "@kurier/session": "*" } }
+{ "dependencies": { "@lotse/widget": "*", "@lotse/core": "*", "@lotse/session": "*" } }
 ```
 
 ```ts
-import { KurierChat } from '@kurier/widget';
+import { LotseChat } from '@lotse/widget';
 ```
 
-`.` is the public entry. Two further sub-paths exist for kurier's own tests (`@kurier/widget/tool-line`,
-`@kurier/widget/permission-dialog`); a host does not need them.
+`.` is the public entry. Two further sub-paths exist for lotse's own tests (`@lotse/widget/tool-line`,
+`@lotse/widget/permission-dialog`); a host does not need them.
 
 ## Minimal example
 
@@ -41,17 +41,17 @@ import {
   DEFAULT_AGENT,
   emptyStateView,
   gatherResolveContext,
-  kurierPathsUnder,
+  lotsePathsUnder,
   requireLauncher,
   resolveDefault,
   resolveRecorded,
   type McpServer,
-} from '@kurier/core';
-import { createSessionStore } from '@kurier/session';
-import { KurierChat } from '@kurier/widget';
+} from '@lotse/core';
+import { createSessionStore } from '@lotse/session';
+import { LotseChat } from '@lotse/widget';
 
-export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): KurierChat {
-  const paths = kurierPathsUnder(dataRoot);
+export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, projectDir: string): LotseChat {
+  const paths = lotsePathsUnder(dataRoot);
   const store = createSessionStore(paths.sessionsFile);
 
   const found = resolveDefault(gatherResolveContext(paths, false));
@@ -61,7 +61,7 @@ export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, proje
     { name: 'my-tools', command: '/usr/bin/my-mcp-server', args: [], env: [] },
   ];
 
-  const chat = new KurierChat({
+  const chat = new LotseChat({
     agent: found?.command ?? requireLauncher(DEFAULT_AGENT),
     agentSource: found?.source ?? 'host',
     newChat: { cwd: projectDir, home: homedir() },
@@ -89,9 +89,9 @@ export function embedChat(window: Adw.ApplicationWindow, dataRoot: string, proje
 This is `app/tests/examples/embed.ts`, which is type-checked with the app. Each line is explained in the
 [host guide](../../docs/embedding.md).
 
-## `KurierChatOptions`
+## `LotseChatOptions`
 
-`new KurierChat(options)`. Only `agent` and `newChat` are required.
+`new LotseChat(options)`. Only `agent` and `newChat` are required.
 
 | Option | Type | Meaning |
 |---|---|---|
@@ -101,7 +101,7 @@ This is `app/tests/examples/embed.ts`, which is type-checked with the app. Each 
 | `createSession` | `(record: SessionRecord) => void` | Write a new conversation's record. `SessionStore.create`. |
 | `appendTurns` | `(sessionId, entries) => void` | Persist streamed transcript lines, once per arriving batch, in order. `SessionStore.append`. |
 | `resolveAgent` | `(id, source) => Promise<RecordedResolution>` | The agent a stored session names, on the copy that held it: `resolveRecorded`. Leave out to run every session on `agent`. |
-| `mcpServers` | `readonly McpServer[]` | Your MCP servers, sent unchanged in `session/new` and on reattach. Never read by kurier past `type`. |
+| `mcpServers` | `readonly McpServer[]` | Your MCP servers, sent unchanged in `session/new` and on reattach. Never read by lotse past `type`. |
 | `noAgent` | `{ kind: 'no-agent', … }` | Nothing was found: Send is off, and `showNoAgent()` shows the `noAgentPage`. Take the value from `emptyStateView`. |
 | `closedPage` | `Gtk.Widget` | Your "nothing is open" page. Absent: that state renders nothing. |
 | `noAgentPage` | `Gtk.Widget` | Your "no agent found" page. Absent: that state renders nothing. |
@@ -135,7 +135,7 @@ the hosting provider. An unreadable state shows the ordinary chat: the page is a
 After a successful login the agent restarts. Nothing here reads or keeps a credential. Core's
 `probeConnections` and `onboardingView` are the pieces, if you want the signal elsewhere.
 
-## `KurierChat` members
+## `LotseChat` members
 
 | Member | Use |
 |---|---|
@@ -151,7 +151,7 @@ After a successful login the agent restarts. Nothing here reads or keeps a crede
 
 `stageOnboarding`, `stagePermissionRequest`, `stageConfigOption`, `openModelDropdown`,
 `chooseModelInDialog`, `hasModelControl`, `permissionAsked`, `streamed` and `failureShown` exist for
-kurier's own dev fixtures and screenshots ([dev-fixtures](../../docs/dev-fixtures.md)); a host does not
+lotse's own dev fixtures and screenshots ([dev-fixtures](../../docs/dev-fixtures.md)); a host does not
 need them.
 
 `shutdown()` order matters: it cancels first so the agent can answer `cancelled` and flush, and
@@ -162,10 +162,10 @@ terminates only afterwards. Terminating first would lose the work of the turn in
 | Export | What it is |
 |---|---|
 | `HostGateAnswer` | `'ask' \| 'decline'`. |
-| `KurierChatOptions` | The options above. |
-| `CSS` | The widget's class-name map, for a host that styles its own widgets next to the chat. The stylesheet itself is installed by `KurierChat`; a host needs no CSS of its own. |
+| `LotseChatOptions` | The options above. |
+| `CSS` | The widget's class-name map, for a host that styles its own widgets next to the chat. The stylesheet itself is installed by `LotseChat`; a host needs no CSS of its own. |
 
 ## Related
 
-[`@kurier/core`](../core/README.md) · [host guide](../../docs/embedding.md) · [design](../../docs/design/README.md)
+[`@lotse/core`](../core/README.md) · [host guide](../../docs/embedding.md) · [design](../../docs/design/README.md)
 (what the widget looks like, with screenshots) · [login](../../docs/login.md)

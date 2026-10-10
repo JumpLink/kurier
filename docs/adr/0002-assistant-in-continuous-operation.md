@@ -3,13 +3,13 @@
 - Status: **Accepted**
 - Date: 2026-10-10
 - Deciders: Pascal Garber
-- Related: [ADR 0001](0001-kurier-as-an-embeddable-widget.md),
+- Related: [ADR 0001](0001-lotse-as-an-embeddable-widget.md),
   [werkstatt ADR 0004](../../../../docs/adr/0004-gnome-is-optional.md) (GNOME is optional),
   Curlew ADR 0004 (sending and writing, granted per capability)
 
 ## Context
 
-kurier today runs one turn at a time: `kurier start`, `kurier resume`, and the window. A person
+lotse today runs one turn at a time: `lotse start`, `lotse resume`, and the window. A person
 is always there to answer `session/request_permission`.
 
 The next step is an assistant that runs all the time. It notices what needs doing, asks its
@@ -30,8 +30,8 @@ Curlew backend later.
 
 ## Decision
 
-1. **`kurier serve` is a long-running process**, run as a systemd user unit. It builds on
-   `@kurier/core` (ADR 0001) and runs headless: no `gi://` GTK import, no display (werkstatt ADR
+1. **`lotse serve` is a long-running process**, run as a systemd user unit. It builds on
+   `@lotse/core` (ADR 0001) and runs headless: no `gi://` GTK import, no display (werkstatt ADR
    0004).
 2. **Triggers start the work.** Three kinds: a schedule (poll a source through its own CLI or MCP
    server at an interval), a message on the channel, and later a push (a D-Bus signal, a webhook).
@@ -42,7 +42,7 @@ Curlew backend later.
    call — a source that suddenly floods must not become a stream of questions nobody reads.
 3. **Tasks are configuration, not code.** A task names its triggers, its prefilter, its profile,
    the MCP servers its sessions may reach, a prompt template and the rights level it asks for.
-   Tasks live in a private, gitignored configuration under `$XDG_CONFIG_HOME/kurier/`. kurier's
+   Tasks live in a private, gitignored configuration under `$XDG_CONFIG_HOME/lotse/`. lotse's
    code knows no particular task, no person and no address. Example tasks in this repository use
    synthetic values only.
 
@@ -66,18 +66,18 @@ Curlew backend later.
      in this one calendar". It is recorded in the task configuration as the person's decision,
      never in a session record.
 
-   The owning app's own gate stays the hard limit. kurier cannot widen it: a Curlew tool that
+   The owning app's own gate stays the hard limit. lotse cannot widen it: a Curlew tool that
    is not granted in Curlew's configuration does not exist for the session (Curlew ADR 0004).
 
-   And no session `serve` starts may have write access to kurier's or Curlew's configuration
+   And no session `serve` starts may have write access to lotse's or Curlew's configuration
    directory. A rights level a session can rewrite is not a limit, and a released area is the
-   person's decision, not the assistant's working material. kurier cannot take file access away
+   person's decision, not the assistant's working material. lotse cannot take file access away
    from an agent process, so the profile's sandbox enforces this; the hash check in §3 is the
    backstop that turns a missed edit into a stop instead of a wider right.
 7. **The gate in `serve` answers from the person's decisions only.** `request_permission`
    is answered `allow_once` only when it matches a question the person answered yes or a released
    area of the task. Everything else becomes a new question or is answered `cancelled`. This
-   amends guardrail 2 for `serve`: kurier now keeps a policy, but it is written by the person,
+   amends guardrail 2 for `serve`: lotse now keeps a policy, but it is written by the person,
    lives in the task configuration, and only narrows what the owning app allows. Guardrail 1 stays
    as it is: a session record never holds a grant, and `assertScopeIsNotAuthority` keeps
    checking.
@@ -114,12 +114,12 @@ Curlew backend later.
    waiting any more — the ordinary case is a `serve` that restarted in between — the answer is
    discarded and the person is told. It is never applied to a resumed session and never to a new
    one: the pending request is what the yes answers, and without it there is nothing to allow.
-9. **The channel goes through Curlew, never through messenger code in kurier.** kurier defines a
+9. **The channel goes through Curlew, never through messenger code in lotse.** lotse defines a
    channel interface (send a text to an address, read new messages since a position). Its first
    implementation is an MCP client against Curlew's server, using the assistant's own account and
    the send tool Curlew grants for it. Messages from the person's own accounts are only read.
 10. **State and log are declared.** Read positions, open questions, users and profiles, and an
-   action log go under kurier's data directory, mode 0600 in 0700. The log has one line per
+   action log go under lotse's data directory, mode 0600 in 0700. The log has one line per
    trigger, question, answer and allowed action, with source ids instead of message text. Tiers:
    configuration and questions are `state`, the log is `state`. Everything is declared in
    `.werkstatt-state.json`.
@@ -135,15 +135,15 @@ Curlew backend later.
   contact maps to a project in the private configuration → question `#A17` ("take this on?") →
   yes → a session of the programming profile in a new worktree → diff to the person, question
   `#A18` ("publish?") → yes → the project's own publish command from the configuration, a reply
-  draft to the person, the work recorded. kurier does not guess any check or publish command.
+  draft to the person, the work recorded. lotse does not guess any check or publish command.
 
 ## Consequences
 
 - `AGENTS.md` changes on acceptance: "MCP wiring against the real apps" and "principal policy"
   leave the "not here yet" list, and guardrail 2 names the `serve` amendment.
-- `serve` needs ADR 0001 steps 2 to 4 first: injectable paths and settings, `@kurier/core`,
+- `serve` needs ADR 0001 steps 2 to 4 first: injectable paths and settings, `@lotse/core`,
   `mcpServers` through `AgentSession`.
-- kurier gains an MCP client for the channel. That is not a change to "MCP is passed through, not
+- lotse gains an MCP client for the channel. That is not a change to "MCP is passed through, not
   known" for sessions: a session's `mcpServers` stay opaque.
 - The action log is the place to answer "what did the assistant do?". It must stay readable
   without a model.
@@ -153,7 +153,7 @@ Curlew backend later.
 ## Order of work
 
 1. ADR 0001 steps 2 to 4.
-2. `kurier serve`: unit file, schedule, state, log, state manifest.
+2. `lotse serve`: unit file, schedule, state, log, state manifest.
 3. Users, profiles, tasks: configuration format and validation, with synthetic test fixtures.
 4. Channel interface and the Curlew implementation (needs Curlew's XMPP send, Curlew ADR 0004).
 5. Questions: ids, expiry, answer parsing, resuming the session, the `serve` gate.

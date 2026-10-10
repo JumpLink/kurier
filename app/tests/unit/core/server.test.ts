@@ -9,7 +9,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { serverCommand, startServer, whyNoLoginServer, type AgentCommand } from '@kurier/core';
+import { serverCommand, startServer, whyNoLoginServer, type AgentCommand } from '@lotse/core';
 
 function agent(program: string, extra: Partial<AgentCommand> = {}): AgentCommand {
   return { id: 'opencode', title: 'opencode', program, args: ['acp'], ...extra };
@@ -19,7 +19,7 @@ async function withProgram(
   body: string,
   run: (program: string, dir: string) => Promise<void>,
 ): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-server-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-server-'));
   try {
     const program = join(dir, 'fake-opencode');
     writeFileSync(program, `#!/bin/sh\n${body}\n`);
@@ -43,7 +43,7 @@ export default async () => {
 
   await describe('whyNoLoginServer', async () => {
     await it("explains a host copy under a Flatpak, which runs where this sandbox's loopback does not reach", async () => {
-      expect(whyNoLoginServer(agent('opencode'), { flatpakInfoExists: true })!.includes('kurier auth')).toBe(
+      expect(whyNoLoginServer(agent('opencode'), { flatpakInfoExists: true })!.includes('lotse auth')).toBe(
         true,
       );
     });

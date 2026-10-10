@@ -1,5 +1,5 @@
 /**
- * `KurierChat` — one conversation as a widget, with the app around it taken away.
+ * `LotseChat` — one conversation as a widget, with the app around it taken away.
  *
  * **What this is.** Everything a chat surface is: the transcript, the composer with its model and
  * mode controls, the tool and thought cards, the approval dialog, the failure notices, the login,
@@ -9,14 +9,14 @@
  * its own permission policy adds.
  *
  * **What this is not.** A window, a session list, a header bar, a menu, a preferences dialog, a
- * notices banner. `docs/adr/0001-kurier-as-an-embeddable-widget.md` draws that line and kurier's own
+ * notices banner. `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws that line and lotse's own
  * `app/src/frontends/gui/window.ts` is the first consumer on the other side of it: it keeps the
  * sidebar and the shell, and it is now one of several possible hosts rather than the only place the
  * chat exists.
  *
  * **This file decides nothing.** Every question it answers — may Send be pressed, what does the
  * status line say, is this failure still owed a dialog, what does a response id mean — is answered
- * by `@kurier/core`, and the widget's job is to pass the answer to a child and hand the child's
+ * by `@lotse/core`, and the widget's job is to pass the answer to a child and hand the child's
  * events back. That is the same rule `window.ts` was written under, and it is what made this split
  * possible at all: a surface with no decisions in it can be moved.
  *
@@ -36,7 +36,7 @@ import GObject from '@girs/gobject-2.0';
 // real, so the typelib is loaded either way.
 import type Gtk from '@girs/gtk-4.0';
 
-import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
+import type { AgentSource, SessionRecord, TranscriptEntry } from '@lotse/session';
 
 import {
   AgentSession,
@@ -62,7 +62,7 @@ import {
   type NotAnsweredReason,
   type PermissionQuestion,
   type RecordedResolution,
-} from '@kurier/core';
+} from '@lotse/core';
 
 import { Composer } from './composer.ts';
 import { installWidgetCss } from './css.ts';
@@ -81,21 +81,21 @@ import Template from './chat.blp';
  * person answers it; `'decline'` answers it without asking. There is deliberately no third value
  * that selects an option: a host may add a rule that *narrows* what the agent gets — "never in this
  * directory", "not while unattended" — and may not hand out an approval nobody gave. That is
- * guardrail 2 of `AGENTS.md` one layer up, and `kurier serve`'s own gate
+ * guardrail 2 of `AGENTS.md` one layer up, and `lotse serve`'s own gate
  * (`docs/adr/0002-assistant-in-continuous-operation.md`) is written to the same shape.
  */
 export type HostGateAnswer = 'ask' | 'decline';
 
 /**
- * What `KurierChat` needs from the host around it.
+ * What `LotseChat` needs from the host around it.
  *
  * **`appendTurns` and `createSession` are callbacks rather than a store passed whole**, because the
  * widget's uses of a store have nothing to do with each other: one writes a record once, the other
  * writes a line per streamed chunk, and a `SessionStore` would drag `all`/`update`/`remove` in beside
- * them. A host that reads the same file for a list of its own (kurier's window does) keeps its own
+ * them. A host that reads the same file for a list of its own (lotse's window does) keeps its own
  * handle on it, and the widget never becomes a second opinion about where sessions live.
  */
-export interface KurierChatOptions {
+export interface LotseChatOptions {
   /** Which agent to start on the first prompt, and the one a login is for. */
   readonly agent: AgentCommand;
   /** Which copy `agent` is — what a new conversation's record names. */
@@ -118,7 +118,7 @@ export interface KurierChatOptions {
   /**
    * The host's own MCP servers, forwarded to `session/new` unchanged.
    *
-   * **Passed through, never read.** `@kurier/core` forwards them as opaque objects and never looks
+   * **Passed through, never read.** `@lotse/core` forwards them as opaque objects and never looks
    * past `type` (`AGENTS.md`: MCP is passed through, not known), so a host wires its own servers in
    * without a line of widget-specific code.
    */
@@ -159,10 +159,10 @@ export interface KurierChatOptions {
   readonly now?: () => string;
 }
 
-export class KurierChat extends Adw.Bin {
-  // The GType name is also the template's `template $KurierChat` — the two must agree, and
+export class LotseChat extends Adw.Bin {
+  // The GType name is also the template's `template $LotseChat` — the two must agree, and
   // `chat.blp` is where the tree is.
-  static readonly GTypeName = 'KurierChat';
+  static readonly GTypeName = 'LotseChat';
 
   /** The five states of a conversation. `chat.blp` names them; this is the only field that switches. */
   declare readonly _stack: Gtk.Stack;
@@ -188,7 +188,7 @@ export class KurierChat extends Adw.Bin {
   readonly #config: ConfigRow;
   /**
    * The approval dialog. One per widget, because one question is ever shown at a time —
-   * `@kurier/core`'s `permission.ts` queues the rest, and `PermissionDialog.show` replaces rather
+   * `@lotse/core`'s `permission.ts` queues the rest, and `PermissionDialog.show` replaces rather
    * than stacks.
    */
   readonly #permissions: PermissionDialog;
@@ -220,7 +220,7 @@ export class KurierChat extends Adw.Bin {
   readonly #agent: AgentSession;
   /** The session on screen, or `null` while none is. */
   #openRecord: SessionRecord | null = null;
-  readonly #newChat: KurierChatOptions['newChat'];
+  readonly #newChat: LotseChatOptions['newChat'];
   /** Lines from the agent (not the person's own) drawn so far; a host's mid-turn hook waits for one. */
   #streamed = 0;
   /**
@@ -234,11 +234,11 @@ export class KurierChat extends Adw.Bin {
   readonly #notices: string[] = [];
   /** Why no prompt can be sent at all (no agent found), or `undefined`. Feeds the composer. */
   readonly #unavailable: string | undefined;
-  readonly #gate: KurierChatOptions['gate'];
-  readonly #hostConversation: KurierChatOptions['onConversation'];
-  readonly #hostNotice: KurierChatOptions['onNotice'];
+  readonly #gate: LotseChatOptions['gate'];
+  readonly #hostConversation: LotseChatOptions['onConversation'];
+  readonly #hostNotice: LotseChatOptions['onNotice'];
 
-  constructor(options: KurierChatOptions) {
+  constructor(options: LotseChatOptions) {
     super();
     installWidgetCss();
 
@@ -281,7 +281,7 @@ export class KurierChat extends Adw.Bin {
       ...(options.createSession ? { create: options.createSession } : {}),
       ...(options.agentSource ? { source: options.agentSource } : {}),
       ...(options.resolveAgent ? { resolveAgent: options.resolveAgent } : {}),
-      // Forwarded as the host gave them. `@kurier/core` passes them to `session/new` and never reads
+      // Forwarded as the host gave them. `@lotse/core` passes them to `session/new` and never reads
       // past `type`, so a host wires its own servers in without a line of widget-specific code.
       ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
       ...(options.now ? { now: options.now } : {}),
@@ -350,13 +350,13 @@ export class KurierChat extends Adw.Bin {
   /**
    * Show a session.
    *
-   * **The record is the host's, read as the host wants it read.** kurier's window re-reads its store
+   * **The record is the host's, read as the host wants it read.** lotse's window re-reads its store
    * first, because its own list was loaded at startup and a session that streamed since is longer on
    * disk; a host with a live store hands over what it already has. Either way this takes the record
    * as given and never looks a session up — the widget has no opinion about where sessions live.
    *
    * **`record.turns` is handed over unchanged.** `TranscriptView.setEntries` takes exactly what the
-   * store holds and projects it through `@kurier/core`; a surface that filtered first would be
+   * store holds and projects it through `@lotse/core`; a surface that filtered first would be
    * re-deriving history the agent's own `session/load` is the authority on (`AGENTS.md` § Privacy:
    * the transcript is a record of what happened, not a re-derivation of it).
    *
@@ -472,7 +472,7 @@ export class KurierChat extends Adw.Bin {
   /**
    * Put up the dialog a failure has earned — **once per failure, and never a stale one.**
    *
-   * Three decisions, all of them made in `@kurier/core`'s `failure.ts`:
+   * Three decisions, all of them made in `@lotse/core`'s `failure.ts`:
    *
    * - `failureToShow(attachment, shown)` — is this failure still owed a dialog? It is `null` for a
    *   failure already shown (identity, not "is one open": a dismissal closes the dialog and the
@@ -550,7 +550,7 @@ export class KurierChat extends Adw.Bin {
    */
   #onNotice(message: string): void {
     this.#notices.push(message);
-    console.log(`kurier: ${message}`);
+    console.log(`lotse: ${message}`);
     this.#hostNotice?.(message);
   }
 
@@ -559,7 +559,7 @@ export class KurierChat extends Adw.Bin {
    *
    * **The gate may only narrow.** `'ask'` is the one answer that lets the question reach a person;
    * everything else — `'decline'`, a throw, a rejected promise, a value from a host that returned
-   * something else entirely — resolves `null`, which `@kurier/core` reads as the dismissal and
+   * something else entirely — resolves `null`, which `@lotse/core` reads as the dismissal and
    * answers `cancelled`. A host whose policy code broke has not approved anything (guardrail 2).
    */
   async #ask(question: PermissionQuestion): Promise<string | null> {
@@ -655,7 +655,7 @@ export class KurierChat extends Adw.Bin {
    * Open the model dropdown, for the failure dialog's "Choose another model".
    *
    * **Through the row's own method and nothing else** — no `set_selected`, no request, no value. A
-   * dialog that picked a model on the person's behalf would be kurier deciding configuration for the
+   * dialog that picked a model on the person's behalf would be lotse deciding configuration for the
    * agent, which is the "always allow" mistake in different clothes; what this does is put the list
    * in front of them.
    *
@@ -666,7 +666,7 @@ export class KurierChat extends Adw.Bin {
    */
   openModelDropdown(): boolean {
     const opened = this.#config.openModelDropdown();
-    console.log(`kurier: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
+    console.log(`lotse: the model dropdown is ${opened ? 'open' : 'not on the row — nothing to open'}`);
     return opened;
   }
 
@@ -675,7 +675,7 @@ export class KurierChat extends Adw.Bin {
   /**
    * Send a prompt as the composer would, draft cleared first.
    *
-   * For a host control that is not the entry — kurier's `KU_APP_THINKING`, a `kurier serve` task.
+   * For a host control that is not the entry — lotse's `LOTSE_APP_THINKING`, a `lotse serve` task.
    * The guard `#onSend` applies is the *entry's* (an empty line is not a prompt); a caller that has
    * a sentence in hand has already passed it.
    */
@@ -774,7 +774,7 @@ export class KurierChat extends Adw.Bin {
     return this.#openRecord?.id ?? null;
   }
 
-  /** Why no prompt can be sent at all, or `undefined`. `KurierChatOptions.noAgent`'s own sentence. */
+  /** Why no prompt can be sent at all, or `undefined`. `LotseChatOptions.noAgent`'s own sentence. */
   get sendReason(): string | undefined {
     return this.#unavailable;
   }
@@ -816,7 +816,7 @@ function composerInput(snapshot: AgentSnapshot, unavailable?: string): ComposerI
 
 GObject.registerClass(
   {
-    GTypeName: KurierChat.GTypeName,
+    GTypeName: LotseChat.GTypeName,
     Template,
     // **The six ids `chat.blp` declares, written out.** The generated `chat.d.blp.ts` sidecar names
     // them too, but nothing in this repo imports a `.blp` by name: `tsc` would need
@@ -827,5 +827,5 @@ GObject.registerClass(
     // above as the typed half.
     InternalChildren: ['stack', 'closedHost', 'noAgentHost', 'transcriptHost', 'composerHost', 'cwdCaption'],
   },
-  KurierChat,
+  LotseChat,
 );

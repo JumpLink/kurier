@@ -2,15 +2,15 @@
  * Output, in two streams with two jobs.
  *
  * **stdout carries the answer, stderr carries everything about the answer.** An agent's message
- * goes to stdout so `kurier start "…"` pipes into something useful; progress, notices, tool
+ * goes to stdout so `lotse start "…"` pipes into something useful; progress, notices, tool
  * questions and the agent's own log lines go to stderr so they never contaminate it. A person
  * watching a turn sees both; a script sees one.
  */
 
-import type { SessionNotification } from '@kurier/acp/types';
-import { labelOf, type SessionRecord } from '@kurier/session';
+import type { SessionNotification } from '@lotse/acp/types';
+import { labelOf, type SessionRecord } from '@lotse/session';
 
-import { chunkToText, describeUsage } from '@kurier/core';
+import { chunkToText, describeUsage } from '@lotse/core';
 
 export function out(line = ''): void {
   process.stdout.write(`${line}\n`);

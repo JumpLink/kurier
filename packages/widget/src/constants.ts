@@ -1,9 +1,9 @@
 /**
  * The numbers the chat surface is laid out by, in one file.
  *
- * Only measurements live here — nothing about an app's identity. A `KurierChat` is embedded in
+ * Only measurements live here — nothing about an app's identity. A `LotseChat` is embedded in
  * somebody else's application, so its id, its name and its version are the host's to decide and
- * are not this package's business (kurier's own are in `app/src/frontends/gui/constants.ts`).
+ * are not this package's business (lotse's own are in `app/src/frontends/gui/constants.ts`).
  */
 
 /**

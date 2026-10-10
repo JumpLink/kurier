@@ -6,7 +6,7 @@ using Pango 1.0;
  * The chat surface's own tree — one conversation, and nothing about the app around it.
  *
  * **An `Adw.Bin`, because a widget a host embeds may not be a window.** The template the app's
- * `window.blp` used to carry is split here along the line `docs/adr/0001-kurier-as-an-embeddable-widget.md`
+ * `window.blp` used to carry is split here along the line `docs/adr/0001-lotse-as-an-embeddable-widget.md`
  * draws: the panes, the header bars, the menu and the banner belong to whoever owns the window, and
  * what is left — the five states a conversation can be in, plus the composer under them — is this.
  * A host slots the result into a container of its own; `Adw.Bin` is the thinnest thing in the toolkit
@@ -29,7 +29,7 @@ using Pango 1.0;
  * never shows those pages — `closed` is the stack's first page and therefore the state the widget
  * starts in, so a host with no session list calls `newChat()` and never comes back to it.
  */
-template $KurierChat: Adw.Bin {
+template $LotseChat: Adw.Bin {
   child: Adw.ToolbarView {
     vexpand: true;
     bottom-bar-style: flat;
@@ -62,7 +62,7 @@ template $KurierChat: Adw.Bin {
           vexpand: true;
           styles [
             "compact",
-            "kurier-calm",
+            "lotse-calm",
           ]
         };
       }
@@ -78,7 +78,7 @@ template $KurierChat: Adw.Bin {
         name: "no-agent";
         // The host's nothing-found page. A slot rather than markup: what to do about a missing agent
         // is "install this, or pick another in Preferences", and both halves of that sentence are the
-        // app's. The widget only decides *when* the page is shown — `KurierChatOptions.noAgent`.
+        // app's. The widget only decides *when* the page is shown — `LotseChatOptions.noAgent`.
         child: Adw.Bin noAgentHost {};
       }
 
@@ -90,7 +90,7 @@ template $KurierChat: Adw.Bin {
       StackPage {
         name: "empty";
         // **Its own state, not the host's idle page reused.** A session that is open and holds no
-        // turns is a third thing: `kurier start` with no prompt produces exactly that. Showing the
+        // turns is a third thing: `lotse start` with no prompt produces exactly that. Showing the
         // transcript's blank column for it reads as a failed load, and showing "nothing is open" for
         // a session that *is* open is a lie.
         child: Adw.StatusPage {
@@ -100,7 +100,7 @@ template $KurierChat: Adw.Bin {
           vexpand: true;
           styles [
             "compact",
-            "kurier-calm",
+            "lotse-calm",
           ]
         };
       }

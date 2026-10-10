@@ -3,7 +3,7 @@
 #
 # Why this exists at all, when `gjsify ship` builds a real `.deb`/`.rpm`/Flatpak:
 # `ship` packs a payload, it does not put an app into the desktop of the machine
-# running it. Two of kurier's consumers need the files *in place*: GTK resolves
+# running it. Two of lotse's consumers need the files *in place*: GTK resolves
 # the window icon by NAME (`main.ts`: `applicationIcon: APP_ID`), and under Wayland
 # the compositor matches a window to a launcher only through an INSTALLED
 # `.desktop`. `app/data/README.md` in buchhaltung says the same for the same
@@ -22,14 +22,14 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 # `-D` so the hicolor and applications subtrees are created in one go; `-m` fixed
 # rather than taken from the umask, because an icon another user cannot read is an
 # icon the icon theme skips.
-install -Dm644 "$here/data/eu.jumplink.Kurier.desktop" \
-	"$root/applications/eu.jumplink.Kurier.desktop"
-install -Dm644 "$here/data/eu.jumplink.Kurier.metainfo.xml" \
-	"$root/metainfo/eu.jumplink.Kurier.metainfo.xml"
-install -Dm644 "$here/data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg" \
-	"$root/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg"
-install -Dm644 "$here/data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg" \
-	"$root/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+install -Dm644 "$here/data/eu.jumplink.Lotse.desktop" \
+	"$root/applications/eu.jumplink.Lotse.desktop"
+install -Dm644 "$here/data/eu.jumplink.Lotse.metainfo.xml" \
+	"$root/metainfo/eu.jumplink.Lotse.metainfo.xml"
+install -Dm644 "$here/data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg" \
+	"$root/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg"
+install -Dm644 "$here/data/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg" \
+	"$root/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg"
 
 # The two caches are what a desktop shell actually reads. Both tools are optional:
 # without `update-desktop-database` the entry still launches, it just does not
@@ -48,4 +48,4 @@ else
 fi
 
 echo "installed desktop entry, metainfo and icons under $root"
-echo "Exec=kurier-app is a binary this install does NOT create — see data/README.md"
+echo "Exec=lotse-app is a binary this install does NOT create — see data/README.md"

@@ -9,7 +9,7 @@ import {
   newSession,
   type SessionRecord,
   type TranscriptEntry,
-} from '@kurier/session';
+} from '@lotse/session';
 
 const AT = '2026-09-30T10:00:00.000Z';
 

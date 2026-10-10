@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import type { StopReason } from '@kurier/acp/types';
+import type { StopReason } from '@lotse/acp/types';
 
 import {
   agentExitedEntry,
@@ -15,7 +15,7 @@ import {
   type CancelledBy,
   type TurnEvent,
   type TurnState,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const ALL: readonly TurnState[] = ['idle', 'thinking', 'waiting-for-you', 'stopped', 'gone'];
 
@@ -24,7 +24,7 @@ const ANSWERED: TurnEvent = { kind: 'permission-answered' };
 const ASKED: TurnEvent = { kind: 'permission-asked' };
 const GONE: TurnEvent = { kind: 'agent-gone', reason: 'exited with code 1' };
 
-/** A settled turn. `stopReason` is `null` only for "kurier never sent the prompt". */
+/** A settled turn. `stopReason` is `null` only for "lotse never sent the prompt". */
 function ended(stopReason: StopReason | null, cancelledBy: CancelledBy): TurnEvent {
   return { kind: 'turn-ended', stopReason, cancelledBy };
 }
@@ -190,9 +190,9 @@ export default async () => {
       { attachment: { status: 'gone', reason: 'exited with code 1' }, attached: false, mentions: 'code 1' },
       { attachment: { status: 'gone', reason: '' }, attached: false, mentions: 'exited' },
       {
-        attachment: { status: 'failed', kind: 'auth', message: 'run `kurier auth`, then try again' },
+        attachment: { status: 'failed', kind: 'auth', message: 'run `lotse auth`, then try again' },
         attached: false,
-        mentions: 'kurier auth',
+        mentions: 'lotse auth',
       },
     ];
 
@@ -221,12 +221,12 @@ export default async () => {
       // While attaching there is a process but no session to prompt, so a Send enabled then would
       // accept a message that cannot be delivered.
       expect(agentStatus({ status: 'attaching' }).attached).toBe(false);
-      expect(agentStatus({ status: 'attached', name: 'KurierStandIn 0.1.0' }).attached).toBe(true);
+      expect(agentStatus({ status: 'attached', name: 'LotseStandIn 0.1.0' }).attached).toBe(true);
     });
 
     await it('carries the auth hint through verbatim — it is the remedy', async () => {
       const message =
-        'attaching to the session failed: the agent wants a human to log in first. Run `kurier auth`, then try again.';
+        'attaching to the session failed: the agent wants a human to log in first. Run `lotse auth`, then try again.';
       expect(agentStatus({ status: 'failed', kind: 'auth', message }).note).toBe(message);
     });
 

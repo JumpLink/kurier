@@ -1,11 +1,11 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
+import { AcpClient } from '@lotse/acp/client';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 
 /**
- * The literal measured answer from the plan (`kurier-acp-client.md` §2, "Gemessen, nicht
+ * The literal measured answer from the plan (`lotse-acp-client.md` §2, "Gemessen, nicht
  * angenommen"), pinned here so this file is the thing that goes red when opencode's shape moves —
  * not `fixture-agent.ts`'s comment, which nobody re-reads once it is trusted.
  */

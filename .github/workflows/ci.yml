@@ -22,7 +22,7 @@ permissions:
 #
 # `opencode` is deliberately NOT installed here. The real-agent integration test needs a model
 # account, and a test that costs a model call is not a test. It runs locally:
-#   gjsify workspace kurier-cli test:real-agent
+#   gjsify workspace lotse-cli test:real-agent
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -73,7 +73,7 @@ jobs:
 
       # The vendored ACP schema against the code. A hand-written copy of a protocol schema drifts,
       # and the drift is silent at runtime: a renamed method is a `-32601` against a live agent, and
-      # a field that became required is an agent that ignores what kurier sent.
+      # a field that became required is an agent that ignores what lotse sent.
       - name: Check the code against refs/acp/schema.v1.json
         run: node scripts/check-schema.mjs
 
@@ -91,14 +91,14 @@ jobs:
         run: node_modules/.bin/oxfmt --check .
 
       - name: Build the app bundle
-        run: gjsify workspace kurier-cli build
+        run: gjsify workspace lotse-cli build
 
       # The dual run. If a change makes the Node leg impossible, the change is in the wrong file.
       - name: Unit tests (gjs + node)
-        run: gjsify workspace kurier-cli test
+        run: gjsify workspace lotse-cli test
 
       # The bundle a person would install has to at least start and print its command table.
       - name: Smoke — the built bundle starts and lists its agents
         run: |
-          gjsify run app/dist/kurier.gjs.mjs agents
-          gjsify run app/dist/kurier.gjs.mjs sessions
+          gjsify run app/dist/lotse.gjs.mjs agents
+          gjsify run app/dist/lotse.gjs.mjs sessions

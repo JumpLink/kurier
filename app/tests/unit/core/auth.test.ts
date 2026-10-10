@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
-import { DENY_EVERYTHING, classifyAuthMethods } from '@kurier/acp/gate';
-import type { AuthMethodInfo } from '@kurier/acp/types';
+import { AcpClient } from '@lotse/acp/client';
+import { DENY_EVERYTHING, classifyAuthMethods } from '@lotse/acp/gate';
+import type { AuthMethodInfo } from '@lotse/acp/types';
 
 import {
   OPENCODE_COMMAND,
@@ -21,7 +21,7 @@ import {
   loginCommandFor,
   type AgentCommand,
   type AuthArrangement,
-} from '@kurier/core';
+} from '@lotse/core';
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 
 /** A method the agent tagged, so it can run the login in a terminal it already owns. */
@@ -120,7 +120,7 @@ export default async function auth(): Promise<void> {
       );
     });
 
-    await it("reads opencode's own shape as a login kurier has to arrange", () => {
+    await it("reads opencode's own shape as a login lotse has to arrange", () => {
       const plan = authPlan([AGENT]);
       expect(plan.kind).toBe('client-arranges-it');
       expect(plan.kind === 'client-arranges-it' && plan.methodId).toBe('opencode-login');
@@ -139,7 +139,7 @@ export default async function auth(): Promise<void> {
         [
           'this agent advertises authentication:',
           '  Login with opencode (opencode-login) — Run `opencode auth login` in the terminal',
-          '  `kurier auth` arranges it; a session started before that will fail with -32000.',
+          '  `lotse auth` arranges it; a session started before that will fail with -32000.',
         ].join('\n'),
       );
     });
@@ -198,7 +198,7 @@ export default async function auth(): Promise<void> {
       const result = await h.run();
       expect(result.kind).toBe('authenticated');
       expect(result.kind === 'authenticated' && result.methodId).toBe('opencode-terminal');
-      // `viaLogin: false` is the difference the CLI words differently: the agent did it, kurier did not.
+      // `viaLogin: false` is the difference the CLI words differently: the agent did it, lotse did not.
       expect(result.kind === 'authenticated' && result.viaLogin).toBe(false);
       expect(h.opened.length).toBe(1);
       expect(h.ranLogin.length).toBe(0);

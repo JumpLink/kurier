@@ -18,12 +18,12 @@
  * 2. **The close response is not a button.** `close_response` defaults to `close`, and
  *    `has_response('close')` is `false` — so "anything that is not one of the ids the agent offered is
  *    cancelled" cannot be contradicted by a dismissal arriving shaped like a press.
- * 3. **`force_close()` emits nothing at all.** So it is the wrong method for kurier's teardown: it
+ * 3. **`force_close()` emits nothing at all.** So it is the wrong method for lotse's teardown: it
  *    leaves the promise unsettled and the turn waiting on a question that is no longer on screen.
  *    `close()` is the right one, and this is why.
  * 4. **`close_response` is a choice, and the other choice is worse.** Setting it to the agent's
  *    rejecting option — the plan's earlier candidate rule — works (case 6) and is weaker: it makes
- *    safety depend on the agent having offered an id with that exact string, so kurier would need to
+ *    safety depend on the agent having offered an id with that exact string, so lotse would need to
  *    know the agent's ids to be safe. An id no agent can offer needs no such knowledge.
  * 5. **`max-content-height` is a real `Gtk.ScrolledWindow` property** (case 7), which is what caps the
  *    dialog's diff body.
@@ -35,8 +35,8 @@
  *    whatever question is open by then, which is an allow for a request nobody read. The guard is one
  *    comparison and it is the difference the case prints.
  * 7. **Where libadwaita puts the focus when `default_response` is unset** (case 9) — on the **first**
- *    added response, not the last as `Adw-1.gir` says. That is the fallback kurier has to make safe,
- *    because a focused `Gtk.Button` answers Enter and Space; what kurier produces instead is measured on
+ *    added response, not the last as `Adw-1.gir` says. That is the fallback lotse has to make safe,
+ *    because a focused `Gtk.Button` answers Enter and Space; what lotse produces instead is measured on
  *    the real widget by `app/tests/probes/permission-focus.ts`.
  * 9. **Whether a `grab_focus` in the first frame beats that fallback** (case 10) — it does, and the
  *    answer is the same whether the grab is synchronous or deferred. Which is why the comment in
@@ -85,7 +85,7 @@ function buttonsUnder(widget, found = []) {
  * set — which is what case 9 needs, because the two candidate rules ("first added" and "last added")
  * agree on every single-order dialog.
  *
- * The default order is the one kurier uses, `reject_once` then `allow_once`, with the *allowing* one
+ * The default order is the one lotse uses, `reject_once` then `allow_once`, with the *allowing* one
  * marked SUGGESTED — so every other case exercises the shape the app really builds.
  */
 function build(...responses) {
@@ -149,7 +149,7 @@ const CASES = [
     (d) => pressButton(d, 'Allow once'),
   ],
   [
-    '2. the same press, settled on `response` with `closed` deferred — what kurier does',
+    '2. the same press, settled on `response` with `closed` deferred — what lotse does',
     { deferOnClosed: true },
     (d) => pressButton(d, 'Allow once'),
   ],
@@ -332,7 +332,7 @@ function runQueued(guard, done) {
 }
 
 /**
- * Case 9 — the *fallback* kurier has to override: where libadwaita puts the focus when
+ * Case 9 — the *fallback* lotse has to override: where libadwaita puts the focus when
  * `default_response` is unset.
  *
  * **It is the FIRST added response, not the last — and `Adw-1.gir` says the opposite.** The GIR text
@@ -342,7 +342,7 @@ function runQueued(guard, done) {
  * The first build is the one the old single-case probe had, and it happened to be consistent with both
  * readings — the reason a comment could claim "last added" for as long as it did.
  *
- * So the claim kurier draws from this is about which slot has to be safe: **the first added response**,
+ * So the claim lotse draws from this is about which slot has to be safe: **the first added response**,
  * which is the one a focused button answers Enter for, and which is live for the frame between
  * `present()` and `PermissionDialog`'s own `grab_focus`. A focused `Gtk.Button` is activated by Enter
  * and by Space whether or not anything is the default widget, so left alone this dialog allows on the
@@ -380,7 +380,7 @@ function focusCase() {
       window.destroy();
       if (ids[0] === 'reject_once') {
         print('  the FIRST added response holds the focus, and the LAST added is the topmost button.');
-        print('  a focused Gtk.Button answers Enter and Space, so kurier moves the focus itself —');
+        print('  a focused Gtk.Button answers Enter and Space, so lotse moves the focus itself —');
         print('  and `orderOptions` puts a decline in the first slot so the race is harmless either way.');
         next();
       }
@@ -390,16 +390,16 @@ function focusCase() {
 }
 
 /**
- * Case 10 — **is the focus on an allow during the frame before kurier's own idle runs?** The one
+ * Case 10 — **is the focus on an allow during the frame before lotse's own idle runs?** The one
  * question `app/tests/probes/permission-focus.ts` cannot answer about the real widget.
  *
- * `present()` maps synchronously, so that probe's timers all run *after* kurier's grab; it measures the
+ * `present()` maps synchronously, so that probe's timers all run *after* lotse's grab; it measures the
  * settled focus and the turn-by-turn sequence, never this frame. A look-alike can, because here the
  * grabbing is the probe's own choice: the same dialog is built twice, once grabbing the body
  * synchronously inside `map` and once deferring to an idle, and the first frame of each is printed.
  *
  * **What it measures, in one line:** with two allows and no `default_response`, libadwaita focuses
- * `allow_once` — and the question is whether kurier's `grab_focus` reaches the body before a stray Enter
+ * `allow_once` — and the question is whether lotse's `grab_focus` reaches the body before a stray Enter
  * could reach the button. Synchronous inside `map`: the body, from the first sample. Deferred to an
  * idle: the button. That difference is the whole justification for the synchronous grab in
  * `PermissionDialog.show()`, and this is the case that would catch its removal.

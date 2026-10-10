@@ -12,7 +12,7 @@ import { detectAgents, parseVersionOutput, type AgentFacts } from './detect.ts';
 import { isolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
 import type { CwdFacts } from '../cwd.ts';
-import type { KurierPaths } from '../paths.ts';
+import type { LotsePaths } from '../paths.ts';
 import type { ResolveContext } from './resolve.ts';
 import {
   FLATPAK_SPAWN,
@@ -87,20 +87,20 @@ export async function gatherAgentFactsAsync(
   );
 }
 
-export async function gatherResolveContextAsync(paths: KurierPaths): Promise<ResolveContext> {
+export async function gatherResolveContextAsync(paths: LotsePaths): Promise<ResolveContext> {
   return resolveContextFrom(paths, await gatherAgentFactsAsync());
 }
 
 /** The impure half of resolution: probe this machine once, and say where a bundled copy keeps its state. */
 export function gatherResolveContext(
-  paths: KurierPaths,
+  paths: LotsePaths,
   readVersions = true,
   probeHost = true,
 ): ResolveContext {
   return resolveContextFrom(paths, gatherAgentFacts(LAUNCHERS, readVersions, probeHost));
 }
 
-function resolveContextFrom(paths: KurierPaths, facts: readonly AgentFacts[]): ResolveContext {
+function resolveContextFrom(paths: LotsePaths, facts: readonly AgentFacts[]): ResolveContext {
   return {
     detections: detectAgents(facts),
     isolationFor: (id) => isolationDirs(paths.dataDir, id),

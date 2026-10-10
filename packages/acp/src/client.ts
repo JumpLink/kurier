@@ -12,8 +12,8 @@
 import {
   DENY_EVERYTHING,
   FileSystemRefusedError,
-  KURIER_CLIENT_CAPABILITIES,
-  KURIER_IMPLEMENTATION,
+  LOTSE_CLIENT_CAPABILITIES,
+  LOTSE_IMPLEMENTATION,
   cancelledOutcome,
   selectedOutcome,
   type ClientGate,
@@ -121,7 +121,7 @@ export class AcpClient {
   constructor(options: AcpClientOptions) {
     this.transport = options.transport;
     this.#gate = options.gate ?? DENY_EVERYTHING;
-    this.#clientInfo = options.clientInfo ?? KURIER_IMPLEMENTATION;
+    this.#clientInfo = options.clientInfo ?? LOTSE_IMPLEMENTATION;
     this.#initializeTimeoutMs = options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS;
     this.transport.onMessage((data) => this.#receive(data));
     this.transport.onClose((reason) => this.#failAll(reason));
@@ -133,14 +133,14 @@ export class AcpClient {
    * The `initialize` handshake, and the only call that must come first.
    *
    * The version is checked, and a mismatch is fatal. ACP says the client should disconnect if it
-   * does not support the version the agent answers with, and kurier takes that literally: a v2
+   * does not support the version the agent answers with, and lotse takes that literally: a v2
    * agent and a v1 client agreeing to muddle along is how a session dies twenty minutes later
    * inside a field that does not exist yet.
    */
   async initialize(request: Partial<InitializeRequest> = {}): Promise<InitializeResponse> {
     const params: InitializeRequest = {
       protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: KURIER_CLIENT_CAPABILITIES,
+      clientCapabilities: LOTSE_CLIENT_CAPABILITIES,
       clientInfo: this.#clientInfo,
       ...request,
     };
@@ -280,7 +280,7 @@ export class AcpClient {
    * `session/list`, following `nextCursor` to the end.
    *
    * A real answer paginates — `opencode acp` returns an opaque base64 cursor and more sessions
-   * behind it. `kurier sessions` shows the agent's whole history, so it walks the pages; the
+   * behind it. `lotse sessions` shows the agent's whole history, so it walks the pages; the
    * `maxPages` bound is a stop for a peer that keeps handing back a cursor.
    */
   async listSessions(
@@ -322,10 +322,10 @@ export class AcpClient {
 
   // ─── session configuration ─────────────────────────────────────────────────────────────────
   //
-  // Both of these write a value **inside the agent**, for the lifetime of that session. kurier
+  // Both of these write a value **inside the agent**, for the lifetime of that session. lotse
   // keeps no copy: the agent's `currentValue` is the truth, and it is re-read on every
   // `session/new`, `session/load` and `config_option_update`. A surface that remembered a preferred
-  // model in a kurier file would be holding configuration authority over the agent — the same
+  // model in a lotse file would be holding configuration authority over the agent — the same
   // mistake as "always allow" in different clothes.
 
   /**
@@ -400,7 +400,7 @@ export class AcpClient {
   }
 
   /** Close the connection. Pending requests reject; late agent traffic is ignored, not answered. */
-  close(reason = 'kurier closed the connection'): void {
+  close(reason = 'lotse closed the connection'): void {
     if (this.#closed) return;
     this.#closed = true;
     this.#failAll(new Error(reason));
@@ -414,9 +414,9 @@ export class AcpClient {
    *
    * **A failed write closes the connection on every path**: a transport that threw once has lost
    * a line, and the next line would arrive at a peer that never saw the one before it. What
-   * differs is the caller. `#send` (kurier's own notifications) throws and `#request` rejects,
+   * differs is the caller. `#send` (lotse's own notifications) throws and `#request` rejects,
    * because somebody is waiting on the call and has to learn it never went out. `#write` (answers
-   * to the agent) returns quietly, because nobody on kurier's side is waiting for those — the
+   * to the agent) returns quietly, because nobody on lotse's side is waiting for those — the
    * agent asked, and a closed connection is the only answer it can still get. A closed connection
    * is the same split: `#send` throws, `#request` rejects, `#write` drops the line.
    */
@@ -546,7 +546,7 @@ export class AcpClient {
         this.#write(
           encodeFailure(request.id, {
             code: ERROR_CODES.METHOD_NOT_FOUND,
-            message: `kurier implements no method "${request.method}"`,
+            message: `lotse implements no method "${request.method}"`,
           }),
         );
     }
@@ -560,7 +560,7 @@ export class AcpClient {
    * doing parallel tool calls can send two `session/request_permission` requests before it has an
    * answer to the first; a terminal gate happens to survive that because a person reads lines in
    * order, but a modal dialog cannot — it has one window, and the second question either vanishes
-   * behind the first or overwrites it. Serialising here means every gate kurier ever grows,
+   * behind the first or overwrites it. Serialising here means every gate lotse ever grows,
    * including the GTK one, can be written as "answer this, then that", with no queue of its own.
    *
    * The order is arrival order. Reversing it would answer the second question first, which is the
@@ -613,7 +613,7 @@ export class AcpClient {
    */
   #reportError(what: string, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`kurier: ${what}: ${message}`);
+    console.error(`lotse: ${what}: ${message}`);
   }
 
   /**
@@ -647,7 +647,7 @@ export class ProtocolVersionMismatchError extends Error {
   constructor(negotiated: number | undefined, supported: number, agentInfo?: Implementation | null) {
     const who = agentInfo ? `${agentInfo.name} ${agentInfo.version}` : 'the agent';
     super(
-      `${who} speaks ACP version ${negotiated ?? 'none'}, kurier implements version ${supported}. ` +
+      `${who} speaks ACP version ${negotiated ?? 'none'}, lotse implements version ${supported}. ` +
         'Refusing to continue — a mismatch found halfway through a turn is far more expensive.',
     );
     this.name = 'ProtocolVersionMismatchError';
@@ -668,7 +668,7 @@ export class UnsupportedCapabilityError extends Error {
   }
 }
 
-/** True when the error is ACP's "log in first" — the one that `kurier auth` exists for. */
+/** True when the error is ACP's "log in first" — the one that `lotse auth` exists for. */
 export function isAuthRequired(error: unknown): boolean {
   return error instanceof RpcError && error.code === ERROR_CODES.AUTH_REQUIRED;
 }

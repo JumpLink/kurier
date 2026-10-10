@@ -1,8 +1,8 @@
 /**
- * `kurier auth` — trap 1 of the plan, given a command.
+ * `lotse auth` — trap 1 of the plan, given a command.
  *
- * Without this command `kurier start` dies on `-32000 auth_required` with a stack trace instead of a
- * sentence. What it does about that is decided in `@kurier/core`'s `auth.ts`: which of the two paths an
+ * Without this command `lotse start` dies on `-32000 auth_required` with a stack trace instead of a
+ * sentence. What it does about that is decided in `@lotse/core`'s `auth.ts`: which of the two paths an
  * agent's `authMethods` allow, what the login command is, and the order the two handshakes run in. What
  * is here is the terminal: the flags, the lines, the exit codes, and the one thing a window would have
  * to do differently — running the login with **inherited stdio**, because a login that opens a browser
@@ -20,14 +20,14 @@ import {
   toHostCommand,
   which,
   type AgentCommand,
-  type KurierPaths,
-} from '@kurier/core';
+  type LotsePaths,
+} from '@lotse/core';
 
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'auth',
   describe: 'arrange the login an agent asked for, so a session does not die on -32000',
   builder: (yargs) =>
@@ -76,7 +76,7 @@ const command = (paths: KurierPaths): CommandModule => ({
         );
         return;
       case 'unusable':
-        err('the agent advertised an auth method without an id — nothing kurier can do with it');
+        err('the agent advertised an auth method without an id — nothing lotse can do with it');
         process.exitCode = 1;
         return;
       case 'login-missing':
@@ -102,7 +102,7 @@ const command = (paths: KurierPaths): CommandModule => ({
  *
  * Routed through the same host rewrite as the ACP channel (`agents/sandbox.ts`), because a login is a
  * host program for exactly the reason the agent is: it opens a browser and keeps its credentials under
- * the person's own home. A `kurier auth` that only worked on a desktop install would be a second
+ * the person's own home. A `lotse auth` that only worked on a desktop install would be a second
  * version of the same bug.
  */
 function runInteractively(command: AgentCommand): Promise<number> {

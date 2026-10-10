@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { noticeDue } from '@kurier/core';
+import { noticeDue } from '@lotse/core';
 import {
   DEFAULT_NOTICES,
   markSeen,
@@ -19,7 +19,7 @@ import {
 } from '../../../src/core/notices.ts';
 
 async function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-notices-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-notices-'));
   try {
     await run(dir);
   } finally {
@@ -41,7 +41,7 @@ export default async () => {
       expect('notices' in parsed && parsed.notices.seen[0]).toBe('bundled-agent');
     });
 
-    await it('leaves out an id this build does not know, so a newer kurier’s notice never breaks this one', async () => {
+    await it('leaves out an id this build does not know, so a newer lotse’s notice never breaks this one', async () => {
       const parsed = parseNotices('{"version":1,"seen":["bundled-agent","from-the-future"]}');
       expect('notices' in parsed && parsed.notices.seen.length).toBe(1);
     });
@@ -96,12 +96,12 @@ export default async () => {
   await describe('writeNotices', async () => {
     await it('round-trips, 0600 in a 0700 directory it created, and leaves no temp file', async () => {
       await withTempDir((dir) => {
-        const file = join(dir, 'kurier', 'notices.json');
+        const file = join(dir, 'lotse', 'notices.json');
         writeNotices(file, markSeen(DEFAULT_NOTICES, 'bundled-agent'));
         expect(readNotices(file).notices.seen[0]).toBe('bundled-agent');
         expect(statSync(file).mode & 0o777).toBe(0o600);
-        expect(statSync(join(dir, 'kurier')).mode & 0o777).toBe(0o700);
-        expect(readdirSync(join(dir, 'kurier')).join(',')).toBe('notices.json');
+        expect(statSync(join(dir, 'lotse')).mode & 0o777).toBe(0o700);
+        expect(readdirSync(join(dir, 'lotse')).join(',')).toBe('notices.json');
         expect(readFileSync(file, 'utf8').includes('bundled-agent')).toBe(true);
       });
     });

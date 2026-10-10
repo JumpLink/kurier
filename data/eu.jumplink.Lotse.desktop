@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=Kurier
+Name=Lotse
 Comment=Start coding agents as subprocesses and drive their sessions
-Exec=kurier-app
-Icon=eu.jumplink.Kurier
+Exec=lotse-app
+Icon=eu.jumplink.Lotse
 Terminal=false
 Type=Application
 Categories=Development;GTK;
 Keywords=ACP;agent;coding assistant;AI;session;Adwaita;GNOME;
 StartupNotify=true
-StartupWMClass=eu.jumplink.Kurier
+StartupWMClass=eu.jumplink.Lotse

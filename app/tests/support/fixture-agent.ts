@@ -23,14 +23,9 @@ import {
   encodeNotification,
   encodeSuccess,
   type JsonRpcMessage,
-} from '@kurier/acp/jsonrpc';
-import {
-  AGENT_METHODS,
-  AGENT_NOTIFICATIONS,
-  CLIENT_METHODS,
-  CLIENT_NOTIFICATIONS,
-} from '@kurier/acp/methods';
-import type { CloseListener, Transport, TransportListener } from '@kurier/acp/transport';
+} from '@lotse/acp/jsonrpc';
+import { AGENT_METHODS, AGENT_NOTIFICATIONS, CLIENT_METHODS, CLIENT_NOTIFICATIONS } from '@lotse/acp/methods';
+import type { CloseListener, Transport, TransportListener } from '@lotse/acp/transport';
 import {
   ERROR_CODES,
   PROTOCOL_VERSION,
@@ -46,7 +41,7 @@ import {
   type SessionNotification,
   type SessionUpdate,
   type StopReason,
-} from '@kurier/acp/types';
+} from '@lotse/acp/types';
 
 /**
  * The three options `opencode acp` 2.0.19 reports, with the shape it reports them in.
@@ -758,7 +753,7 @@ export class FixtureAgent {
    *
    * - **A non-string value is refused outright.** opencode 2.0.19 answers
    *   `InvalidConfigOptionError` for `typeof value !== "string"`, so it implements no boolean
-   *   options at all. That is the measurement behind `KURIER_CLIENT_CAPABILITIES` omitting
+   *   options at all. That is the measurement behind `LOTSE_CLIENT_CAPABILITIES` omitting
    *   `session.configOptions.boolean`: announcing a shape the agent refuses is a promise the agent
    *   is entitled to break.
    * - **The answer is the full list, and it is the truth.** An unknown `configId` or a value outside

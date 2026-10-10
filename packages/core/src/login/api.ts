@@ -101,7 +101,7 @@ function parseStatus(response: HttpResponse): OAuthStatus {
 }
 
 export interface OpencodeLogin extends LoginApi {
-  /** Hand opencode an API key, which it stores. kurier keeps it only for the length of this call. */
+  /** Hand opencode an API key, which it stores. lotse keeps it only for the length of this call. */
   connectKey(providerId: string, key: string, answer: Readonly<Record<string, string>>): Promise<void>;
   /** The providers to offer. Rejects with a 404 `LoginApiError` for an opencode that has no such API. */
   providers(policy?: LoginPolicy): Promise<LoginProvider[]>;

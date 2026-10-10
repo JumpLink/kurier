@@ -10,7 +10,7 @@ import {
   type LoginSession,
   type LoginState,
   type OAuthStatus,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const DEVICE: LoginMethod = { id: 'device', kind: 'oauth', label: 'Device code', fields: [] };
 const KEY: LoginMethod = { id: 'key', kind: 'key', label: 'API key', fields: [] };
@@ -110,7 +110,7 @@ const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 export default async () => {
   await describe('LoginController', async () => {
     await it('offers a terminal hint and starts nothing when no server can be had', async () => {
-      const h = harness({ unavailable: 'use kurier auth' });
+      const h = harness({ unavailable: 'use lotse auth' });
       await h.controller.open();
       expect(h.controller.state.step).toBe('unavailable');
       expect(h.calls.includes('open')).toBe(false);

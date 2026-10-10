@@ -33,6 +33,7 @@ import isolation from './unit/core/isolation.test.ts';
 import resolve from './unit/core/resolve.test.ts';
 import devAgent from './unit/core/dev-agent.test.ts';
 import paths from './unit/core/paths.test.ts';
+import migrate from './unit/core/migrate.test.ts';
 import settings from './unit/core/settings.test.ts';
 import settingsView from './unit/core/settings-view.test.ts';
 import scroll from './unit/core/scroll.test.ts';
@@ -86,6 +87,7 @@ run({
   resolve,
   devAgent,
   paths,
+  migrate,
   settings,
   settingsView,
   scroll,

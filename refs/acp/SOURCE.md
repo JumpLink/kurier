@@ -44,5 +44,5 @@ Three things about it belong here, next to the schema:
 
 `opencode acp` negotiates `protocolVersion: 1`. The upstream repository also carries
 `schema/v2/schema.json`; v2 is a draft and is deliberately NOT vendored. When an agent answers
-`initialize` with a `protocolVersion` kurier does not implement, `AcpClient.initialize` refuses
+`initialize` with a `protocolVersion` lotse does not implement, `AcpClient.initialize` refuses
 the connection rather than continuing on a guess.

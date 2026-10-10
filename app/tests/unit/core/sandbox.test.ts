@@ -40,7 +40,7 @@ import {
   which,
   type AgentCommand,
   type SandboxFacts,
-} from '@kurier/core';
+} from '@lotse/core';
 
 /** Sandboxed: the one fact, present. */
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };
@@ -55,7 +55,7 @@ const OPENCODE: AgentCommand = {
 };
 
 function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-sandbox-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-sandbox-'));
   try {
     return Promise.resolve(run(dir)).finally(() => rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
@@ -66,7 +66,7 @@ function withTempDir(run: (dir: string) => Promise<void> | void): Promise<void> 
 
 /** The same, for a case whose value is the thing under test. */
 function withTempDirValue<T>(run: (dir: string) => T): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'kurier-sandbox-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lotse-sandbox-'));
   try {
     return Promise.resolve(run(dir)).finally(() => rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
@@ -142,7 +142,7 @@ export default async () => {
     const BUNDLED: AgentCommand = {
       ...OPENCODE,
       program: '/app/extra/agents/opencode/package/bin/opencode',
-      env: { XDG_CONFIG_HOME: '/data/kurier/agents/opencode/config' },
+      env: { XDG_CONFIG_HOME: '/data/lotse/agents/opencode/config' },
       bundled: true,
     };
 
@@ -169,7 +169,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'bundled',
-          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$KURIER_BLANKED"\n',
+          '#!/bin/sh\nprintf "XDG:%s\\n" "$XDG_CONFIG_HOME"\nprintf "BLANK:[%s]\\n" "$LOTSE_BLANKED"\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -177,7 +177,7 @@ export default async () => {
             title: 'fake',
             program,
             args: [],
-            env: { XDG_CONFIG_HOME: config, KURIER_BLANKED: '' },
+            env: { XDG_CONFIG_HOME: config, LOTSE_BLANKED: '' },
             bundled: true,
           },
           onStderr: () => {},
@@ -298,7 +298,7 @@ export default async () => {
     });
 
     await it('answers on the protocol fd, through the same wrapper, in the directory it was started in', async () => {
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'kurier-cwd-')));
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'lotse-cwd-')));
       try {
         const home = join(root, 'home');
         const work = join(root, 'work');
@@ -324,7 +324,7 @@ export default async () => {
      * The fake HOME is hostile on purpose: its profile AND its rc print to stdout and `read` from
      * stdin. Without the fence, the print lands in the middle of the JSON-RPC stream and the `read`
      * eats the request; with it, stdout is byte-for-byte the program's own output and the program
-     * receives what kurier sent. `SOCKET`-style isolation is not needed — this is a pipe.
+     * receives what lotse sent. `SOCKET`-style isolation is not needed — this is a pipe.
      */
     await it('leaves stdout untouched and stdin intact, with a profile and rc that print and read', async () => {
       if (process.platform === 'win32') return;
@@ -429,7 +429,7 @@ export default async () => {
     await it('passes the rc path in an env var, not a positional, which the program owns', async () => {
       // `$0` is the inner script and `$1` is the agent; the rc path needs its own channel.
       const { outer } = shapeOf(toHostCommand(OPENCODE, SANDBOXED));
-      expect(outer).toContain('KURIER_RC=');
+      expect(outer).toContain('LOTSE_RC=');
     });
 
     await it('accepts a capture only if it holds a slash, and keeps the login PATH otherwise', async () => {
@@ -448,9 +448,9 @@ export default async () => {
       await withTempDir((dir) => {
         const home = join(dir, 'home');
         mkdirSync(home, { recursive: true });
-        writeHomeFile(home, '.bashrc', 'case $- in *i*) ;; *) return;; esac\nexport KURIER_RC_RAN=1\n');
+        writeHomeFile(home, '.bashrc', 'case $- in *i*) ;; *) return;; esac\nexport LOTSE_RC_RAN=1\n');
         const run = (flags: string): string =>
-          spawnSync('/bin/bash', [...flags.split(' '), '-c', 'printf %s "${KURIER_RC_RAN:-no}"'], {
+          spawnSync('/bin/bash', [...flags.split(' '), '-c', 'printf %s "${LOTSE_RC_RAN:-no}"'], {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
             timeout: 10_000,
@@ -607,11 +607,11 @@ export default async () => {
         // is found on Windows because NTFS is case-insensitive, and that is a property of the
         // FILESYSTEM, not of `which` — which is why the fixture used to be written lower-case: it
         // passed on macOS (APFS, case-insensitive) and failed on the Linux CI runner (ext4,
-        // case-sensitive) with `undefined`, a red run that said nothing about kurier. The shipped
+        // case-sensitive) with `undefined`, a red run that said nothing about lotse. The shipped
         // path is untouched either way: macOS and Linux never set PATHEXT, so these candidates
         // are never walked there.
         writeFileSync(join(dir, 'opencode.CMD'), '@echo off\n');
-        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         // Lower-cased on both sides, not `toBe`: the returned string is the candidate built from
         // PATHEXT's own casing (conventionally uppercase, `.CMD`), so the exact casing is not part
         // of the contract `which` makes.
@@ -625,7 +625,7 @@ export default async () => {
       await withTempDir((dir) => {
         writeFileSync(join(dir, 'opencode'), '');
         writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
-        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, PATHEXT: '.COM;.EXE;.BAT;.CMD', LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         expect(which('opencode', env, NOT_SANDBOXED)).toBe(join(dir, 'opencode'));
       });
     });
@@ -633,7 +633,7 @@ export default async () => {
     await it('is unaffected when PATHEXT is unset, so macOS/Linux behaviour is unchanged', async () => {
       await withTempDir((dir) => {
         writeFileSync(join(dir, 'opencode.cmd'), '@echo off\n');
-        const env = { PATH: dir, KURIER_TEST_ASSUME_EXECUTABLE: '1' };
+        const env = { PATH: dir, LOTSE_TEST_ASSUME_EXECUTABLE: '1' };
         expect(which('opencode', env, NOT_SANDBOXED)).toBe(null);
       });
     });
@@ -730,7 +730,7 @@ export default async () => {
         });
         // Nothing, and that is the correct answer for two independent reasons: the probe runs in a
         // POSIX `sh` that never read the bash rc, AND even if it had, a function is not a program.
-        // Either way `kurier agents` says NOT FOUND rather than printing a name it cannot run.
+        // Either way `lotse agents` says NOT FOUND rather than printing a name it cannot run.
         expect(result.stdout.trim()).toBe('');
         expect(result.status).not.toBe(0);
       });
@@ -777,7 +777,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'echoer',
-          '#!/bin/sh\nprintf "ARGV:%s|%s\\n" "$1" "$2"\nprintf "CWD:%s\\n" "$(pwd)"\nprintf "ENV:%s\\n" "$KURIER_TEST_VAR"\n',
+          '#!/bin/sh\nprintf "ARGV:%s|%s\\n" "$1" "$2"\nprintf "CWD:%s\\n" "$(pwd)"\nprintf "ENV:%s\\n" "$LOTSE_TEST_VAR"\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -786,7 +786,7 @@ export default async () => {
             program,
             args: ['one', 'two'],
             cwd: dir,
-            env: { KURIER_TEST_VAR: 'present' },
+            env: { LOTSE_TEST_VAR: 'present' },
           },
           onStderr: () => {},
           sandboxFacts: NOT_SANDBOXED,
@@ -808,7 +808,7 @@ export default async () => {
           expect(out).toContain('ARGV:one|two');
           // `realpathSync`, not `dir`: macOS's `/tmp` is a symlink to `/private/tmp`, and the
           // child's own `pwd` reports the resolved target — asserting the unresolved path is a
-          // test bug, not a product one, because kurier never promised the CWD comes back
+          // test bug, not a product one, because lotse never promised the CWD comes back
           // byte-identical to what it passed, only that the process actually started there.
           expect(out).toContain(`CWD:${realpathSync(dir)}`);
           expect(out).toContain('ENV:present');
@@ -851,7 +851,7 @@ export default async () => {
         const program = writeProgram(
           dir,
           'late',
-          '#!/bin/sh\n( sleep 0.4; printf "LATE:%s\\n" "$KURIER_TEST_VAR" ) &\nprintf "EARLY\\n"\nexit 0\n',
+          '#!/bin/sh\n( sleep 0.4; printf "LATE:%s\\n" "$LOTSE_TEST_VAR" ) &\nprintf "EARLY\\n"\nexit 0\n',
         );
         const channel = new StdioChannel({
           command: {
@@ -859,7 +859,7 @@ export default async () => {
             title: 'late',
             program,
             args: [],
-            env: { KURIER_TEST_VAR: 'after-exit' },
+            env: { LOTSE_TEST_VAR: 'after-exit' },
           },
           onStderr: () => {},
           sandboxFacts: NOT_SANDBOXED,

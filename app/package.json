@@ -1,10 +1,10 @@
 {
-  "name": "kurier-cli",
+  "name": "lotse-cli",
   "version": "0.1.1",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
-  "description": "Kurier app: the `kurier` binary \u2014 a CLI over @kurier/acp and @kurier/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
+  "description": "Lotse app: the `lotse` binary \u2014 a CLI over @lotse/acp and @lotse/session, bundled to a single .gjs.mjs and run on GJS via gjsify.",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -16,11 +16,11 @@
     "lint": "gjsify lint .",
     "lint:fix": "gjsify lint --fix .",
     "build": "gjsify run build:gjs",
-    "build:gjs": "gjsify build src/index.ts --app gjs --outfile dist/kurier.gjs.mjs",
-    "build:app": "gjsify build src/frontends/gui/main.ts --app gjs --outfile dist/kurier-app.gjs.mjs",
-    "build:app:node": "gjsify build src/frontends/gui/main.ts --app node --outfile dist/kurier-app.node.mjs",
-    "start": "gjsify run dist/kurier.gjs.mjs",
-    "start:app": "gjsify run dist/kurier-app.gjs.mjs",
+    "build:gjs": "gjsify build src/index.ts --app gjs --outfile dist/lotse.gjs.mjs",
+    "build:app": "gjsify build src/frontends/gui/main.ts --app gjs --outfile dist/lotse-app.gjs.mjs",
+    "build:app:node": "gjsify build src/frontends/gui/main.ts --app node --outfile dist/lotse-app.node.mjs",
+    "start": "gjsify run dist/lotse.gjs.mjs",
+    "start:app": "gjsify run dist/lotse-app.gjs.mjs",
     "dev": "gjsify run build:gjs && gjsify run start",
     "dev:app": "gjsify run build:app && gjsify run start:app",
     "test": "gjsify test",
@@ -37,20 +37,20 @@
       ]
     },
     "ship": {
-      "appId": "eu.jumplink.Kurier",
-      "binaryName": "kurier-app",
+      "appId": "eu.jumplink.Lotse",
+      "binaryName": "lotse-app",
       "kind": "app",
-      "name": "Kurier",
+      "name": "Lotse",
       "bundle": {
-        "linux": "dist/kurier-app.gjs.mjs",
-        "darwin": "dist/kurier-app.node.mjs",
-        "win32": "dist/kurier-app.node.mjs"
+        "linux": "dist/lotse-app.gjs.mjs",
+        "darwin": "dist/lotse-app.node.mjs",
+        "win32": "dist/lotse-app.node.mjs"
       },
       "app": {
         "darwin": "node",
         "win32": "node"
       },
-      "icon": "../data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+      "icon": "../data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
       "categories": [
         "Development",
         "GTK"
@@ -73,10 +73,10 @@
       "license": {
         "project": "AGPL-3.0-or-later"
       },
-      "description": "Kurier is a client for the Agent Client Protocol (ACP). It starts an agent such as OpenCode as a subprocess, keeps the conversation, and shows what the agent says while it works. The agent and the model behind it are not part of Kurier.",
-      "homepageUrl": "https://github.com/JumpLink/kurier",
-      "bugtrackerUrl": "https://github.com/JumpLink/kurier/issues",
-      "vcsBrowserUrl": "https://github.com/JumpLink/kurier",
+      "description": "Lotse is a client for the Agent Client Protocol (ACP). It starts an agent such as OpenCode as a subprocess, keeps the conversation, and shows what the agent says while it works. The agent and the model behind it are not part of Lotse.",
+      "homepageUrl": "https://github.com/JumpLink/lotse",
+      "bugtrackerUrl": "https://github.com/JumpLink/lotse/issues",
+      "vcsBrowserUrl": "https://github.com/JumpLink/lotse",
       "flatpak": {
         "finishArgs": [
           "--device=dri",
@@ -91,10 +91,10 @@
     }
   },
   "dependencies": {
-    "@kurier/acp": "*",
-    "@kurier/core": "*",
-    "@kurier/session": "*",
-    "@kurier/widget": "*",
+    "@lotse/acp": "*",
+    "@lotse/core": "*",
+    "@lotse/session": "*",
+    "@lotse/widget": "*",
     "yargs": "^18.1.0"
   },
   "devDependencies": {

@@ -2,13 +2,13 @@
  * The session runner: the three steps every command that talks to an agent performs.
  *
  * Start the process, shake hands, get out of the way. Everything protocol-shaped lives in
- * `@kurier/acp`; everything decision-shaped lives in the `ClientGate` the caller passes in. What
- * is left here is the part that is *only* true of kurier: which launcher, which working
+ * `@lotse/acp`; everything decision-shaped lives in the `ClientGate` the caller passes in. What
+ * is left here is the part that is *only* true of lotse: which launcher, which working
  * directory, and what to do when the agent says it needs a login.
  *
  * The `finally` blocks are the reason this file exists as a unit. An ACP agent is a child process
  * with a model behind it; leaking one means a leaked process and a leaked session, and the second
- * `kurier start` then fails for a reason nobody can reconstruct.
+ * `lotse start` then fails for a reason nobody can reconstruct.
  */
 
 import {
@@ -17,8 +17,8 @@ import {
   type ClientGate,
   type SessionNotification,
   type StopReason,
-} from '@kurier/acp';
-import { classifyAuthMethods } from '@kurier/acp/gate';
+} from '@lotse/acp';
+import { classifyAuthMethods } from '@lotse/acp/gate';
 
 import { stdioTransport, type AgentCommand } from './agents/stdio.ts';
 import { describeAuthMethods } from './auth.ts';
@@ -28,7 +28,7 @@ export interface AgentHandle {
   client: AcpClient;
   /** Stderr from the agent, already split into lines. */
   readonly logLines: string[];
-  /** Name and version the agent reported, for `kurier start`'s first line. */
+  /** Name and version the agent reported, for `lotse start`'s first line. */
   readonly agentInfo: string;
   /**
    * End the agent. Resolves once the process has ended (bounded by `CLOSE_WAIT_MS`), so a caller that is
@@ -52,7 +52,7 @@ export interface OpenAgentOptions {
    * handshake, not after it.
    *
    * The gap this closes is a real orphan, not a theoretical one: a cold `opencode acp` takes
-   * seconds to answer `initialize`, and a Ctrl-C inside that window used to kill kurier with no
+   * seconds to answer `initialize`, and a Ctrl-C inside that window used to kill lotse with no
    * handler installed and the agent still running. Handing the caller a closer at spawn time means
    * there is no interval in which a process exists that nobody can end. See `interrupt.ts`.
    */
@@ -117,7 +117,7 @@ export async function openAgent(options: OpenAgentOptions): Promise<AgentHandle>
 }
 
 /**
- * Re-thrown with the `kurier auth` hint attached, so a caller does not have to know the code.
+ * Re-thrown with the `lotse auth` hint attached, so a caller does not have to know the code.
  *
  * **`AuthRequiredError` and not a plain `Error`, and the message alone is why.** The hint turns
  * ACP's `-32000` into a sentence a person can act on, and a sentence is not a classification: a

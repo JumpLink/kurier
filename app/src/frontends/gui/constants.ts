@@ -11,16 +11,16 @@
 /**
  * The GApplication id. Matches the repository, and the desktop entry that ships with it.
  *
- * **`eu.jumplink.*`, like everything else in the workspace.** First written as `de.jumplink.Kurier`
+ * **`eu.jumplink.*`, like everything else in the workspace.** First written under `de.jumplink.*`
  * and corrected — one string in one file, but an app id is a reverse-DNS name that has to agree with
  * the session bus, the WM_CLASS, the desktop entry and the AppStream metainfo, and a second
  * convention is a second thing to keep in step. `learn6502` (`easy6502/packages/app-gnome`) is the
  * model: `eu.jumplink.Learn6502`, with the value overridable at build time rather than hardcoded.
  */
-export const APP_ID = 'eu.jumplink.Kurier';
+export const APP_ID = 'eu.jumplink.Lotse';
 
 /** What the window and the about dialog call the app. */
-export const APP_NAME = 'kurier';
+export const APP_NAME = 'lotse';
 
 /** Read from the package so the about dialog cannot drift from the installed version. */
 export const APP_VERSION = '0.1.1';
@@ -28,17 +28,17 @@ export const APP_VERSION = '0.1.1';
 /**
  * The env prefix for the dev hooks, without a trailing underscore.
  *
- * `KU_` rather than `KURIER_` on purpose: these are read by hand while developing, and the short
- * form is what fits in a `gjsify run … KU_APP_SESSION=…` line without wrapping.
+ * `LOTSE_APP_` rather than `LOTSE_` on purpose: a hook is read by hand while developing and never
+ * by someone running the app, so it stays apart from the knobs a person may set.
  */
-export const DEV_HOOK_PREFIX = 'KU_APP';
+export const DEV_HOOK_PREFIX = 'LOTSE_APP';
 
 /**
  * The window's *default* size, in logical pixels — a default, not a floor.
  *
  * **1024×600, and the number is a decision with a reason.** GNOME's HIG asks every app for a
  * sensible default as well as a minimum. 1024 is a desktop conversation at a readable measure; the
- * floor that actually decides whether kurier fits a phone is `WINDOW_MIN_WIDTH_PX` below, and the two
+ * floor that actually decides whether lotse fits a phone is `WINDOW_MIN_WIDTH_PX` below, and the two
  * are deliberately not the same number.
  */
 export const WINDOW_WIDTH = 1024;
@@ -67,7 +67,7 @@ export const WINDOW_HEIGHT = 600;
  * **The right-hand column is the finding, and it corrects the left one.** With no floor of its own the
  * window grants 420 and 360 and then refuses to go narrower, on a tree where the content could not
  * have been the reason: asked for its minimum, the transcript column wants 126, the composer 153, the
- * content header bar 98 and the sidebar list 138. Nothing in kurier's own layout asks for 360. The
+ * content header bar 98 and the sidebar list 138. Nothing in lotse's own layout asks for 360. The
  * limit is `Adw.NavigationSplitView` plus the toplevel chrome, and 360 is where they stop.
  *
  * So the old `widthRequest: 480` was **not** a measurement of this layout, and neither is this one:
@@ -82,13 +82,13 @@ export const WINDOW_MIN_WIDTH_PX = 360;
  *
  * The same 720 px `createNavShell` uses, and the same measurement behind it: it is the point where a
  * 300 px sidebar plus a readable conversation stops being possible. Copied rather than imported
- * because kurier builds its own `Adw.NavigationSplitView` — the packaged shell takes a readonly
+ * because lotse builds its own `Adw.NavigationSplitView` — the packaged shell takes a readonly
  * `NavItem[]`, has no list handle for date headers, and no bottom bar for the composer.
  */
 export const COLLAPSE_WIDTH_PX = 720;
 
 /**
- * The conversation's measure is `CONTENT_MAX_WIDTH_PX` in `@kurier/widget`, not a constant of this
+ * The conversation's measure is `CONTENT_MAX_WIDTH_PX` in `@lotse/widget`, not a constant of this
  * file: it caps the transcript and the composer, which are the widget's, while the 720 above
  * collapses this window's sidebar. The two were always separate decisions that happened to be equal
  * — now they are also in separate packages, which is what keeps a host from changing one and getting

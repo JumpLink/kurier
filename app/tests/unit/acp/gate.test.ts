@@ -1,24 +1,24 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient } from '@kurier/acp/client';
+import { AcpClient } from '@lotse/acp/client';
 import {
   FileSystemRefusedError,
-  KURIER_CLIENT_CAPABILITIES,
-  KURIER_IMPLEMENTATION,
+  LOTSE_CLIENT_CAPABILITIES,
+  LOTSE_IMPLEMENTATION,
   assertScopeIsNotAuthority,
   classifyAuthMethods,
   denyAll,
   rejectOnce,
-} from '@kurier/acp/gate';
-import { UNSUPPORTED_AGENT_METHODS } from '@kurier/acp/methods';
-import type { Transport } from '@kurier/acp/transport';
+} from '@lotse/acp/gate';
+import { UNSUPPORTED_AGENT_METHODS } from '@lotse/acp/methods';
+import type { Transport } from '@lotse/acp/transport';
 import {
   ERROR_CODES,
   type AuthMethodInfo,
   type PermissionOption,
   type RequestPermissionRequest,
-} from '@kurier/acp/types';
-import { newSession } from '@kurier/session';
+} from '@lotse/acp/types';
+import { newSession } from '@lotse/session';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 
@@ -255,18 +255,18 @@ export default async () => {
     });
   });
 
-  await describe('KURIER_CLIENT_CAPABILITIES and KURIER_IMPLEMENTATION', async () => {
+  await describe('LOTSE_CLIENT_CAPABILITIES and LOTSE_IMPLEMENTATION', async () => {
     await it('match what the plan requires', async () => {
-      expect(KURIER_CLIENT_CAPABILITIES.fs).toStrictEqual({ readTextFile: false, writeTextFile: false });
-      expect(KURIER_CLIENT_CAPABILITIES.terminal).toBe(false);
-      expect(KURIER_IMPLEMENTATION.name).toBe('kurier');
-      expect(typeof KURIER_IMPLEMENTATION.version).toBe('string');
+      expect(LOTSE_CLIENT_CAPABILITIES.fs).toStrictEqual({ readTextFile: false, writeTextFile: false });
+      expect(LOTSE_CLIENT_CAPABILITIES.terminal).toBe(false);
+      expect(LOTSE_IMPLEMENTATION.name).toBe('lotse');
+      expect(typeof LOTSE_IMPLEMENTATION.version).toBe('string');
     });
   });
 
   await describe('classifyAuthMethods — trap 1', async () => {
     await it('the measured opencode shape (no type tag) classifies as agent, not terminal', async () => {
-      // Real wire shape, cast because `kind` is what kurier *derives*, never what the agent sends.
+      // Real wire shape, cast because `kind` is what lotse *derives*, never what the agent sends.
       const measured = {
         id: 'opencode-login',
         name: 'Login with opencode',

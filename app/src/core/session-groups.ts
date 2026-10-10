@@ -31,7 +31,7 @@
  * sort does, so one section cannot reappear in the middle of the list.
  */
 
-import { byRecency, type SessionRecord } from '@kurier/session';
+import { byRecency, type SessionRecord } from '@lotse/session';
 
 export type SessionGroupLabel = 'today' | 'yesterday' | 'this-week' | 'earlier';
 

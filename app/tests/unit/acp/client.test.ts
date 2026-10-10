@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { AcpClient, ProtocolVersionMismatchError, UnsupportedCapabilityError } from '@kurier/acp/client';
-import type { Transport } from '@kurier/acp/transport';
+import { AcpClient, ProtocolVersionMismatchError, UnsupportedCapabilityError } from '@lotse/acp/client';
+import type { Transport } from '@lotse/acp/transport';
 
 import { FixtureAgent } from '../../support/fixture-agent.ts';
 
@@ -28,7 +28,7 @@ export default async () => {
   await describe('AcpClient — initialize', async () => {
     await it('sends fs.readTextFile=false, fs.writeTextFile=false and terminal=false on the wire', async () => {
       // Guardrail 3: this must be a real assertion on what the fixture RECEIVED, not on the
-      // KURIER_CLIENT_CAPABILITIES constant re-imported into the test.
+      // LOTSE_CLIENT_CAPABILITIES constant re-imported into the test.
       const fixture = new FixtureAgent();
       const client = new AcpClient({ transport: fixture.transport });
       await client.initialize();
@@ -78,7 +78,7 @@ export default async () => {
       const wire: string[] = [];
       client.onSessionUpdate((n) => updates.push(n.update.sessionUpdate));
       client.onWireMessage((m) => wire.push(m.method));
-      const { sessionId } = await client.newSession({ cwd: '/tmp/kurier-test', mcpServers: [] });
+      const { sessionId } = await client.newSession({ cwd: '/tmp/lotse-test', mcpServers: [] });
       expect(typeof sessionId).toBe('string');
       expect(sessionId.length > 0).toBe(true);
       expect(updates).toContain('available_commands_update');
@@ -233,11 +233,11 @@ export default async () => {
         onClose: () => {},
         close: () => {},
       });
-      // A notification kurier sends: the caller hears about it, and the client knows it is closed.
+      // A notification lotse sends: the caller hears about it, and the client knows it is closed.
       const notifying = new AcpClient({ transport: broken() });
       expect(() => notifying.cancel({ sessionId: 'x' })).toThrow(/EPIPE/);
       expect(notifying.closed).toBe(true);
-      // A request kurier sends: the promise rejects, and the client is closed the same way.
+      // A request lotse sends: the promise rejects, and the client is closed the same way.
       const requesting = new AcpClient({ transport: broken() });
       await expect(requesting.newSession({ cwd: '/tmp', mcpServers: [] })).rejects.toThrow(/EPIPE/);
       expect(requesting.closed).toBe(true);

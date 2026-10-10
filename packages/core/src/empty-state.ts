@@ -14,7 +14,7 @@ export const DOCS_URL = 'https://opencode.ai/docs';
 /** The remedy as one sentence, for a terminal. */
 export const NO_AGENT_REMEDY =
   `install opencode (${INSTALL_COMMAND}, or see ${DOCS_URL}), ` +
-  'or install kurier from Flatpak, which bundles one';
+  'or install lotse from Flatpak, which bundles one';
 
 export type EmptyStateView =
   | { readonly kind: 'ready' }
@@ -34,8 +34,8 @@ export function emptyStateView(resolution: { readonly agent: ResolvedAgent | nul
     kind: 'no-agent',
     title: 'No agent found',
     body:
-      'kurier starts a coding agent but found none on this machine. Install opencode with the command ' +
-      'below, or install kurier from Flatpak, which bundles one. Then start kurier again.',
+      'lotse starts a coding agent but found none on this machine. Install opencode with the command ' +
+      'below, or install lotse from Flatpak, which bundles one. Then start lotse again.',
     commands: [INSTALL_COMMAND],
     docsUrl: DOCS_URL,
     sendReason: 'No agent found, so there is nothing to send to.',

@@ -1,13 +1,13 @@
 /**
- * Where a bundled agent keeps its own config, login, database and cache — a pure function of kurier's
+ * Where a bundled agent keeps its own config, login, database and cache — a pure function of lotse's
  * data directory.
  *
  * **Why the bundled copy gets its own XDG directories — and its own HOME.** The person's own `opencode`
  * carries their login, config and model choice, and the bundled one must never read or write any of it.
- * Inside a Flatpak the XDG variables already point under `~/.var/app/eu.jumplink.Kurier/`, but
+ * Inside a Flatpak the XDG variables already point under `~/.var/app/eu.jumplink.Lotse/`, but
  * `--filesystem=host` exposes the real home right next to it, and relying on a runtime default is how this
  * breaks silently the day the default changes — or in a build that is not a Flatpak at all. So the four
- * directories are named explicitly, under `<kurier data dir>/agents/<id>/`.
+ * directories are named explicitly, under `<lotse data dir>/agents/<id>/`.
  *
  * **HOME moves too, since opencode v2.** v1 had `OPENCODE_DISABLE_CLAUDE_CODE` and
  * `OPENCODE_DISABLE_EXTERNAL_SKILLS` to keep it out of the person's `~/.claude`; v2 has neither (they are

@@ -1,5 +1,5 @@
 /**
- * The bundled-agent catalog: what the validator refuses, and that the file kurier ships passes it.
+ * The bundled-agent catalog: what the validator refuses, and that the file lotse ships passes it.
  *
  * Every rejection case starts from one valid object and breaks exactly one thing, so a failure names the
  * rule rather than a fixture. Synthetic values only — the shipped file is the one real input, and it is
@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { BUNDLED_AGENTS, BUNDLED_PREFIX, bundledProgram, parseBundledCatalog } from '@kurier/core';
-import manifest from '../../../../eu.jumplink.Kurier.json' with { type: 'json' };
+import { BUNDLED_AGENTS, BUNDLED_PREFIX, bundledProgram, parseBundledCatalog } from '@lotse/core';
+import manifest from '../../../../eu.jumplink.Lotse.json' with { type: 'json' };
 import pkg from '../../../../package.json' with { type: 'json' };
 
 const SHA = 'a'.repeat(64);
@@ -142,13 +142,13 @@ export default async () => {
   });
 
   await describe('the Flatpak module agrees with the catalog', async () => {
-    // `package.json#gjsify.flatpak.modules` is hand-written, `eu.jumplink.Kurier.json` is generated from it
+    // `package.json#gjsify.flatpak.modules` is hand-written, `eu.jumplink.Lotse.json` is generated from it
     // by `gjsify flatpak init --force`, and the catalog is the pin. A refresh that updates one and not the
     // others would ship a hash the archive no longer has, or unpack where `bundledProgram` does not look —
     // and a forgotten `init --force` leaves the manifest stale while `package.json` is right.
     const lists: Array<[string, Array<Record<string, any>>]> = [
       ['package.json', (pkg as any).gjsify.flatpak.modules],
-      ['eu.jumplink.Kurier.json', (manifest as any).modules],
+      ['eu.jumplink.Lotse.json', (manifest as any).modules],
     ];
 
     for (const [file, modules] of lists) {
@@ -183,10 +183,10 @@ export default async () => {
           }
         });
 
-        await it(`${file} unpacks ${agent.id} where bundledProgram looks, before kurier's own module`, async () => {
+        await it(`${file} unpacks ${agent.id} where bundledProgram looks, before lotse's own module`, async () => {
           const index = modules.findIndex((entry) => entry['name'] === agent.id);
           expect(index >= 0).toBe(true);
-          expect(index < modules.findIndex((entry) => entry['name'] === 'kurier')).toBe(true);
+          expect(index < modules.findIndex((entry) => entry['name'] === 'lotse')).toBe(true);
           const sources = modules[index]!['sources'] as Array<Record<string, any>>;
           const filenames = new Set(
             sources.filter((s) => s['type'] === 'extra-data').map((s) => s['filename'] as string),

@@ -19,8 +19,8 @@ import {
   findControl,
   projectConfigOptions,
   type ConfigControl,
-} from '@kurier/core';
-import type { SessionConfigOption } from '@kurier/acp/types';
+} from '@lotse/core';
+import type { SessionConfigOption } from '@lotse/acp/types';
 
 import { buildManyModelOptions, opencodeConfigOptions } from '../../support/fixture-agent.ts';
 

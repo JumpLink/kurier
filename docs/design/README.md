@@ -1,8 +1,8 @@
 # GUI design
 
-The kurier window follows the GNOME HIG and libadwaita. Its layout borrows from established chat
+The lotse window follows the GNOME HIG and libadwaita. Its layout borrows from established chat
 apps (Claude, ChatGPT, LibreChat): one reading column, quiet chrome, one composer. This look is
-the baseline `@kurier/widget` inherits ([ADR 0001](../adr/0001-kurier-as-an-embeddable-widget.md)).
+the baseline `@lotse/widget` inherits ([ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md)).
 
 ## Principles
 

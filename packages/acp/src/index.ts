@@ -1,5 +1,5 @@
 /**
- * `@kurier/acp` — Agent Client Protocol, layer 1.
+ * `@lotse/acp` — Agent Client Protocol, layer 1.
  *
  * Everything the protocol needs and nothing about how it is carried: the types against
  * `refs/acp/schema.v1.json`, the JSON-RPC codec, the transport seam, the client session

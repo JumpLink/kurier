@@ -1,14 +1,14 @@
 /**
- * Which providers a person can log in to from kurier, read off opencode's own catalog.
+ * Which providers a person can log in to from lotse, read off opencode's own catalog.
  *
- * **The catalog is the agent's, the policy is kurier's.** opencode v2 lists every integration it knows
+ * **The catalog is the agent's, the policy is lotse's.** opencode v2 lists every integration it knows
  * (`GET /api/integration`, 229 on 2.0.22) with the ways to connect each: an API key, an environment
- * variable, or an OAuth flow. kurier offers the browser logins and the API key; the environment method is
- * left out. An OAuth flow never passes through here: opencode runs it, shows kurier a URL and a code, and
+ * variable, or an OAuth flow. lotse offers the browser logins and the API key; the environment method is
+ * left out. An OAuth flow never passes through here: opencode runs it, shows lotse a URL and a code, and
  * keeps the result in its own store. A pasted key is handed to opencode in one call and held nowhere else
  * (`AGENTS.md` § Privacy: memory only, never persisted).
  *
- * `packages/core/data/login-providers.json` is the one list kurier owns: providers it deliberately does not offer
+ * `packages/core/data/login-providers.json` is the one list lotse owns: providers it deliberately does not offer
  * (`excluded`, each with its reason), the featured order (`preferred`) and the European ones (`europe`). A
  * provider that is in none is still shown, after the featured ones — a new provider upstream is a row, not a code
  * change, and the file is only touched to *remove* or *reorder*.
@@ -64,7 +64,7 @@ export interface LoginProvider {
 }
 
 export interface LoginPolicy {
-  /** Provider id → why kurier does not offer it. */
+  /** Provider id → why lotse does not offer it. */
   readonly excluded: ReadonlyMap<string, string>;
   readonly preferred: readonly string[];
   readonly europe: ReadonlySet<string>;
@@ -103,14 +103,14 @@ export function parseLoginPolicy(value: unknown): LoginPolicy {
   return { excluded, preferred: value['preferred'] as string[], europe: new Set(europe as string[]) };
 }
 
-/** The shipped login policy (`data/login-providers.json`): providers kurier hides (with the reason), features first, and marks European. */
+/** The shipped login policy (`data/login-providers.json`): providers lotse hides (with the reason), features first, and marks European. */
 export const LOGIN_POLICY: LoginPolicy = parseLoginPolicy(raw);
 
 function parseField(value: unknown): LoginField | null {
   if (!isRecord(value)) return null;
   const key = text(value['key']);
   const title = text(value['title']);
-  // Only text answers exist for the providers kurier offers; a number or a multiselect is a field this
+  // Only text answers exist for the providers lotse offers; a number or a multiselect is a field this
   // window has no widget for, so the whole method is left out rather than offered half-working.
   if (!key || value['type'] !== 'string') return null;
   const options = Array.isArray(value['options'])
@@ -153,7 +153,7 @@ function parseField(value: unknown): LoginField | null {
   };
 }
 
-/** The key method carries no id or label on the wire; kurier gives it the same ones everywhere. */
+/** The key method carries no id or label on the wire; lotse gives it the same ones everywhere. */
 export const KEY_METHOD_ID = 'key';
 
 function parseMethod(value: unknown): LoginMethod | null {

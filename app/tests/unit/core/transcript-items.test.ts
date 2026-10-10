@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { labelOf, newSession, type TranscriptEntry } from '@kurier/session';
+import { labelOf, newSession, type TranscriptEntry } from '@lotse/session';
 
-import { toTranscriptItems, type TranscriptItem } from '@kurier/core';
+import { toTranscriptItems, type TranscriptItem } from '@lotse/core';
 
 const AT = '2026-09-30T10:00:00.000Z';
 const LATER = '2026-09-30T10:00:01.000Z';
@@ -60,7 +60,7 @@ export default async () => {
       expect(thought.expanded).toBe(false);
       const tool = items[1];
       if (tool?.kind !== 'tool') throw new Error('expected a tool item');
-      // `null`, and this is the assertion that says so: kurier holds a tool call's title and status
+      // `null`, and this is the assertion that says so: lotse holds a tool call's title and status
       // and no payload (`toTranscript` keeps neither `rawInput` nor `rawOutput`), so a body could
       // only be the summary repeated, the agent's internal id and a raw timestamp.
       expect(tool.detail).toBeNull();
@@ -110,7 +110,7 @@ export default async () => {
 
     await it('keeps the space that was inside a chunk instead of trimming each one', async () => {
       // `'first '` + `'answer'` is `'first answer'`. Trimming per chunk gives `'firstanswer'`, which
-      // is the mid-word glue `labelOf` in `@kurier/session` also refuses to do.
+      // is the mid-word glue `labelOf` in `@lotse/session` also refuses to do.
       expect(textOf(toTranscriptItems([entry('agent', 'first '), entry('agent', 'answer')])[0])).toBe(
         'first answer',
       );

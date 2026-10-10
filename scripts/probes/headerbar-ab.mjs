@@ -78,7 +78,7 @@ function sample(win, name) {
   const node = snapshot.to_node();
   if (!node) throw new Error(`${name}: nothing rendered`);
   // Through a PNG because it is the one texture → pixel path both GTK and GdkPixbuf agree on.
-  const file = GLib.build_filenamev([GLib.get_tmp_dir(), `kurier-probe-${name}.png`]);
+  const file = GLib.build_filenamev([GLib.get_tmp_dir(), `lotse-probe-${name}.png`]);
   win.get_native().get_renderer().render_texture(node, null).save_to_png(file);
   const pixbuf = GdkPixbuf.Pixbuf.new_from_file(file);
   const px = pixbuf.get_pixels();
@@ -94,7 +94,7 @@ function sample(win, name) {
   }
 }
 
-const app = new Adw.Application({ applicationId: 'eu.jumplink.Kurier.Probe' });
+const app = new Adw.Application({ applicationId: 'eu.jumplink.Lotse.Probe' });
 app.connect('activate', () => {
   // Bound to the application, or it has no window, releases and exits before the timer fires.
   const a = windowFor(app, sidebarBox());

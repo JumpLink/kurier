@@ -2,7 +2,7 @@
  * What Ctrl-C means, and what it used to get wrong.
  *
  * The orphan this file's subject fixes was measured on the real bundle: `opencode acp` takes
- * seconds to answer `initialize` from cold, a Ctrl-C inside that window killed kurier with no
+ * seconds to answer `initialize` from cold, a Ctrl-C inside that window killed lotse with no
  * handler installed, and the agent subprocess stayed running with nothing owning it. So the
  * decision has to be provable without sending signals at a subprocess — which is also the only way
  * to test it on both runtimes, since a real signal test is exactly what produced three confident
@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { decideInterrupt } from '@kurier/core';
+import { decideInterrupt } from '@lotse/core';
 
 export default async () => {
   await describe('decideInterrupt — nothing of ours is running', async () => {
@@ -41,7 +41,7 @@ export default async () => {
     });
 
     await it('closes even when a session id is known but no turn runs', async () => {
-      // `kurier start` with no prompt opens a session and stops. Ctrl-C there should end the
+      // `lotse start` with no prompt opens a session and stops. Ctrl-C there should end the
       // process, not send a cancel into a session with nothing running in it.
       expect(decideInterrupt({ agentRunning: true, turnRunning: false, sessionId: 'ses_1' }).kind).toBe(
         'close',

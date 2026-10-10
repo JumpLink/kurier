@@ -58,7 +58,7 @@ export const FOLLOW_MAX_ATTEMPTS = 3;
  * widget, which is why it lives here.** `#scrollToEnd` used to read `upper`/`page_size` once on an
  * idle and give up when `end <= 0`, on the comment's promise that "the first frame's allocation
  * retries this". Nothing retried it, and the promise is false in the one case that matters: the
- * window's constructor fills the transcript (`KU_APP_SESSION`, or a session clicked before the first
+ * window's constructor fills the transcript (`LOTSE_APP_SESSION`, or a session clicked before the first
  * frame), and at that moment the scrolled window has never been allocated, so `upper` and `page_size`
  * are both `0` on **every** idle until the window is presented.
  *

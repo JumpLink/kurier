@@ -1,7 +1,7 @@
 /**
  * The login dialog's logic, with no widget in it.
  *
- * A window cannot print a URL and wait on stdin the way `kurier login` does, so this holds the same
+ * A window cannot print a URL and wait on stdin the way `lotse login` does, so this holds the same
  * steps as a state a dialog can draw: the providers on offer, the fields a method still asks for, the
  * URL and code to show, the pasted code to collect, and the end. The dialog only renders `state` and
  * calls the methods below; every decision lives here, where a test can drive it without a display.
@@ -47,7 +47,7 @@ export type LoginState =
   | { readonly step: 'key'; readonly provider: LoginProvider; readonly method: LoginMethod }
   /** The provider is being asked to begin. */
   | { readonly step: 'beginning'; readonly provider: LoginProvider }
-  /** `prompt.mode` says whether kurier polls (`auto`) or the person pastes a code (`code`). */
+  /** `prompt.mode` says whether lotse polls (`auto`) or the person pastes a code (`code`). */
   | { readonly step: 'waiting'; readonly provider: LoginProvider; readonly prompt: LoginPrompt }
   | { readonly step: 'connected'; readonly provider: LoginProvider }
   | { readonly step: 'failed'; readonly message: string }

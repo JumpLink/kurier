@@ -10,7 +10,7 @@
  * dialog that is meant to explain it. A saved choice that names an id this build does not know gets a row
  * of its own for the same reason.
  *
- * Row keys are `auto`, `<id>:host` and `<id>:bundled`; `kurier agents --use` takes the last two as they
+ * Row keys are `auto`, `<id>:host` and `<id>:bundled`; `lotse agents --use` takes the last two as they
  * are and spells Automatic `none`.
  *
  * **A host install may still be unknown.** Inside a Flatpak finding one means asking the host, which takes
@@ -18,7 +18,7 @@
  * function once the answer is in. The pending view and the detected one list the same keys in the same
  * order, so the merge is just this function called twice — and a test can say so.
  *
- * **A file kurier must not overwrite locks the rows** (`readOnly`, decided by `saveDecision`), and the note
+ * **A file lotse must not overwrite locks the rows** (`readOnly`, decided by `saveDecision`), and the note
  * says why; a file it will first move aside says so too.
  */
 
@@ -28,7 +28,7 @@ import {
   type AgentChoice,
   type AgentDetection,
   type BundledAgent,
-} from '@kurier/core';
+} from '@lotse/core';
 import { saveDecision, type Settings, type SettingsProblemKind } from './settings.ts';
 
 export const AUTOMATIC_KEY = 'auto';
@@ -129,7 +129,7 @@ export function settingsChoicesView(
     rows.push({
       key: selectedKey,
       title: source === 'bundled' ? bundledTitle(id, null) : hostTitle(id, null),
-      subtitle: 'Not known to this version of kurier',
+      subtitle: 'Not known to this version of lotse',
       available: false,
       pending: false,
     });
@@ -165,14 +165,14 @@ export function settingsChoicesView(
   if (facts.problem) lines.push(facts.problem);
   const decision = saveDecision(facts.problemKind ?? null);
   if (decision === 'refuse') {
-    lines.push('kurier will not overwrite that file, so choosing an agent is turned off here.');
+    lines.push('lotse will not overwrite that file, so choosing an agent is turned off here.');
   } else if (decision === 'backup-then-write' && facts.backupPath) {
     lines.push(`Your next choice first moves that file to ${facts.backupPath}.`);
   }
   const chosen = ordered.find((row) => row.selected);
   if (settings.agent && chosen && !chosen.available && !chosen.pending) {
     lines.push(
-      `Your saved choice, ${chosen.title}, is not available here, so kurier starts ` +
+      `Your saved choice, ${chosen.title}, is not available here, so lotse starts ` +
         `${nowTitle ?? 'no agent (none is available)'} instead.`,
     );
   }

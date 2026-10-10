@@ -14,7 +14,7 @@
  * would put two bubbles where the person sent one, and would make an answer's own bubbles
  * indistinguishable from two answers. So a run of adjacent entries of one kind is joined.
  *
- * **2. Joined with nothing between, and trimmed only at the end.** `labelOf` in `@kurier/session`
+ * **2. Joined with nothing between, and trimmed only at the end.** `labelOf` in `@lotse/session`
  * arrived at this first and says why: trimming each chunk before joining glues words together at the
  * seam (`'first '` + `'answer'` becomes `'firstanswer'`), which is the mid-word artefact both
  * functions exist to remove. A test here asserts the two agree on the same input, so a change to one
@@ -39,7 +39,7 @@
  *
  * **A tool line has no body, and that is the honest outcome rather than a missing feature.** A
  * `tool_call` carries `rawInput` and `rawOutput` in whatever shape the agent's tool used, and
- * `toTranscript` deliberately keeps neither (its own file header is about this), so kurier holds a
+ * `toTranscript` deliberately keeps neither (its own file header is about this), so lotse holds a
  * tool call's title and status and nothing else. The first version put the recorded line, the agent's
  * `toolCallId` and the raw ISO timestamp in the body — which is the summary again, an internal id,
  * and a timestamp no surface renders. Repeating the summary behind a disclosure and calling it a
@@ -47,7 +47,7 @@
  * it as a plain row.
  */
 
-import type { EntryKind, TranscriptEntry } from '@kurier/session';
+import type { EntryKind, TranscriptEntry } from '@lotse/session';
 
 /**
  * Kinds whose adjacent entries are one message rather than several — see decision 1.
@@ -121,7 +121,7 @@ export interface ThoughtItem extends DisclosureItem {
 }
 
 /**
- * A tool call, closed by default — and with no body, because kurier records the line and not the
+ * A tool call, closed by default — and with no body, because lotse records the line and not the
  * call's payload. See the file header; the `detail` a future one would carry is a tool's output, and
  * `TranscriptEntry` is where it would have to arrive.
  */

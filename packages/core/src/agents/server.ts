@@ -11,10 +11,10 @@
  * It lives under the same isolation environment as the agent it belongs to (`isolation.ts`), which is the
  * point: the login has to land in the store *that* agent reads. And it is closed as soon as the login is.
  *
- * **Only a copy that runs where kurier runs.** A bundled agent runs inside the sandbox, so its loopback is
+ * **Only a copy that runs where lotse runs.** A bundled agent runs inside the sandbox, so its loopback is
  * ours. A *host* opencode under a Flatpak runs on the other side of `flatpak-spawn --host`, in a network
  * the sandbox cannot see, so there is nothing to connect to: `whyNoLoginServer` says so and the caller
- * falls back to `kurier auth`.
+ * falls back to `lotse auth`.
  */
 
 import { spawn } from 'node:child_process';
@@ -53,7 +53,7 @@ export function whyNoLoginServer(agent: AgentCommand, facts: SandboxFacts): stri
   if (!agent.bundled && isSandboxed(facts)) {
     return (
       'your own opencode runs outside this sandbox, so its login server cannot be reached — ' +
-      'log in with `kurier auth` in a terminal instead'
+      'log in with `lotse auth` in a terminal instead'
     );
   }
   return null;
@@ -146,7 +146,7 @@ export function startServer(
       const baseUrl = found[1]!.replace(/\/$/, '');
       resolve({ baseUrl, password, send: makeSend(baseUrl, password), close });
     });
-    // Nothing is read off stderr: it is the agent's log, and kurier has no use for it here.
+    // Nothing is read off stderr: it is the agent's log, and lotse has no use for it here.
     child.stderr.on('data', () => undefined);
     child.once('error', (error) => fail(error));
     child.once('exit', (code, signal) => {

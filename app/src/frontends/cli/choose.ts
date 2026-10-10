@@ -14,10 +14,10 @@ import {
   requireLauncher,
   resolveDefaultWithNote,
   resolveRecorded,
-  type KurierPaths,
+  type LotsePaths,
   type ResolvedAgent,
   type ResolvedSource,
-} from '@kurier/core';
+} from '@lotse/core';
 import { readSettings } from '../../core/settings.ts';
 
 import { err } from './output.ts';
@@ -29,7 +29,7 @@ function announce(agent: ResolvedAgent): ResolvedAgent {
 }
 
 /** An agent for a new session, or for `auth`: the explicit launcher, else the default resolution. */
-export function agentForNew(paths: KurierPaths, explicit: string | undefined): ResolvedAgent | null {
+export function agentForNew(paths: LotsePaths, explicit: string | undefined): ResolvedAgent | null {
   if (explicit) {
     return { command: requireLauncher(explicit), source: 'host', version: null, isolation: null };
   }
@@ -50,7 +50,7 @@ export function agentForNew(paths: KurierPaths, explicit: string | undefined): R
  * id gets its menu; a copy that is gone prints why and sets the exit code.
  */
 export function agentForRecorded(
-  paths: KurierPaths,
+  paths: LotsePaths,
   id: string,
   source: ResolvedSource | undefined,
 ): ResolvedAgent | null {

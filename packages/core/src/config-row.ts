@@ -9,7 +9,7 @@
  * - **a refused set must not move the row** — the person clicked, the agent said no, and a dropdown
  *   still showing the value they chose is a lie about what the agent is doing;
  * - **re-selecting the current value sends nothing** — the row is rebuilt on every answer, and a
- *   rebuild that fires a request turns "kurier showed the model" into "kurier set the model";
+ *   rebuild that fires a request turns "lotse showed the model" into "lotse set the model";
  * - **a value the agent did not offer is never sent**, whatever the widget believes is selected.
  *
  * Each of those compiles, each of them runs, and each of them is the bug. `permission.ts` made the
@@ -19,16 +19,16 @@
  * **What is here, in one line:** `configRowInput` (what to draw), `configSelection` (which value a
  * dropdown row means), `configRequest` (what goes on the wire), `configAfterSet` (what the answer did
  * to the row), `isConfigChange` (whether this is a change at all) and `parseConfigOptionSpec` (the one
- * format `KU_APP_CONFIG` is read in).
+ * format `LOTSE_APP_CONFIG` is read in).
  *
  * **The agent's `currentValue` is the only truth.** Every view here is built from the last list the
  * agent reported — from `session/new`, from `session/load`/`session/resume`, from a
  * `config_option_update`, and from the answer to a set. Nothing is remembered between sessions and
- * nothing is persisted: kurier keeping a preferred model would be kurier holding configuration
+ * nothing is persisted: lotse keeping a preferred model would be lotse holding configuration
  * authority over the agent, which is the "always allow" mistake in different clothes (see
- * `KURIER_CLIENT_CAPABILITIES`).
+ * `LOTSE_CLIENT_CAPABILITIES`).
  *
- * **A `boolean` option is skipped, and that is not an oversight.** kurier announces
+ * **A `boolean` option is skipped, and that is not an oversight.** lotse announces
  * `session.configOptions: {}` without the `boolean` capability (`gate.ts`), so an agent entitled to
  * believe it has promised no booleans — and the one agent measured (`opencode acp` 2.0.19) refuses a
  * tagged value outright. `projectConfigOptions` still projects them, because the `type` check belongs
@@ -36,7 +36,7 @@
  * until then a switch would be a control the agent is not obliged to honour.
  */
 import { configValue, projectConfigOptions, type ConfigControl, type ConfigValue } from './config.ts';
-import type { SessionConfigOption, SessionUpdate, SetSessionConfigOptionRequest } from '@kurier/acp/types';
+import type { SessionConfigOption, SessionUpdate, SetSessionConfigOptionRequest } from '@lotse/acp/types';
 
 /** What the row needs that is not the agent's own answer: a set in flight, and a sentence. */
 export interface ConfigRowInput {
@@ -228,7 +228,7 @@ export function configSelection(
  * list, a dev hook, a bug) gets `null` here rather than a request the agent will refuse.
  *
  * A `boolean` control is `null` too, and for the same reason `projectSelects` does not put one on the
- * row: nothing may send a tagged boolean while `KURIER_CLIENT_CAPABILITIES` does not announce it.
+ * row: nothing may send a tagged boolean while `LOTSE_CLIENT_CAPABILITIES` does not announce it.
  */
 export function configRequest(
   control: ConfigControl,
@@ -324,7 +324,7 @@ export function applyConfigUpdate(
 const MODE_CONTROL_ID = 'mode';
 
 /**
- * `KU_APP_CONFIG`'s one format: `configId=valueId`.
+ * `LOTSE_APP_CONFIG`'s one format: `configId=valueId`.
  *
  * **Both halves are required, and neither is guessed.** A control id alone says which option to set
  * and not to what, and a value id alone cannot be resolved — a hook that picked the other half would

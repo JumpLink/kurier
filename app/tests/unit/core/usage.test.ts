@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from '@gjsify/unit';
 
-import { describeUsage, formatCost, formatUsageNumber } from '@kurier/core';
+import { describeUsage, formatCost, formatUsageNumber } from '@lotse/core';
 
 export default async function usage(): Promise<void> {
   await describe('usage — the number a cost is rounded to', async () => {

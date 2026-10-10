@@ -3,11 +3,11 @@
  * that does it.
  *
  * **A hint, and the word is load-bearing in all four of its senses.** Plan §3 rejected both alternatives
- * and this file is what the rejection left behind: kurier never *chooses* a model (a hardcoded id would
+ * and this file is what the rejection left behind: lotse never *chooses* a model (a hardcoded id would
  * be a policy table in a client, and it rots), and it never *probes* (burning a turn on each candidate
  * until one answers is slow and costs quota). What it does is move the ids a maintainer wrote down into
  * the first rows of a list the **agent** supplied — so the person still picks, the agent still decides
- * what exists, and the only thing kurier added is order.
+ * what exists, and the only thing lotse added is order.
  *
  * **Three things it deliberately does not do**, and each of them is a rule rather than an omission:
  *
@@ -16,7 +16,7 @@
  *   selection — a client that picked a model would be holding configuration authority over the agent,
  *   which is the "always allow" mistake in different clothes (`core/config-row.ts`'s header).
  * - **Never hides.** Every id the agent offered is still in the list, in its original relative order
- *   within its group. A model kurier stopped showing is a model a person cannot go back to.
+ *   within its group. A model lotse stopped showing is a model a person cannot go back to.
  * - **Never guesses.** The hint is a set of exact id strings. An id this file has never heard of is not
  *   free, is not paid, and is simply not matched — which is also why the list can rot harmlessly: a
  *   model that disappears leaves a stale entry that matches nothing.
@@ -52,7 +52,7 @@ export const FREE_MODEL_IDS: readonly string[] = FREE_MODELS.ids;
 export interface FreeModelList {
   /** ISO date the ids were last read off the provider's own page. */
   readonly checked: string;
-  /** Where they were read. The only authority kurier has on this. */
+  /** Where they were read. The only authority lotse has on this. */
   readonly link: string;
   /** Why these ids and not the merely-free ones. */
   readonly criterion: string;

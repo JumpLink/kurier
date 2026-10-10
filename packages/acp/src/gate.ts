@@ -1,5 +1,5 @@
 /**
- * The client half of ACP: what kurier is willing to do when the agent asks, and what it
+ * The client half of ACP: what lotse is willing to do when the agent asks, and what it
  * advertises up front.
  *
  * This file is where the plan's guardrails (§5) become code rather than intentions. Three of them
@@ -10,7 +10,7 @@
  * - **`session/request_permission` fails closed.** `denyAll` is the default gate, and the type
  *   system is arranged so that replacing it requires naming a `PermissionGate` — a human or a
  *   policy that answers. There is no "allow because the agent asked" path in this file, and
- *   `kurier` adds none.
+ *   `lotse` adds none.
  * - **A session is a scope, not a permission.** Nothing here is stored with a session: there is
  *   no allow-list to persist, therefore none to hand on. `assertScopeIsNotAuthority` is a runtime
  *   canary over the persisted record, so a future field cannot quietly reintroduce the key.
@@ -27,21 +27,21 @@ import type {
   WriteTextFileRequest,
 } from './types.ts';
 
-/** What kurier calls itself in `initialize.clientInfo`. */
-export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: '0.1.1' };
+/** What lotse calls itself in `initialize.clientInfo`. */
+export const LOTSE_IMPLEMENTATION: Implementation = { name: 'lotse', version: '0.1.1' };
 
 /**
- * The capabilities kurier announces. Both file-system flags are `false` and `terminal` is
- * `false`: the agent gets no channel to kurier's file system and no channel to a shell. A later
+ * The capabilities lotse announces. Both file-system flags are `false` and `terminal` is
+ * `false`: the agent gets no channel to lotse's file system and no channel to a shell. A later
  * slice may add one, but it has to be added *here*, visibly, next to the reasoning.
  *
- * `session.configOptions` announces that kurier can **act on** a session's configuration — the
+ * `session.configOptions` announces that lotse can **act on** a session's configuration — the
  * model, the thought level, the mode. Two things about it are deliberate:
  *
- * - **It is a client capability.** It sits under `ClientCapabilities.session`, so it is kurier
+ * - **It is a client capability.** It sits under `ClientCapabilities.session`, so it is lotse
  *   saying what it can do, not a record of what the agent offered. Measured against
  *   `opencode acp` 2.0.19: the agent answers `session/new` with 400+ models, 6 thought levels and
- *   2 modes whether kurier announces this or not — which is a reason to announce, not a reason to
+ *   2 modes whether lotse announces this or not — which is a reason to announce, not a reason to
  *   believe the announcement made the options appear.
  * - **`boolean` is omitted, so it will not be sent.** `{}` there means "I can render a switch";
  *   leaving it out means the agent must not include `type: "boolean"` options. The surface does not
@@ -49,7 +49,7 @@ export const KURIER_IMPLEMENTATION: Implementation = { name: 'kurier', version: 
  *   entitled to act on. It goes in when the switch goes in — next to this line, not in a later
  *   commit that leaves no trace of why.
  */
-export const KURIER_CLIENT_CAPABILITIES: ClientCapabilities = {
+export const LOTSE_CLIENT_CAPABILITIES: ClientCapabilities = {
   fs: { readTextFile: false, writeTextFile: false },
   terminal: false,
   auth: { terminal: false },
@@ -99,7 +99,7 @@ export function selectedOutcome(optionId: string): RequestPermissionResponse {
 export interface ClientGate {
   /** Fail-closed by default. See `denyAll` and the note on `PermissionGate`. */
   readonly permission: PermissionGate;
-  /** Advisory only — kurier never refuses a request because of it. */
+  /** Advisory only — lotse never refuses a request because of it. */
   describe?(request: CreateElicitationRequest): Promise<string | null> | string | null;
 }
 
@@ -115,7 +115,7 @@ export function writeTextFileRefused(request: WriteTextFileRequest): never {
 }
 
 /**
- * The error kurier returns for a file-system request it does not answer. It is a *refusal*, not
+ * The error lotse returns for a file-system request it does not answer. It is a *refusal*, not
  * a failure: the agent is expected to carry on without that capability, and a good one will.
  */
 export class FileSystemRefusedError extends Error {
@@ -123,7 +123,7 @@ export class FileSystemRefusedError extends Error {
 
   constructor(path: string) {
     super(
-      `kurier does not expose a file system to agents: ${path} was refused on principle, not by accident.`,
+      `lotse does not expose a file system to agents: ${path} was refused on principle, not by accident.`,
     );
     this.name = 'FileSystemRefusedError';
     this.path = path;
@@ -133,12 +133,12 @@ export class FileSystemRefusedError extends Error {
 // ─── authentication: trap 1 of the plan ─────────────────────────────────────────────────────
 
 /**
- * The auth methods an agent advertises, split by what kurier can do about them.
+ * The auth methods an agent advertises, split by what lotse can do about them.
  *
  * `opencode acp` advertises `{ id: "opencode-login", name: "Login with opencode", description:
  * "Run `opencode auth login` in the terminal" }` — no `type`, and a description that is not in
  * the schema. Read as the protocol's *agent* auth method it means "the client is expected to
- * arrange the login itself", which is what `kurier auth` does: it runs the command the agent's
+ * arrange the login itself", which is what `lotse auth` does: it runs the command the agent's
  * own `authenticate` would have run, outside the ACP channel. Dying on a missing
  * `opencode auth login` is trap 1 of the plan, and this classification is the first half of the
  * fix.
@@ -146,7 +146,7 @@ export class FileSystemRefusedError extends Error {
 export interface ClassifiedAuthMethods {
   /** The agent can run the login itself, in the terminal it already owns. */
   terminal: AuthMethodInfo[];
-  /** kurier has to arrange the login, or the session cannot start. */
+  /** lotse has to arrange the login, or the session cannot start. */
   agent: AuthMethodInfo[];
   /** Nothing to do. The agent wants no authentication. */
   none: boolean;
@@ -188,7 +188,7 @@ export function assertScopeIsNotAuthority(record: Record<string, unknown>): void
   for (const key of AUTHORITY_KEYS) {
     if (key in record) {
       throw new Error(
-        `a kurier session may not carry "${key}": a session says what is reachable, not what is ` +
+        `a lotse session may not carry "${key}": a session says what is reachable, not what is ` +
           'allowed. Grant per call, in the gate — never here.',
       );
     }

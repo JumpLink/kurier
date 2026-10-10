@@ -1,5 +1,5 @@
 /**
- * The `kurier` binary.
+ * The `lotse` binary.
  *
  * The yargs chrome is copied from postbote's entrypoint, including the three comments that explain
  * the non-obvious options — they are not decoration, each one fixes a failure that a plain yargs
@@ -26,10 +26,14 @@ import {
   sessionsCommand,
   startCommand,
 } from './frontends/cli/index.ts';
-import { kurierPaths } from './core/paths.ts';
+import { migratedPaths } from './core/migrate.ts';
 
-// The one place the process environment becomes paths; everything below is handed them.
-const paths = kurierPaths();
+// The one place the process environment becomes paths; everything below is handed them. The
+// one-time move from the directories lotse wrote happens here too (`core/migrate.ts`), and its
+// notes go to stderr: a directory that moved — or could not be moved — is something *about* the
+// answer, never the answer a pipe is reading.
+const { paths, notes } = migratedPaths();
+for (const note of notes) console.error(`lotse: ${note}`);
 
 function reportError(err: unknown): void {
   console.error(err instanceof Error ? err.message : String(err));
@@ -45,9 +49,9 @@ const parseArgs = () =>
     .command(authCommand(paths))
     .command(loginCommand(paths))
     .command(agentsCommand(paths))
-    .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
+    .demandCommand(1, 'Please provide a command — `lotse --help` lists them all.')
     .strictCommands()
-    .scriptName('kurier')
+    .scriptName('lotse')
     .locale('en')
     .help()
     .fail(false)

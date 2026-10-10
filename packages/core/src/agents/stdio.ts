@@ -19,7 +19,7 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 
-import { channelTransport, type RawChannel, type Transport } from '@kurier/acp/transport';
+import { channelTransport, type RawChannel, type Transport } from '@lotse/acp/transport';
 
 import { prepareIsolation } from './isolation.ts';
 import {
@@ -34,7 +34,7 @@ import {
 export interface AgentCommand {
   /** The adapter id, e.g. `opencode`. What a session record stores as `agent`. */
   readonly id: string;
-  /** What a human sees in `kurier agents`. */
+  /** What a human sees in `lotse agents`. */
   readonly title: string;
   /** The binary, resolved on PATH. */
   readonly program: string;
@@ -47,12 +47,12 @@ export interface AgentCommand {
    */
   readonly cwd?: string;
   /**
-   * Extra environment for the agent. Never credentials — kurier has nowhere safe to put them in
+   * Extra environment for the agent. Never credentials — lotse has nowhere safe to put them in
    * Scheibe 1, and a token in here would land in a session record's process listing.
    */
   readonly env?: Record<string, string>;
   /**
-   * This is the copy shipped inside the build, under `/app/extra`. It runs where kurier runs — the
+   * This is the copy shipped inside the build, under `/app/extra`. It runs where lotse runs — the
    * sandbox — so `toHostCommand` leaves it alone: the host cannot see that path.
    */
   readonly bundled?: true;
@@ -60,7 +60,7 @@ export interface AgentCommand {
 
 export interface StdioChannelOptions {
   command: AgentCommand;
-  /** Lines the agent writes to stderr. ACP says stderr is for logs; kurier never parses it. */
+  /** Lines the agent writes to stderr. ACP says stderr is for logs; lotse never parses it. */
   /** One line at a time, from the agent's stderr. Delivered, never interpreted. */
   onStderr?: (line: string) => void;
   /** How long the process gets between `SIGTERM` and `SIGKILL`. */
@@ -91,7 +91,7 @@ const STDIN_CHUNK_BYTES = 4096;
 
 /**
  * How long the "is it installed" host probe may take. Short, because the probe sits on the path of
- * `kurier agents` and of any window that reports launcher state: a slow answer reads as a broken
+ * `lotse agents` and of any window that reports launcher state: a slow answer reads as a broken
  * app, and nothing about resolving one program's location is worth more than this.
  */
 const HOST_PROBE_TIMEOUT_MS = 5000;
@@ -158,7 +158,7 @@ export class StdioChannel implements RawChannel {
     });
     this.#child.stdout.setEncoding('utf8');
     this.#child.stdout.on('data', (chunk: string) => {
-      // A chunk boundary is not a message boundary. The `MessageReader` in @kurier/acp owns that
+      // A chunk boundary is not a message boundary. The `MessageReader` in @lotse/acp owns that
       // decision; this layer only moves bytes and never looks inside a line.
       for (const listener of this.#dataListeners) listener(chunk);
     });
@@ -240,7 +240,7 @@ export class StdioChannel implements RawChannel {
    * End the agent, politely first.
    *
    * `SIGTERM`, then `SIGKILL` after a grace period: an agent mid-turn holds open state, and a bare
-   * `SIGKILL` leaves a lock behind in its own data directory that fails the *next* `kurier start`
+   * `SIGKILL` leaves a lock behind in its own data directory that fails the *next* `lotse start`
    * with a message about a lock nobody remembers. The timer is unref'd so it can never be the
    * reason the CLI hangs on exit.
    */
@@ -266,7 +266,7 @@ export class StdioChannel implements RawChannel {
    * Its own session also means the terminal's signals stop reaching the agent. For Ctrl-C that is
    * the point: `interrupt.ts` decides between `session/cancel` and a close, and a SIGINT that also
    * hit the agent's group killed it mid-turn before the cancel could land. A closed terminal's
-   * SIGHUP no longer reaches it either; kurier dies of it, the agent's stdin hits EOF, and an ACP
+   * SIGHUP no longer reaches it either; lotse dies of it, the agent's stdin hits EOF, and an ACP
    * agent ends on that.
    */
   #signal(signal: NodeJS.Signals): void {
@@ -308,7 +308,7 @@ export class StdioChannel implements RawChannel {
    * have been read. On GJS `node:child_process` is polyfilled over `Gio.Subprocess`, so stdout
    * arrives through `read_bytes_async` — a GLib main-context source — and the child's `exit`
    * source can be dispatched first. Ending here dropped the final JSON-RPC message, which for a
-   * one-turn `kurier start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
+   * one-turn `lotse start` is the agent's actual answer. On Node `exit` merely *tends* to arrive
    * before the stdio streams are drained, so the same code was a latent bug there too.
    *
    * Node's own answer is the event called `close` — emitted once the process has ended *and* the
@@ -379,7 +379,7 @@ export function needsWindowsShell(program: string, platform: NodeJS.Platform = p
  *
  * **Three answers, in order, and the order is the point.** A program named by path is the person's
  * own answer and is only ever checked here. Failing that, the sandbox's own PATH is walked (pure,
- * fast, and right for a desktop install). Only if that finds nothing AND kurier is inside a Flatpak
+ * fast, and right for a desktop install). Only if that finds nothing AND lotse is inside a Flatpak
  * is the host asked, because then the sandbox's PATH is the wrong PATH: the agent is a host program
  * and the host's shell is the only thing that can say where it is. See `sandbox.ts`.
  *
@@ -387,7 +387,7 @@ export function needsWindowsShell(program: string, platform: NodeJS.Platform = p
  * opencode in it" without a subprocess; the third is the one impure step, and it sits behind the
  * injected `facts` argument so a test that does not want it can say so.
  *
- * This is the difference between `kurier agents` reporting "not installed" and reporting "broken",
+ * This is the difference between `lotse agents` reporting "not installed" and reporting "broken",
  * which are two very different messages to somebody reading them at 23:00.
  */
 export function which(
@@ -453,7 +453,7 @@ function probeOnHostAsync(argv: string[]): Promise<string | null> {
 /** The pure PATH walk, now PATHEXT-aware. */
 function whichOnPath(program: string, env: NodeJS.ProcessEnv): string | null {
   const path = env['PATH'] ?? '';
-  // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `kurier agents`
+  // A Windows PATH uses `;`. Checking for it rather than assuming `:` keeps `lotse agents`
   // honest on the platform the app is eventually meant to run on.
   const separator = path.includes(';') ? ';' : ':';
   const extensions = pathextCandidates(env);
@@ -496,7 +496,7 @@ function pathextCandidates(env: NodeJS.ProcessEnv): string[] {
 function probeOnHost(argv: string[]): string | null {
   // `stdin: 'ignore'` and a bounded `timeout` because this runs on a path a person waits on: a host
   // whose shell hangs — an rc that blocks on a terminal read, a `gpg-agent` prompt, a network mount
-  // in a login script — would otherwise hang `kurier agents` and, through it, the window that asks.
+  // in a login script — would otherwise hang `lotse agents` and, through it, the window that asks.
   // `stdio` rather than `stdin`: this is `spawnSync`, and there the option that covers all three
   // descriptors is `stdio` — `stdin` is an `spawn` option and the type says so. The probe must not
   // read stdin (a host rc could block on one) and does not write stderr, so 'ignore' on both is the
@@ -523,7 +523,7 @@ export function parseHostProbeOutput(stdout: string): string | null {
     .pop();
   // **Only an absolute path counts.** `command -v` also answers for an alias, a function, a keyword
   // and a builtin — and those print their own name, e.g. bare `opencode` for an alias, which is
-  // emphatically not something `spawn` can execute. kurier spawns a program, so anything that is not
+  // emphatically not something `spawn` can execute. lotse spawns a program, so anything that is not
   // a path is "not installed" as far as this table is concerned.
   return found !== undefined && probeAccepts(found) ? found : null;
 }
@@ -533,9 +533,9 @@ export function parseHostProbeOutput(stdout: string): string | null {
  *
  * **Only an absolute path.** `command -v` also answers for an alias, a function, a keyword and a
  * builtin, and each of those prints its own NAME — bare `opencode` for an alias, which is not
- * something `spawn` can execute. kurier spawns a *program*, so anything that is not a path is "not
+ * something `spawn` can execute. lotse spawns a *program*, so anything that is not a path is "not
  * installed" as far as this table is concerned; reporting it otherwise would put a name in a
- * `kurier agents` STATE column that would fail the moment somebody acted on it.
+ * `lotse agents` STATE column that would fail the moment somebody acted on it.
  *
  * Exported because it is the whole of the rule, and a rule with no test is a comment.
  */
@@ -544,10 +544,10 @@ export function probeAccepts(answer: string): boolean {
 }
 
 function isExecutable(candidate: string, env: NodeJS.ProcessEnv): boolean {
-  // `KURIER_TEST_ASSUME_EXECUTABLE=1` skips the mode check so a Windows checkout without Unix
+  // `LOTSE_TEST_ASSUME_EXECUTABLE=1` skips the mode check so a Windows checkout without Unix
   // execute bits still exercises the PATH walk. It is a test seam, not a way to weaken the real
   // answer: nothing in the CLI sets it.
-  const mode = env['KURIER_TEST_ASSUME_EXECUTABLE'] === '1' ? constants.F_OK : constants.X_OK;
+  const mode = env['LOTSE_TEST_ASSUME_EXECUTABLE'] === '1' ? constants.F_OK : constants.X_OK;
   try {
     accessSync(candidate, mode);
     return true;

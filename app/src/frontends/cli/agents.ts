@@ -1,10 +1,10 @@
 /**
- * `kurier agents` — the launchers, and whether their binary is there.
+ * `lotse agents` — the launchers, and whether their binary is there.
  *
  * A small command with one job: make "not installed" and "broken" different sentences. Both look
  * identical from the outside until you know whether the binary exists, and the fix for each is
  * nothing alike. The SOURCE column says where a usable one came from — the person's own install
- * (`host`) or the copy shipped inside this build (`bundled`) — and the last line names the one kurier
+ * (`host`) or the copy shipped inside this build (`bundled`) — and the last line names the one lotse
  * would start now.
  */
 
@@ -21,8 +21,8 @@ import {
   resolveAgent,
   type AgentCommand,
   type AgentDetection,
-  type KurierPaths,
-} from '@kurier/core';
+  type LotsePaths,
+} from '@lotse/core';
 import { parseChoiceSpec, readSettings, saveSettings, type Settings } from '../../core/settings.ts';
 
 import { err, out, pickArgv } from './output.ts';
@@ -59,8 +59,8 @@ export function agentsReport(
   lines.push('');
   lines.push(
     chosen
-      ? `kurier would use: ${chosen.id} (${SOURCE_LABEL[chosen.source]}, ${chosen.path}${chosen.version ? `, ${chosen.version}` : ''})`
-      : `kurier would use: none — no agent is available — ${NO_AGENT_REMEDY}`,
+      ? `lotse would use: ${chosen.id} (${SOURCE_LABEL[chosen.source]}, ${chosen.path}${chosen.version ? `, ${chosen.version}` : ''})`
+      : `lotse would use: none — no agent is available — ${NO_AGENT_REMEDY}`,
   );
   return lines;
 }
@@ -73,9 +73,9 @@ export function settingsReport(file: string, settings: Settings, problem: string
   return lines;
 }
 
-const command = (paths: KurierPaths): CommandModule => ({
+const command = (paths: LotsePaths): CommandModule => ({
   command: 'agents',
-  describe: 'list the agent launchers kurier knows how to start',
+  describe: 'list the agent launchers lotse knows how to start',
   builder: (yargs) =>
     yargs
       .option('use', {

@@ -69,7 +69,7 @@ imports them.
 ## Why `@gjsify/napi` is not pinned
 
 All `@gjsify/*` packages are pinned to the same exact version. One is absent: `@gjsify/napi`,
-which nothing in kurier imports — its rewrite only fires for a compiled `.node` addon inside a
+which nothing in lotse imports — its rewrite only fires for a compiled `.node` addon inside a
 bundle, and every addon in this tree is build-time tooling that runs under Node. It was also
 unpublishable through 0.53.0 (`packages/napi/**` is not a workspace member — its release leg builds
 a meson prebuild per platform first, and the 0.53.0 tarball never landed); 0.54.0 publishes it

@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { describe as describeRequest, permissionView, terminalGate } from '@kurier/core';
+import { describe as describeRequest, permissionView, terminalGate } from '@lotse/core';
 import { scriptedTerminal } from '../../../src/frontends/cli/terminal.ts';
 
-import type { RequestPermissionRequest } from '@kurier/acp/types';
+import type { RequestPermissionRequest } from '@lotse/acp/types';
 
 function requestWith(options: RequestPermissionRequest['options']): RequestPermissionRequest {
   return {
@@ -42,7 +42,7 @@ export default async () => {
 
     await it('"y" returns allow_always when it is the only allow the agent offered', async () => {
       // Filtering it out of the gate would leave `y` with nothing to answer, and the agent's own
-      // option would become unreachable. kurier relays the choice; the agent keeps the promise.
+      // option would become unreachable. lotse relays the choice; the agent keeps the promise.
       const request = requestWith([
         { optionId: 'allow_always_id', name: 'Always allow', kind: 'allow_always' },
         { optionId: 'reject_id', name: 'Reject', kind: 'reject_once' },
@@ -52,7 +52,7 @@ export default async () => {
       expect(await gate(request)).toBe('allow_always_id');
     });
 
-    await it("the prompt says which option y grants, in kurier's words", async () => {
+    await it("the prompt says which option y grants, in lotse's words", async () => {
       // **The point of the line.** It used to print the agent's own `name`s and never said what `y`
       // would actually do, so a `y` could silently become a session-wide grant. Now it names the
       // option, from the same `optionLabel` the dialog puts on its button.
@@ -89,7 +89,7 @@ export default async () => {
       const gate = terminalGate({ terminal });
       const request = requestWith([{ optionId: 'reject_id', name: 'Reject', kind: 'reject_once' }]);
       // `y` gets nothing, the printed line does not pretend otherwise, and the answer is the agent's own
-      // decline id rather than `null` — so the agent learns *which* of its options kurier picked.
+      // decline id rather than `null` — so the agent learns *which* of its options lotse picked.
       expect(await gate(request)).toBe('reject_id');
       expect(terminal.output).toContain('no allowing option');
       expect(terminal.output).not.toContain('y =');
@@ -153,7 +153,7 @@ export default async () => {
       const terminal = scriptedTerminal(['n']);
       const gate = terminalGate({ terminal });
       expect(await gate(request)).toBe(null);
-      // The prompt names what the bare line does, in kurier's wording: `decline` in lower case, because
+      // The prompt names what the bare line does, in lotse's wording: `decline` in lower case, because
       // there is no decline *option id* to hand back — the agent offered none. It still says Enter is safe.
       expect(terminal.output).toContain('n/Enter = decline');
     });

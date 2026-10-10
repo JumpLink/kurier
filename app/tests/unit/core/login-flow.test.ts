@@ -12,7 +12,7 @@ import {
   type LoginHooks,
   type LoginMode,
   type OAuthStatus,
-} from '@kurier/core';
+} from '@lotse/core';
 
 interface Script {
   mode?: LoginMode;

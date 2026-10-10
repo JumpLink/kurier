@@ -21,9 +21,9 @@
  *
  * **Why `allow_always` and `reject_always` are shown, not filtered.** They used to be dropped here, on
  * the reasoning that a client which keeps no promise must not offer one. That reasoning was backwards:
- * **the agent remembers an "always", not kurier.** ACP has no `allowed_always` outcome and no policy
+ * **the agent remembers an "always", not lotse.** ACP has no `allowed_always` outcome and no policy
  * handshake — the answer is `selected` plus *the agent's own option id*, and the agent is the party
- * that decides whether to ask again. kurier stores no policy, so it has nothing to store, and passing
+ * that decides whether to ask again. lotse stores no policy, so it has nothing to store, and passing
  * an id back changes nothing about the wire: the agent already treats that id as permission it granted
  * itself. Hiding the button therefore removed a choice a person had *without* adding a single check —
  * the fail-closed rules below are about who chose, not about how wide a promise they chose.
@@ -41,7 +41,7 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   ToolCallUpdate,
-} from '@kurier/acp/types';
+} from '@lotse/acp/types';
 
 /** Where a request points, flattened into renderable lines. */
 export type PermissionView = {
@@ -57,7 +57,7 @@ export type PermissionView = {
   /** The raw input as a *string*, or null when the agent did not report any. */
   rawInput: string | null;
   /**
-   * Every option the agent sent, never augmented and never filtered — in **kurier's** order
+   * Every option the agent sent, never augmented and never filtered — in **lotse's** order
    * (`orderOptions`), not the order the agent reported them, because that order is chosen by the agent
    * and the button row is not.
    */
@@ -65,13 +65,13 @@ export type PermissionView = {
 };
 
 /**
- * What kurier calls the decision a button carries, in kurier's own words — **one sentence per kind.**
+ * What lotse calls the decision a button carries, in lotse's own words — **one sentence per kind.**
  *
- * **This is kurier's sentence and it is built from `kind`, never from the agent's `name`.** An
+ * **This is lotse's sentence and it is built from `kind`, never from the agent's `name`.** An
  * option's `name` is the agent's to choose, and ACP lets an agent call its `allow_once` option
  * "Decline" — a dialog that printed the name verbatim would then show a suggested-looking button
  * reading "Decline" that allows, and the person would have no way to tell. So the leading word is
- * kurier's, derived from the kind, and the agent's name follows only when it adds something.
+ * lotse's, derived from the kind, and the agent's name follows only when it adds something.
  *
  * **Four sentences, not two with a suffix.** "Allow once" / "Allow always" as a pair would make the
  * difference a trailing word in a 360 px dialog, and the two buttons sit next to each other — the
@@ -149,7 +149,7 @@ export function initialFocusResponseId(options: readonly PermissionOption[]): st
 }
 
 /**
- * A decision, named. **There is no `allowed-always` variant and none is needed**: kurier did not
+ * A decision, named. **There is no `allowed-always` variant and none is needed**: lotse did not
  * decide *how long* the permission lasts — it decided which of the agent's own options a person
  * pressed, and that id carries the duration. Splitting the type per duration would be a second place
  * to keep a distinction the protocol does not make.
@@ -170,7 +170,7 @@ export type NotAnsweredReason =
   /** The agent exited, or the transport ended, before answering. */
   | 'agent-gone';
 
-/** The only option kinds ACP v1 defines. Anything else is a message kurier does not understand. */
+/** The only option kinds ACP v1 defines. Anything else is a message lotse does not understand. */
 const OPTION_KINDS = new Set<PermissionOption['kind']>([
   'allow_once',
   'allow_always',
@@ -181,7 +181,7 @@ const OPTION_KINDS = new Set<PermissionOption['kind']>([
 /**
  * An option is genuine only if ACP v1 names its kind. **Exported because both surfaces need the same
  * answer**: the dialog renders a projection built here, and the terminal gate reads the raw wire
- * options — and there is exactly one way kurier may decide that a thing an agent asked for is one of
+ * options — and there is exactly one way lotse may decide that a thing an agent asked for is one of
  * the four. A second implementation would be a second door into the same decision, which is the shape
  * of bug this file exists to refuse.
  */
@@ -192,7 +192,7 @@ export function isKnownOptionKind(kind: unknown): kind is PermissionOption['kind
 /**
  * The narrowing for a surface that reads the raw request rather than a projection — the terminal gate.
  *
- * **Returns the options in kurier's order with the unknown kinds dropped**, so the gate decides over
+ * **Returns the options in lotse's order with the unknown kinds dropped**, so the gate decides over
  * the same set the dialog renders. `permissionView` does this plus the cap and the location filtering,
  * which a terminal line does not need; the shared part is the kind check and the order, and a gate that
  * filtered differently from the window would be two gates.
@@ -212,12 +212,12 @@ export function usableOptions(request: RequestPermissionRequest | undefined): Pe
 /**
  * Project a request into exactly what may be shown.
  *
- * Five things are load-bearing. **Every option the agent sent is shown, and kurier adds none** — no
- * injected "always allow", no synthesised default; a button kurier invented would be a decision
+ * Five things are load-bearing. **Every option the agent sent is shown, and lotse adds none** — no
+ * injected "always allow", no synthesised default; a button lotse invented would be a decision
  * nobody offered. **`rawInput` is normalised to `string | null`**, because the widget cannot do that:
  * an agent that omits `rawInput` entirely and an agent that sends `null` mean the same thing here, and
  * both must render as "the agent did not say" rather than as an empty box that looks like an
- * intentionally empty input. **The order is kurier's, and it is the safest reading of the agent's**
+ * intentionally empty input. **The order is lotse's, and it is the safest reading of the agent's**
  * (`orderOptions`). **Nothing on the wire is trusted to be the shape the schema declares** — the same
  * reason `AcpClient` passes `_meta` through without reading it, and the same reason guardrail 4 exists.
  * A missing or wrong-typed `toolCall` projects to the fallback copy ("unnamed tool", "unknown") and the
@@ -225,7 +225,7 @@ export function usableOptions(request: RequestPermissionRequest | undefined): Pe
  * `kind` is missing, wrong-typed, or a word the schema does not define is **dropped**, because
  * `decideFromView` decides by `startsWith('allow')` and an unknown word must not be allowed to mean
  * "allow" by prefix. Nothing here throws: a gate that throws takes the turn down, and one malformed
- * message from one agent would then look like a crash in kurier.
+ * message from one agent would then look like a crash in lotse.
  */
 export function permissionView(request: RequestPermissionRequest): PermissionView {
   const call = toolCallOf(request);
@@ -258,14 +258,14 @@ export function permissionView(request: RequestPermissionRequest): PermissionVie
     kind: cap(textOf(call?.kind, 'unknown'), LIMITS.kind),
     locations,
     rawInput: rawInputOf(call?.rawInput),
-    // Every option the agent sent, in kurier's order. The order is *not* the agent's because the
+    // Every option the agent sent, in lotse's order. The order is *not* the agent's because the
     // agent's order is not chosen with a person's hand in mind — see `orderOptions`.
     options: orderOptions(options),
   };
 }
 
 /**
- * The order the buttons are added in, and it is kurier's rather than the agent's.
+ * The order the buttons are added in, and it is lotse's rather than the agent's.
  *
  * **Same kind → same rank, so a stable sort keeps the agent's order within a kind.** The agent may
  * repeat a kind (two `allow_once` options for two tools), and neither of them outranks the other.
@@ -279,7 +279,7 @@ export function permissionView(request: RequestPermissionRequest): PermissionVie
  *   is what `Adw-1.gir` says and what this repo's comments used to repeat. Added `A B C D`, focus is
  *   on `A`; added `D C B A`, focus is on `D`. So the *first* added response is the one a stray Enter
  *   can reach in the frame before `show()`'s own `grab_focus` runs, and it is a **decline**. That is
- *   why kurier's fallback and kurier's own choice are the same button: the race is harmless in *both*
+ *   why lotse's fallback and lotse's own choice are the same button: the race is harmless in *both*
  *   directions, which is not true of any other order of these four.
  * - **The buttons render bottom-up from the add order**: added `A B C D`, they are laid out
  *   `D C B A` from the top, so the *last* added is the topmost — the one a hand reaches for first. That
@@ -324,7 +324,7 @@ function arrayOf(value: unknown): unknown[] {
 }
 
 /**
- * The text on a button: **kurier's sentence for the kind, and nothing else.**
+ * The text on a button: **lotse's sentence for the kind, and nothing else.**
  *
  * **The words come from `kind` and the styling comes from `kind` too**, which is what makes the pair
  * impossible to disagree: an agent that names its `allow_once` option "Decline" gets a button that
@@ -334,21 +334,21 @@ function arrayOf(value: unknown): unknown[] {
  * **The agent's name is not on the button, and that is a measurement.** It used to be appended — "Always
  * allow: Always allow in this session" — and a screenshot at 1024 px showed the ellipsis landing in the
  * middle of the agent's half of the sentence, with the same first words twice. At 360 px, which is
- * kurier's own floor (`WINDOW_MIN_WIDTH_PX`), the button was unreadable. A button is the decision; its
+ * lotse's own floor (`WINDOW_MIN_WIDTH_PX`), the button was unreadable. A button is the decision; its
  * label has to survive a narrow window in one line. The agent's name still reaches the person — in the
  * body's `agentNames` line, where it can wrap and where repeating "Always allow" costs nothing.
  *
  * **`_` is doubled, because `add_response` parses mnemonics.** GTK reads an underscore in a response
  * label as "the next character is the Alt accelerator", so an agent that named its option
- * `Delete_everything` would be choosing kurier's keyboard shortcut. Doubling the underscore escapes it
- * and prints a literal one. Kurier's own sentences carry no underscore, so this is belt-and-braces
+ * `Delete_everything` would be choosing lotse's keyboard shortcut. Doubling the underscore escapes it
+ * and prints a literal one. Lotse's own sentences carry no underscore, so this is belt-and-braces
  * against a future wording change — but it stays, and stays tested here, because the widget passes the
  * result through untouched and nothing downstream would catch it.
  */
 export function optionLabel(option: PermissionOption): string {
   // A record the kind is not in would fall through to `undefined` and print "undefined". ACP v1 names
   // exactly four kinds and both surfaces filter to them, but this function is exported and a direct
-  // caller can hold anything the type allows — so the fallback is kurier's own word, never the
+  // caller can hold anything the type allows — so the fallback is lotse's own word, never the
   // agent's name on its own, which is the one thing this function exists to prevent.
   const ours = KIND_WORDS[option.kind] ?? (option.kind.startsWith('allow') ? 'Allow' : 'Decline');
   return escapeMnemonic(ours);
@@ -358,8 +358,8 @@ export function optionLabel(option: PermissionOption): string {
  * The agent's own names for its options, as one line for the dialog body — or `null` when there is
  * nothing worth saying.
  *
- * **Why it exists at all:** the button labels are kurier's short sentences (see `optionLabel`), so the
- * agent's wording has to land somewhere or kurier has thrown away information the person was given.
+ * **Why it exists at all:** the button labels are lotse's short sentences (see `optionLabel`), so the
+ * agent's wording has to land somewhere or lotse has thrown away information the person was given.
  * **And why it is `null` more often than not:** an agent whose names repeat the kinds — "Allow once",
  * "Decline", which is what most send — adds a line of noise to every question. Only the names that say
  * something the kind does not are listed.
@@ -458,7 +458,7 @@ export function decideFromView(
  *
  * There is no `allowed_once` in ACP v1, and no `allowed_always`: the outcome is `selected` plus **the
  * option id the agent itself offered**, and what that id means — once or always — is the agent's
- * business. That is why kurier can pass an "always" through without promising anything: the response
+ * business. That is why lotse can pass an "always" through without promising anything: the response
  * is a *pointer* to the agent's own option, and the agent is the party that remembers it.
  */
 export function answerFor(decision: PermissionDecision): RequestPermissionResponse {
@@ -554,7 +554,7 @@ export class PermissionDesk {
       }
       if (this.#open !== null) {
         // Never stack, never answer: queue it. The agent asked twice because it is waiting, and
-        // answering the second on the person's behalf would be kurier deciding.
+        // answering the second on the person's behalf would be lotse deciding.
         this.#waiting.push({ question, settle: resolve });
         return;
       }

@@ -11,7 +11,7 @@ import {
   emptyStateView,
   noticeView,
   type ResolvedAgent,
-} from '@kurier/core';
+} from '@lotse/core';
 
 const FOUND: ResolvedAgent = {
   command: { id: 'opencode', title: 'OpenCode', program: 'opencode', args: ['acp'] },
