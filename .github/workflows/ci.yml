@@ -63,6 +63,11 @@ jobs:
       - name: Install dependencies (gjsify install --immutable)
         run: gjsify install --immutable
 
+      # The Flatpak builds offline from gjsify-sources.json. A lockfile bump without regenerating
+      # it only fails in release.yml, inside the sandbox, on the first tag (v0.1.1 did).
+      - name: Offline Flatpak sources match the lockfile
+        run: gjsify flatpak sources && git diff --exit-code gjsify-sources.json
+
       # The vendored ACP schema against the code. A hand-written copy of a protocol schema drifts,
       # and the drift is silent at runtime: a renamed method is a `-32601` against a live agent, and
       # a field that became required is an agent that ignores what kurier sent.
