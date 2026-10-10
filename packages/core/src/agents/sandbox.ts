@@ -253,7 +253,7 @@ function hostArgv(inner: string, argv: readonly string[], command?: AgentCommand
  *
  * SIGTERM → flatpak-spawn        carrier dies, and the host process ends with it   (forwarded)
  * SIGKILL → flatpak-spawn        carrier dies, and the host process SURVIVES        (orphaned)
- * flatpak kill eu.jumplink.Kurier  no `opencode acp` left on the host
+ * flatpak kill eu.jumplink.Lotse  no `opencode acp` left on the host
  * ```
  *
  * So: **SIGTERM is forwarded** and does the real work, which is why Stop and a closed window leave

@@ -37,7 +37,7 @@
       ]
     },
     "ship": {
-      "appId": "eu.jumplink.Kurier",
+      "appId": "eu.jumplink.Lotse",
       "binaryName": "kurier-app",
       "kind": "app",
       "name": "Kurier",
@@ -50,7 +50,7 @@
         "darwin": "node",
         "win32": "node"
       },
-      "icon": "../data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+      "icon": "../data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
       "categories": [
         "Development",
         "GTK"

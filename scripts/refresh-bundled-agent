@@ -16,7 +16,7 @@
 // output: the catalog tests fail when the module in package.json disagrees with the data file.
 //
 // After --write, re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging so the
-// generated eu.jumplink.Kurier.json follows.
+// generated eu.jumplink.Lotse.json follows.
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

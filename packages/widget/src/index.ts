@@ -5,7 +5,7 @@
  * transcript, the composer with its model and mode controls, the tool and thought cards, the
  * approval dialog, the failure notices, the login — and nothing around one. The host brings the
  * window, the session list, the menu and the preferences; see
- * [ADR 0001](../../../docs/adr/0001-kurier-as-an-embeddable-widget.md) for where that line runs and
+ * [ADR 0001](../../../docs/adr/0001-lotse-as-an-embeddable-widget.md) for where that line runs and
  * `app/src/frontends/gui/window.ts` for the first consumer on the other side of it.
  *
  * **This package knows a toolkit and no decisions.** GTK 4 and libadwaita are imported here, which

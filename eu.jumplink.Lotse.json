@@ -1,5 +1,5 @@
 {
-  "id": "eu.jumplink.Kurier",
+  "id": "eu.jumplink.Lotse",
   "runtime": "org.gnome.Platform",
   "runtime-version": "50",
   "sdk": "org.gnome.Sdk",
@@ -75,10 +75,10 @@
         "printf '#!/usr/bin/gjs -m\\n' > /app/bin/kurier",
         "cat app/dist/kurier.gjs.mjs >> /app/bin/kurier",
         "chmod 0755 /app/bin/kurier",
-        "install -Dm644 data/eu.jumplink.Kurier.desktop /app/share/applications/eu.jumplink.Kurier.desktop",
-        "install -Dm644 data/eu.jumplink.Kurier.metainfo.xml /app/share/metainfo/eu.jumplink.Kurier.metainfo.xml",
-        "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
-        "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+        "install -Dm644 data/eu.jumplink.Lotse.desktop /app/share/applications/eu.jumplink.Lotse.desktop",
+        "install -Dm644 data/eu.jumplink.Lotse.metainfo.xml /app/share/metainfo/eu.jumplink.Lotse.metainfo.xml",
+        "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
+        "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg"
       ],
       "sources": [
         {

@@ -11,13 +11,13 @@
 /**
  * The GApplication id. Matches the repository, and the desktop entry that ships with it.
  *
- * **`eu.jumplink.*`, like everything else in the workspace.** First written as `de.jumplink.Kurier`
+ * **`eu.jumplink.*`, like everything else in the workspace.** First written under `de.jumplink.*`
  * and corrected — one string in one file, but an app id is a reverse-DNS name that has to agree with
  * the session bus, the WM_CLASS, the desktop entry and the AppStream metainfo, and a second
  * convention is a second thing to keep in step. `learn6502` (`easy6502/packages/app-gnome`) is the
  * model: `eu.jumplink.Learn6502`, with the value overridable at build time rather than hardcoded.
  */
-export const APP_ID = 'eu.jumplink.Kurier';
+export const APP_ID = 'eu.jumplink.Lotse';
 
 /** What the window and the about dialog call the app. */
 export const APP_NAME = 'kurier';

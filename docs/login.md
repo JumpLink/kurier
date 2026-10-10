@@ -61,7 +61,7 @@ failure. That was the reason to build on opencode in the first place.
 
 ## Inline onboarding
 
-A host opting in with `providerOnboarding` gets the same login from an inline page instead of a menu entry: `GET /api/integration` reports `connections` per provider (measured on 2.0.25, `scripts/probes/provider-connections.mjs`), so a chat with nothing connected offers **Connect a provider…** (this dialog) or **Use free hosted models**. Unknown state shows the ordinary chat. See [ADR 0001](adr/0001-kurier-as-an-embeddable-widget.md).
+A host opting in with `providerOnboarding` gets the same login from an inline page instead of a menu entry: `GET /api/integration` reports `connections` per provider (measured on 2.0.25, `scripts/probes/provider-connections.mjs`), so a chat with nothing connected offers **Connect a provider…** (this dialog) or **Use free hosted models**. Unknown state shows the ordinary chat. See [ADR 0001](adr/0001-lotse-as-an-embeddable-widget.md).
 
 ## Limits, and what is not known
 

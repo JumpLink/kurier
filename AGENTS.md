@@ -39,7 +39,7 @@ file (`notices.ts`), `session-groups.ts`, `private-file.ts`. Three of those are 
 `KurierPaths` shape, `AgentChoice`/`describeChoice` and `NOTICE_IDS`/`noticeDue` are decisions and live in
 the package, while reading and writing one app's file stays here. Before adding to `app/src/core`, ask
 whether a host would want it; if yes it belongs one level down. [ADR
-0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) records what stayed and why.
+0001](docs/adr/0001-lotse-as-an-embeddable-widget.md) records what stayed and why.
 
 **The app imports `@kurier/core`, never a file inside it** — and the same for `@kurier/widget`. Each
 package's `src/index.ts` is a deliberate barrel, so what is public is a decision somebody made rather than

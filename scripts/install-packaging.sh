@@ -22,14 +22,14 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 # `-D` so the hicolor and applications subtrees are created in one go; `-m` fixed
 # rather than taken from the umask, because an icon another user cannot read is an
 # icon the icon theme skips.
-install -Dm644 "$here/data/eu.jumplink.Kurier.desktop" \
-	"$root/applications/eu.jumplink.Kurier.desktop"
-install -Dm644 "$here/data/eu.jumplink.Kurier.metainfo.xml" \
-	"$root/metainfo/eu.jumplink.Kurier.metainfo.xml"
-install -Dm644 "$here/data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg" \
-	"$root/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg"
-install -Dm644 "$here/data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg" \
-	"$root/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+install -Dm644 "$here/data/eu.jumplink.Lotse.desktop" \
+	"$root/applications/eu.jumplink.Lotse.desktop"
+install -Dm644 "$here/data/eu.jumplink.Lotse.metainfo.xml" \
+	"$root/metainfo/eu.jumplink.Lotse.metainfo.xml"
+install -Dm644 "$here/data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg" \
+	"$root/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg"
+install -Dm644 "$here/data/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg" \
+	"$root/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg"
 
 # The two caches are what a desktop shell actually reads. Both tools are optional:
 # without `update-desktop-database` the entry still launches, it just does not

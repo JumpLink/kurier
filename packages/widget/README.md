@@ -11,7 +11,7 @@ The widget draws; every decision (may Send be pressed, what does this failure sa
 permission dialog show) is made in [`@kurier/core`](../core/README.md). The host brings the window, the
 session list, the menu and the preferences. The full walkthrough, from data directory to shutdown, is
 the [host guide](../../docs/embedding.md); the design of the split is
-[ADR 0001](../../docs/adr/0001-kurier-as-an-embeddable-widget.md).
+[ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
 
 Requires GJS with GTK 4 and libadwaita, and an ACP agent (opencode today) on `PATH` or bundled.
 

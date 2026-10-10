@@ -3,7 +3,7 @@
 - Status: **Accepted**
 - Date: 2026-10-10
 - Deciders: Pascal Garber
-- Related: [ADR 0001](0001-kurier-as-an-embeddable-widget.md),
+- Related: [ADR 0001](0001-lotse-as-an-embeddable-widget.md),
   [werkstatt ADR 0004](../../../../docs/adr/0004-gnome-is-optional.md) (GNOME is optional),
   Curlew ADR 0004 (sending and writing, granted per capability)
 

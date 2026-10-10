@@ -8,7 +8,7 @@
  *
  * **The conversation is no longer this file's.** `@kurier/widget`'s `KurierChat` owns the
  * transcript, the composer, the config row, the three dialogs and the agent behind them;
- * `docs/adr/0001-kurier-as-an-embeddable-widget.md` draws the line and this window is now one host
+ * `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws the line and this window is now one host
  * among possible others. What is left here is what names *kurier*: the sidebar and its list, the
  * primary menu, Preferences, the privacy banner, the window's own actions and the dev hooks that
  * photograph them. Every one of those reaches the conversation through the widget's own methods

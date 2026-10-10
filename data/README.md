@@ -6,10 +6,10 @@ and the icons are hand-written files.
 
 | File | Read by | Written by |
 |---|---|---|
-| `eu.jumplink.Kurier.desktop` | the shell, the compositor, `desktop-file-validate` | `gjsify flatpak init` |
-| `eu.jumplink.Kurier.metainfo.xml` | GNOME Software, `appstreamcli` | `gjsify flatpak init` |
-| `icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg` | GTK, by icon **name** | placeholder |
-| `icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg` | GTK, `<app id>-symbolic` | placeholder |
+| `eu.jumplink.Lotse.desktop` | the shell, the compositor, `desktop-file-validate` | `gjsify flatpak init` |
+| `eu.jumplink.Lotse.metainfo.xml` | GNOME Software, `appstreamcli` | `gjsify flatpak init` |
+| `icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg` | GTK, by icon **name** | placeholder |
+| `icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg` | GTK, `<app id>-symbolic` | placeholder |
 
 No `.in` suffix: that suffix means "input for an i18n `merge_file`", and this repo has
 no gettext pipeline and no Meson to run one. `gjsify flatpak init` defaults to `.in`
@@ -19,9 +19,9 @@ and takes the paths as flags.
 
 ```bash
 ./node_modules/.bin/gjsify flatpak init --force --no-format \
-  --manifest eu.jumplink.Kurier.json \
-  --metainfo data/eu.jumplink.Kurier.metainfo.xml \
-  --desktop data/eu.jumplink.Kurier.desktop \
+  --manifest eu.jumplink.Lotse.json \
+  --metainfo data/eu.jumplink.Lotse.metainfo.xml \
+  --desktop data/eu.jumplink.Lotse.desktop \
   --flathub-json flathub.json
 ```
 
@@ -63,7 +63,7 @@ it, the desktop entry is installed and points at a command that is not on `PATH`
 
 ## The Flatpak, and what it gives up
 
-`eu.jumplink.Kurier.json` is the Flathub build. Its two non-obvious finish-args are
+`eu.jumplink.Lotse.json` is the Flathub build. Its two non-obvious finish-args are
 deliberate and are the reason to read it before trusting it:
 
 - `--talk-name=org.freedesktop.Flatpak` — kurier starts coding agents, and the agents
@@ -158,7 +158,7 @@ platform package's own `latest` tag: that one points at an unrelated 1.18.18 wit
 version, verifies the registry's sha512, computes the sha256 `extra-data` needs, checks the binary's
 path in the archive, and updates both `bundled-agents.json` and the module in `package.json`. Then
 re-run the `gjsify flatpak init --force …` line from AGENTS.md § Packaging. The catalog tests fail
-when the module in either `package.json` or the generated `eu.jumplink.Kurier.json` disagrees with
+when the module in either `package.json` or the generated `eu.jumplink.Lotse.json` disagrees with
 the catalog, so a forgotten `init --force` is red.
 
 **The bundled copy gets its own `HOME`** (`@kurier/core`'s `agents/isolation.ts`). opencode v2 reads
@@ -189,9 +189,9 @@ resolves once that tag is pushed; the release workflow swaps it for the checkout
 
 ```sh
 npm run packaging:validate
-desktop-file-validate data/eu.jumplink.Kurier.desktop
-appstreamcli validate --no-net --explain data/eu.jumplink.Kurier.metainfo.xml
-flatpak-builder --show-manifest eu.jumplink.Kurier.json DIR   # prints, does NOT validate
+desktop-file-validate data/eu.jumplink.Lotse.desktop
+appstreamcli validate --no-net --explain data/eu.jumplink.Lotse.metainfo.xml
+flatpak-builder --show-manifest eu.jumplink.Lotse.json DIR   # prints, does NOT validate
 ```
 
 `--show-manifest` is not a validator — it accepted `buildsystem: "nonsense"` at exit 0

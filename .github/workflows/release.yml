@@ -10,7 +10,7 @@ name: Release
 #
 # Three artifacts: `ship-deb-rpm-appimage` (.deb, .rpm, .AppImage — all from `gjsify.ship`, the GUI
 # binary `kurier-app`), `ship-macos-windows` (both macos-app-zips, windows-dir-zip, .msi), and
-# `ship-flatpak` (eu.jumplink.Kurier.flatpak, from the hand-maintained manifest that stages both
+# `ship-flatpak` (eu.jumplink.Lotse.flatpak, from the hand-maintained manifest that stages both
 # `kurier` and `kurier-app` and bundles opencode as extra-data).
 on:
   push:
@@ -235,7 +235,7 @@ jobs:
   # `bwrap`, which a `fedora:44` container without `options: --privileged` refuses ("Can't mount
   # proc on /proc: Permission denied").
   #
-  # Builds from the hand-maintained root `eu.jumplink.Kurier.json` — it stages BOTH `kurier` and
+  # Builds from the hand-maintained root `eu.jumplink.Lotse.json` — it stages BOTH `kurier` and
   # `kurier-app` and carries the bundled opencode (`extra-data` + `apply_extra`), which is not
   # what `gjsify ship --target flatpak` would produce. That manifest's `kurier` module fetches a
   # `git` source at a pinned tag (what Flathub builds); for a release the source is the checkout
@@ -274,7 +274,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /var/lib/flatpak
-          key: flatpak-${{ hashFiles('eu.jumplink.Kurier.json', 'gjsify-lock.json', 'gjsify-sources.json') }}
+          key: flatpak-${{ hashFiles('eu.jumplink.Lotse.json', 'gjsify-lock.json', 'gjsify-sources.json') }}
           restore-keys: flatpak-
 
       # What the bundle must contain, asserted against the manifest the build reads: the network
@@ -284,7 +284,7 @@ jobs:
       - name: Check the manifest carries the bundled opencode
         run: |
           set -eu
-          m=eu.jumplink.Kurier.json
+          m=eu.jumplink.Lotse.json
           jq -e '.["finish-args"] | index("--share=network")' "$m" >/dev/null \
             || { echo "::error::$m lacks --share=network"; exit 1; }
           jq -e '[.modules[].sources[]? | select(type == "object" and .type == "extra-data")] | length > 0' "$m" >/dev/null \
@@ -333,27 +333,27 @@ jobs:
                 map(if type == "object" and .type == "git"
                     then {type: "dir", path: ".", skip: [".git", ".flatpak-builder", "flatpak-build", "repo"]}
                     else . end)' \
-            eu.jumplink.Kurier.json > eu.jumplink.Kurier.ci.json
-          jq -e '[.modules[].sources[]? | select(type == "object" and .type == "git")] | length == 0' eu.jumplink.Kurier.ci.json >/dev/null
+            eu.jumplink.Lotse.json > eu.jumplink.Lotse.ci.json
+          jq -e '[.modules[].sources[]? | select(type == "object" and .type == "git")] | length == 0' eu.jumplink.Lotse.ci.json >/dev/null
 
       # The manifest's build-commands run `gjsify install`/`build`/`build:app` INSIDE the sandbox —
       # no host-side install or build step belongs here.
       - name: Build the Flatpak
         run: |
           set -eu
-          gjsify flatpak build eu.jumplink.Kurier.ci.json \
-            --repo repo --bundle eu.jumplink.Kurier.flatpak
+          gjsify flatpak build eu.jumplink.Lotse.ci.json \
+            --repo repo --bundle eu.jumplink.Lotse.flatpak
 
       - name: Assert the bundle arrived
         run: |
           set -eu
-          ls -la eu.jumplink.Kurier.flatpak
-          [ -s eu.jumplink.Kurier.flatpak ] || { echo "::error::missing or empty eu.jumplink.Kurier.flatpak"; exit 1; }
+          ls -la eu.jumplink.Lotse.flatpak
+          [ -s eu.jumplink.Lotse.flatpak ] || { echo "::error::missing or empty eu.jumplink.Lotse.flatpak"; exit 1; }
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ship-flatpak
-          path: eu.jumplink.Kurier.flatpak
+          path: eu.jumplink.Lotse.flatpak
           compression-level: 0
 
   release:
@@ -392,7 +392,7 @@ jobs:
             "${binary}-${version}-1.macos.x86_64.zip" \
             "${binary}-${version}-1.windows.x64.zip" \
             "${binary}-${version}-1.x64.msi" \
-            "eu.jumplink.Kurier.flatpak"; do
+            "eu.jumplink.Lotse.flatpak"; do
             if [ ! -s "ship/$f" ]; then
               echo "::error::missing or empty artifact: $f"
               missing=1

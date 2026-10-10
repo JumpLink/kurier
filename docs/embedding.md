@@ -8,7 +8,7 @@ data directory, the agent choice and your own permission policy.
 Both packages are LGPL-3.0-or-later, so you may link them into an application under another licence;
 changes to the packages themselves stay LGPL. Reference: [`@kurier/core`](../packages/core/README.md),
 [`@kurier/widget`](../packages/widget/README.md). Why the line is drawn where it is:
-[ADR 0001](adr/0001-kurier-as-an-embeddable-widget.md).
+[ADR 0001](adr/0001-lotse-as-an-embeddable-widget.md).
 
 The finished code of this guide is `app/tests/examples/embed.ts`; it is type-checked with the app, so
 it matches the signatures.

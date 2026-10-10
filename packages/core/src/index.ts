@@ -5,7 +5,7 @@
  * and how to start it, the session a prompt turn runs in, the view models a chat is drawn from,
  * and the provider login. The CLI, the Adwaita window and an embedded widget are three consumers
  * of the same code, which is the whole reason this package exists — see
- * [ADR 0001](../../../docs/adr/0001-kurier-as-an-embeddable-widget.md).
+ * [ADR 0001](../../../docs/adr/0001-lotse-as-an-embeddable-widget.md).
  *
  * **Nothing here knows a toolkit.** No `gi://`, no yargs, no widget: the pieces that need a
  * decision take it as an argument. Paths arrive as a `KurierPaths`, the agent choice as an

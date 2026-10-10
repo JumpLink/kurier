@@ -9,7 +9,7 @@
  * its own permission policy adds.
  *
  * **What this is not.** A window, a session list, a header bar, a menu, a preferences dialog, a
- * notices banner. `docs/adr/0001-kurier-as-an-embeddable-widget.md` draws that line and kurier's own
+ * notices banner. `docs/adr/0001-lotse-as-an-embeddable-widget.md` draws that line and kurier's own
  * `app/src/frontends/gui/window.ts` is the first consumer on the other side of it: it keeps the
  * sidebar and the shell, and it is now one of several possible hosts rather than the only place the
  * chat exists.

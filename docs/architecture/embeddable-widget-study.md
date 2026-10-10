@@ -1,6 +1,6 @@
 # Study: kurier as an embeddable widget (`@kurier/widget`)
 
-Design study behind [ADR 0001](../adr/0001-kurier-as-an-embeddable-widget.md). Facts are from the repo as of 2026-10-09; items marked **UNVERIFIED** were not measured. The `mcpServers` question was measured on 2026-10-10 (section 3).
+Design study behind [ADR 0001](../adr/0001-lotse-as-an-embeddable-widget.md). Facts are from the repo as of 2026-10-09; items marked **UNVERIFIED** were not measured. The `mcpServers` question was measured on 2026-10-10 (section 3).
 
 ## 1. What forms the widget, what moves, what stays
 
@@ -151,7 +151,7 @@ shipped, and the differences are all in the same direction — fewer things the 
   shadow a host opencode. `/app/extra` because the archive is Flatpak `extra-data` and `apply_extra` can only write there.
 - **Detection:** `detect.ts` (pure) ignores any host hit under the prefix; `resolve.ts` picks setting > first host > first
   bundled; `probe.ts` gathers the facts. A bundled copy runs inside the sandbox (`AgentCommand.bundled`, no `toHostCommand`).
-- **Manifest recipe** (from `eu.jumplink.Kurier.json`), what a host app must copy:
+- **Manifest recipe** (from `eu.jumplink.Lotse.json`), what a host app must copy:
   1. An `opencode` module: `extra-data` sources per arch (url, sha256, size) + a script source `apply_extra` that does
      `mkdir -p /app/extra/agents/opencode`, untars, `chmod 0755 …/package/bin/opencode`, removes the tarball.
   2. Same `installPath` so `BUNDLED_PREFIX` matches. A host that wants another prefix needs the prefix injectable.

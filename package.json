@@ -18,13 +18,13 @@
     "build": "gjsify workspace kurier-cli build",
     "start": "gjsify workspace kurier-cli start",
     "test": "gjsify workspace kurier-cli test",
-    "packaging:validate": "desktop-file-validate data/eu.jumplink.Kurier.desktop && appstreamcli validate --no-net --explain data/eu.jumplink.Kurier.metainfo.xml",
+    "packaging:validate": "desktop-file-validate data/eu.jumplink.Lotse.desktop && appstreamcli validate --no-net --explain data/eu.jumplink.Lotse.metainfo.xml",
     "packaging:install": "sh scripts/install-packaging.sh"
   },
   "gjsify": {
     "flatpak": {
-      "appId": "eu.jumplink.Kurier",
-      "icon": "data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
+      "appId": "eu.jumplink.Lotse",
+      "icon": "data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
       "kind": "app",
       "name": "Kurier",
       "command": "kurier-app",
@@ -252,10 +252,10 @@
             "printf '#!/usr/bin/gjs -m\\n' > /app/bin/kurier",
             "cat app/dist/kurier.gjs.mjs >> /app/bin/kurier",
             "chmod 0755 /app/bin/kurier",
-            "install -Dm644 data/eu.jumplink.Kurier.desktop /app/share/applications/eu.jumplink.Kurier.desktop",
-            "install -Dm644 data/eu.jumplink.Kurier.metainfo.xml /app/share/metainfo/eu.jumplink.Kurier.metainfo.xml",
-            "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Kurier.svg",
-            "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Kurier-symbolic.svg"
+            "install -Dm644 data/eu.jumplink.Lotse.desktop /app/share/applications/eu.jumplink.Lotse.desktop",
+            "install -Dm644 data/eu.jumplink.Lotse.metainfo.xml /app/share/metainfo/eu.jumplink.Lotse.metainfo.xml",
+            "install -Dm644 data/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg /app/share/icons/hicolor/scalable/apps/eu.jumplink.Lotse.svg",
+            "install -Dm644 data/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg /app/share/icons/hicolor/symbolic/apps/eu.jumplink.Lotse-symbolic.svg"
           ],
           "sources": [
             {

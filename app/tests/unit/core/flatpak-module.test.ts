@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import { BUNDLED_AGENTS, flatpakAgentModule } from '@kurier/core';
-import manifest from '../../../../eu.jumplink.Kurier.json' with { type: 'json' };
+import manifest from '../../../../eu.jumplink.Lotse.json' with { type: 'json' };
 import pkg from '../../../../package.json' with { type: 'json' };
 
 type Named = { name: string };

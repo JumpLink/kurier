@@ -252,7 +252,7 @@ Not a sixth pointer-only control in the table above, but the same reason: radio 
 
 ```sh
 # 360 px: with GJSIFY_DEVTOOLS=1, resize afterwards:
-#   gdbus call --session --dest eu.jumplink.Kurier --object-path /eu/jumplink/Kurier/devtools \
+#   gdbus call --session --dest eu.jumplink.Lotse --object-path /eu/jumplink/Lotse/devtools \
 #     --method org.gjsify.Devtools.ResizeWindow 360 600
 GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-in KU_APP_PREFERENCES_AGENT=opencode:bundled \
   ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
@@ -435,7 +435,7 @@ run, not a fixture.*
 ### GTK Behaviour (moved from AGENTS.md)
 
 **The GUI is looked at, not believed:** start it detached (a foreground GJS process is killed by the
-agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on `/eu/jumplink/Kurier/devtools`
+agent sandbox), with `GJSIFY_DEVTOOLS=1` for `org.gjsify.Devtools` on `/eu/jumplink/Lotse/devtools`
 (`Screenshot`, `DumpTree`), `KURIER_SESSIONS_FILE=<synthetic file>` so no real conversation ends up in a
 screenshot, and `KU_APP_SESSION=<id>` to open a session without a pointer. GTK behaviour a comment
 relies on gets a probe in `scripts/probes/` that prints the numbers the comment quotes.

@@ -183,4 +183,4 @@ Pure functions from state to "what to draw", tested on Node and GJS. Use them to
 ## Related
 
 [`@kurier/widget`](../widget/README.md) · [host guide](../../docs/embedding.md) ·
-[ADR 0001](../../docs/adr/0001-kurier-as-an-embeddable-widget.md) · [login](../../docs/login.md)
+[ADR 0001](../../docs/adr/0001-lotse-as-an-embeddable-widget.md) · [login](../../docs/login.md)

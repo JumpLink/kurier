@@ -4,7 +4,7 @@
     PLACEHOLDER, not a designed icon.
 
     `main.ts` sets `applicationIcon: APP_ID`, so GTK resolves the window's icon by
-    NAME and needs an installed `eu.jumplink.Kurier.svg` before the about dialog and
+    NAME and needs an installed `eu.jumplink.Lotse.svg` before the about dialog and
     the taskbar stop falling back to a generic missing-image. That is all this file
     has to be for kurier to be installable and correct — and it is deliberately
     geometric so nobody mistakes it for art somebody chose.

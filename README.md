@@ -86,7 +86,7 @@ LGPL) holds `KurierChat` — one conversation: the transcript, the composer with
 controls, the tool cards, the approval dialog, the login — and another GTK app embeds it by parenting
 one widget and passing which agent, which directory and which MCP servers to use. The window in
 `app/src/frontends/gui/` keeps what only an app has: the sidebar, the menu, Preferences. The line
-between them is drawn in [ADR 0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) and studied in
+between them is drawn in [ADR 0001](docs/adr/0001-lotse-as-an-embeddable-widget.md) and studied in
 [docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
 
 To embed the chat in your own app, start with the [host guide](docs/embedding.md); the API is documented in
@@ -116,7 +116,7 @@ adapter for Claude Code. Details and the reasoning: [AGENTS.md](AGENTS.md).
 
 `git tag vX.Y.Z && git push --tags` runs the whole of CI — tests, type check, lint — and, if it
 passes, builds and attaches every installable format to the tag's GitHub release (packaging runs only on a tag or a manual dispatch, never on a push or PR): `.deb`, `.rpm`,
-`.AppImage`, a Flatpak (`eu.jumplink.Kurier.flatpak`, from the manifest in
+`.AppImage`, a Flatpak (`eu.jumplink.Lotse.flatpak`, from the manifest in
 [data/README.md](data/README.md)), a macOS `.app.zip` (arm64 + x64), and a Windows program
 directory `.zip` and `.msi` (x64). All of it packages the GUI (`kurier-app`), the one binary with
 a desktop entry and an App-ID; the `kurier` CLI installs alongside it inside the `.deb`/`.rpm`/

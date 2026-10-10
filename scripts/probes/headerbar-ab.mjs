@@ -94,7 +94,7 @@ function sample(win, name) {
   }
 }
 
-const app = new Adw.Application({ applicationId: 'eu.jumplink.Kurier.Probe' });
+const app = new Adw.Application({ applicationId: 'eu.jumplink.Lotse.Probe' });
 app.connect('activate', () => {
   // Bound to the application, or it has no window, releases and exits before the timer fires.
   const a = windowFor(app, sidebarBox());
