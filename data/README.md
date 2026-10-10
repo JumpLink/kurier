@@ -15,6 +15,19 @@ No `.in` suffix: that suffix means "input for an i18n `merge_file`", and this re
 no gettext pipeline and no Meson to run one. `gjsify flatpak init` defaults to `.in`
 and takes the paths as flags.
 
+### Regenerating the four files
+
+```bash
+./node_modules/.bin/gjsify flatpak init --force --no-format \
+  --manifest eu.jumplink.Kurier.json \
+  --metainfo data/eu.jumplink.Kurier.metainfo.xml \
+  --desktop data/eu.jumplink.Kurier.desktop \
+  --flathub-json flathub.json
+```
+
+`--no-format` because the repo's own `oxfmt` run owns the formatting, and every path is
+given explicitly — the defaults put the files somewhere this repo does not keep them.
+
 **`package.json#gjsify.flatpak` is the source of truth for the first two.** Editing a
 generated file is a change that the next `flatpak init --force` silently reverts, so
 change the config and re-run. The one thing a re-run does lose is the screenshot TODO
@@ -75,13 +88,25 @@ infer it from the manifest.
 
 `packages/core/src/agents/sandbox.ts` rewrites an agent command into
 `flatpak-spawn --host … /bin/sh -c …`, and it is a **no-op outside a Flatpak** — a
-desktop install spawns exactly what it always did. Two things about the host side are
-worth knowing before filing an issue against "kurier cannot find my agent":
+desktop install spawns exactly what it always did. Four things about the host side are
+worth knowing before filing an issue against "kurier cannot find my agent", and each has
+a test:
 
+- **Detection is `/.flatpak-info` alone, not `FLATPAK_ID`.** A terminal, editor or IDE
+  installed *as a Flatpak* sets `FLATPAK_ID` in an otherwise host environment; treating
+  that as sandboxed would route its agents through `flatpak-spawn --host` and lose the
+  PATH it already had.
+- **The protocol pipes are fenced off.** A login shell reads several files before the
+  agent starts and any of them may print (a banner lands in the JSON-RPC stream) or `read`
+  from stdin (an `ssh-add` prompt swallows `initialize` and the handshake hangs with no
+  error). The wrapper parks the pipes on fds 3/4 and points the inherited ones at
+  `/dev/null`/stderr, and the inner script hands them back before the agent starts.
 - **The PATH is the host's, recovered from the person's own shell config.** `flatpak-spawn
   --host` passes the *session bus* PATH, which is not the PATH an interactive terminal
   has, and on this machine it does not contain `~/.opencode/bin` at all. kurier therefore
   runs the agent through the host's login shell and reads `~/.zshrc` or `~/.bashrc` first.
+  A login shell ALONE is not enough — `-l` does not read `~/.zshrc` — and neither is
+  sourcing it from `/bin/sh`, because `~/.zshrc` is zsh syntax that dash cannot parse.
   **Known limit:** a `.bashrc` guarded by `[ -t 0 ]` returns early when there is no
   terminal, and there never is one here, so such a person gets the login PATH and
   `kurier agents` says NOT FOUND. A `$-`-style guard is fine. The fix belongs on the

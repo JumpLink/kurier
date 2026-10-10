@@ -258,7 +258,9 @@ GJSIFY_DEVTOOLS=1 KURIER_SETTINGS_FILE=/tmp/x/settings.json KU_APP_AGENT=stand-i
   ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
 ```
 
-Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version.
+Rows are action rows with radio buttons rather than an `Adw.ComboRow`: a combo row has no per-item subtitle (path, version, "not found") and wraps badly at 360 px. Versions are never probed here (`--version` is skipped), so a host row shows no version. `app/src/core/settings-view.ts` decides the rows, and an unavailable agent stays listed rather than disappearing. **Inside a Flatpak the dialog opens before the host has answered** — rows read `Checking…` and fill in asynchronously — because waiting would show nothing at all for as long as `flatpak-spawn` takes.
+
+**A save never destroys a settings file kurier could not read** (`saveDecision`): a `version` newer than this build refuses the write outright, and anything else unreadable is first moved to `settings.json.bak`. A change applies the next time kurier starts, because the window resolves its agent once and keeps it.
 
 ## The login dialog
 

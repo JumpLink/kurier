@@ -1,0 +1,142 @@
+using Gtk 4.0;
+using Adw 1;
+using Pango 1.0;
+
+/**
+ * The chat surface's own tree — one conversation, and nothing about the app around it.
+ *
+ * **An `Adw.Bin`, because a widget a host embeds may not be a window.** The template the app's
+ * `window.blp` used to carry is split here along the line `docs/adr/0001-kurier-as-an-embeddable-widget.md`
+ * draws: the panes, the header bars, the menu and the banner belong to whoever owns the window, and
+ * what is left — the five states a conversation can be in, plus the composer under them — is this.
+ * A host slots the result into a container of its own; `Adw.Bin` is the thinnest thing in the toolkit
+ * that can be slotted, so the widget adds no level of nesting to argue about.
+ *
+ * **The `Adw.ToolbarView` is here rather than in the host, and that is the whole reason this file
+ * exists as a tree at all.** The composer is a *bottom bar*, so it is drawn below the content and
+ * survives every switch between the five states — and `Adw.ToolbarView` has exactly one bottom bar.
+ * A host that owned the toolbar view would own the composer's slot, and the five status pages would
+ * then have to be the host's pages too: that is the arrangement this split replaces. No `[top]` bar
+ * here on purpose — a header bar names a window, and this widget has none. `bottom-bar-style: flat`
+ * so the composer's card floats rather than sitting in a band of its own; `window.blp`'s old header
+ * carries the pixels that decided it, and `css.ts` carries the card.
+ *
+ * **Two of the five states are the host's to write.** `closed` and `no-agent` are `Adw.Bin` slots
+ * rather than markup, because their copy can only be written by something that knows what surrounds
+ * the chat: "pick a session from the list" names a list this widget does not have, and the remedy for
+ * "no agent found" names an installer and a preferences dialog that are the app's. The other three
+ * are about the conversation itself and so are declared here. A host that leaves the slots empty
+ * never shows those pages — `closed` is the stack's first page and therefore the state the widget
+ * starts in, so a host with no session list calls `newChat()` and never comes back to it.
+ */
+template $KurierChat: Adw.Bin {
+  child: Adw.ToolbarView {
+    vexpand: true;
+    bottom-bar-style: flat;
+
+    // **The stack, not a swap of `set_content`.** The empty states and a session are answers to one
+    // question, and a `Gtk.Stack` holds all of them so switching is a `visibleChildName` assignment
+    // rather than a reparent. That matters because the *composer* is a bottom bar of this
+    // `Adw.ToolbarView` and not part of any child: putting it inside whichever child is showing
+    // would rebuild its entry on every session switch, and the composer's whole job is to survive
+    // one.
+    content: Gtk.Stack stack {
+      vexpand: true;
+
+      StackPage {
+        name: "closed";
+        // The host's idle page. First in source order, so it is what the widget shows before anything
+        // is opened — and nothing ever switches back to it, because only a host that has somewhere
+        // else to go (a session list) can take a conversation off the screen.
+        child: Adw.Bin closedHost {};
+      }
+
+      StackPage {
+        name: "new";
+        // The first-run page: no session exists yet and the composer below is live. It says what
+        // happens on Send rather than pointing at a control, because the control is right there.
+        child: Adw.StatusPage {
+          icon-name: "mail-send-receive-symbolic";
+          title: _("New chat");
+          description: _("Write a message below. The agent starts when you send it.");
+          vexpand: true;
+          styles [
+            "compact",
+            "kurier-calm",
+          ]
+        };
+      }
+
+      StackPage {
+        name: "no-agent";
+        // The host's nothing-found page. A slot rather than markup: what to do about a missing agent
+        // is "install this, or pick another in Preferences", and both halves of that sentence are the
+        // app's. The widget only decides *when* the page is shown — `KurierChatOptions.noAgent`.
+        child: Adw.Bin noAgentHost {};
+      }
+
+      StackPage {
+        name: "open";
+        child: Adw.Bin transcriptHost {};
+      }
+
+      StackPage {
+        name: "empty";
+        // **Its own state, not the host's idle page reused.** A session that is open and holds no
+        // turns is a third thing: `kurier start` with no prompt produces exactly that. Showing the
+        // transcript's blank column for it reads as a failed load, and showing "nothing is open" for
+        // a session that *is* open is a lie.
+        child: Adw.StatusPage {
+          icon-name: "mail-send-receive-symbolic";
+          title: _("Nothing here yet");
+          description: _("No prompt has been sent in this session yet. The first one starts it.");
+          vexpand: true;
+          styles [
+            "compact",
+            "kurier-calm",
+          ]
+        };
+      }
+    };
+
+    // **The bar is a vertical box of [composer, cwd line].** The config row used to be a third
+    // `Adw.Bin` at the top of this box, because `Adw.ToolbarView` has exactly one bottom bar and the
+    // composer owns it — but stacking it here gave the bottom of the pane two surfaces that read as
+    // two panes. It is now inside the composer's card (`composer.ts`, `ComposerOptions.config`),
+    // which is one object with two lines. The order the plan asks for (§7 step 7: what you pick
+    // applies to what you are about to send) is kept by the card's own layout, not by this box.
+    [bottom]
+    Gtk.Box {
+      orientation: vertical;
+      spacing: 0;
+
+      Adw.Bin composerHost {}
+
+      // Where a new chat will run — one dim line, only while a new chat is waiting. `use-markup:
+      // false` is in the template so it holds before the first label is assigned: the path is the
+      // person's directory name, and Pango would parse a `&` in it. The clamp is the composer's own
+      // (`CONTENT_MAX_WIDTH_PX`, 720 — a template cannot import it), so the line sits under the
+      // frame's left edge instead of under the pane's.
+      Adw.Clamp {
+        maximum-size: 720;
+        tightening-threshold: 720;
+
+        Gtk.Label cwdCaption {
+          visible: false;
+          use-markup: false;
+          xalign: 0;
+          ellipsize: middle;
+          margin-start: 16;
+          margin-end: 16;
+          margin-top: 4;
+          margin-bottom: 12;
+
+          styles [
+            "dim-label",
+            "caption",
+          ]
+        }
+      }
+    }
+  };
+}

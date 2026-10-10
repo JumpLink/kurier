@@ -94,6 +94,7 @@
     "@kurier/acp": "*",
     "@kurier/core": "*",
     "@kurier/session": "*",
+    "@kurier/widget": "*",
     "yargs": "^18.1.0"
   },
   "devDependencies": {

@@ -10,6 +10,7 @@
  */
 
 import Adw from '@girs/adw-1';
+import Gtk from '@girs/gtk-4.0';
 
 import type { FailureNotice } from '@kurier/core';
 
@@ -63,7 +64,13 @@ export class FailureDialog {
     return this.#dialog !== null;
   }
 
-  show(notice: FailureNotice, window: Adw.Window, actions: FailureDialogActions = {}): void {
+  /**
+   * Put the notice up over `parent`.
+   *
+   * **`parent` is a `Gtk.Widget`, not the window** — the same reason as `PermissionDialog`'s: a widget
+   * a host embeds does not know its window, and `Adw.Dialog.present` walks up to the root itself.
+   */
+  show(notice: FailureNotice, parent: Gtk.Widget, actions: FailureDialogActions = {}): void {
     this.close();
     const dialog = new Adw.AlertDialog({
       heading: notice.heading,
@@ -124,7 +131,7 @@ export class FailureDialog {
       if (this.#dialog === dialog) this.#dialog = null;
     });
     this.#dialog = dialog;
-    dialog.present(window);
+    dialog.present(parent);
   }
 
   /**

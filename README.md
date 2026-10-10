@@ -81,9 +81,16 @@ otherwise, the choice in `settings.json` above both. An empty session file opens
 your first prompt starts the session. Every dev hook, the stand-in agent that needs no model, and the
 measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
 
-Design decisions are in [docs/adr/](docs/adr/README.md); the embeddable-widget plan is studied in
-[docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md). The
-GUI's look and screenshots of every state are in [docs/design/](docs/design/README.md).
+**The chat is a widget, and this window is one consumer of it.** `@kurier/widget` (`packages/widget`,
+LGPL) holds `KurierChat` — one conversation: the transcript, the composer with its model and mode
+controls, the tool cards, the approval dialog, the login — and another GTK app embeds it by parenting
+one widget and passing which agent, which directory and which MCP servers to use. The window in
+`app/src/frontends/gui/` keeps what only an app has: the sidebar, the menu, Preferences. The line
+between them is drawn in [ADR 0001](docs/adr/0001-kurier-as-an-embeddable-widget.md) and studied in
+[docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
+
+Design decisions are in [docs/adr/](docs/adr/README.md). The GUI's look and screenshots of every
+state are in [docs/design/](docs/design/README.md).
 
 ## Where your data lives
 
@@ -125,5 +132,5 @@ See [AGENTS.md](AGENTS.md).
 ## License
 
 The apps are [AGPL-3.0-or-later](LICENSE); the reusable packages under `packages/*`
-(`@kurier/acp`, `@kurier/session`, `@kurier/core`) are LGPL-3.0-or-later, each with its own `LICENSE` and
+(`@kurier/acp`, `@kurier/session`, `@kurier/core`, `@kurier/widget`) are LGPL-3.0-or-later, each with its own `LICENSE` and
 `COPYING`. © Pascal Garber.

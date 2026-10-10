@@ -51,7 +51,7 @@
  *
  * The bubbles' and the composer's padding come from `css.ts`, and a probe with its own copy of those
  * rules would measure a layout nobody ships. So the probe reads `app/src/frontends/gui/css.ts`, takes
- * the `APP_CSS` template literal out of it, substitutes the three name constants, and loads that. If
+ * the `APP_CSS` template literal out of it, substitutes the three name constants (plus the widget sheet), and loads that. If
  * the stylesheet changes, this measures the change.
  *
  * ## How to run it so the sweep means anything
@@ -94,25 +94,37 @@ function frames(count) {
   });
 }
 
-/**
- * The real `APP_CSS`, taken out of the source file.
- *
- * Deliberately not pasted: the whole question is what the shipped padding and margins demand, and a
- * second copy of the stylesheet is a second thing to keep in step with the first.
- */
-function loadRealStylesheet() {
-  const path = GLib.build_filenamev([GLib.get_current_dir(), 'app/src/frontends/gui/css.ts']);
+/** One `export const NAME = \`…\`.trim();` template literal out of a TypeScript source file. */
+function readSheet(relative, name) {
+  const path = GLib.build_filenamev([GLib.get_current_dir(), relative]);
   const file = Gio.File.new_for_path(path);
   if (!file.query_exists(null)) {
-    print(`  (no css.ts at ${path} — run this from the repository root)`);
+    print(`  (no ${relative} at ${path} — run this from the repository root)`);
     return null;
   }
   const [, bytes] = file.load_contents(null);
   const source = new TextDecoder().decode(bytes);
-  const match = /export const APP_CSS = `([\s\S]*?)`\.trim\(\);/.exec(source);
-  if (!match) return null;
+  const match = new RegExp(`export const ${name} = \`([\\s\\S]*?)\`\\.trim\\(\\);`).exec(source);
+  return match ? match[1] : null;
+}
+
+/**
+ * The real `APP_CSS`, taken out of the source files.
+ *
+ * Deliberately not pasted: the whole question is what the shipped padding and margins demand, and a
+ * second copy of the stylesheet is a second thing to keep in step with the first.
+ *
+ * **Two files since ADR 0001 step 5**, because the sheet is: the chat's rules are
+ * `@kurier/widget`'s `WIDGET_CSS` and the app's own three are `APP_CSS`; the widget installs
+ * its sheet itself, so both are loaded here. Reading only the app's file would measure a window with no transcript padding at all —
+ * which is exactly the kind of quietly-wrong baseline this function exists to avoid.
+ */
+function loadRealStylesheet() {
+  const app = readSheet('app/src/frontends/gui/css.ts', 'APP_CSS');
+  const widget = readSheet('packages/widget/src/css.ts', 'WIDGET_CSS');
+  if (app === null || widget === null) return null;
   // The three interpolated Adwaita name classes. Everything else in the sheet is literal.
-  const css = match[1]
+  const css = (widget + '\n' + app)
     .replaceAll('${MONO}', 'monospace')
     .replaceAll('${DIM}', 'dim-label')
     .replaceAll('${TITLE}', 'title-1');

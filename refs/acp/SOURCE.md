@@ -23,6 +23,23 @@ The script writes the new schema, then runs `npm run check:schema` (see
 types, the method table and the capability check in `packages/acp` may all need to move — a
 refresh that only changes the JSON is a sign the schema was copied but not read.
 
+## What one real agent answers
+
+The schema says what is allowed. What `opencode acp` 2.0.19 actually sent back to `initialize`,
+measured inside one GJS process with no Node anywhere in the chain, is the verbatim result block in
+[README.md](../../README.md#why-acp-instead-of-one-sdk-per-agent) — kept there in one copy so a
+re-measurement cannot update half of them.
+
+Three things about it belong here, next to the schema:
+
+- The `authMethods` entry carries a **`description` the schema does not define**, and no `type` tag.
+  That is trap 1 in [AGENTS.md](../../AGENTS.md#the-two-traps): a real, interactive auth method the
+  client has to arrange itself.
+- `sessionCapabilities` carries a **`fork` marker v1 does not define**. Unknown capability keys and
+  unknown `_meta` must never be an error (guardrail 4).
+- `mcpCapabilities` is `{"http":true,"sse":false}`, which is why a host's own MCP server may be
+  stdio or HTTP but not SSE.
+
 ## Why v1
 
 `opencode acp` negotiates `protocolVersion: 1`. The upstream repository also carries

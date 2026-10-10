@@ -47,6 +47,25 @@ gjsify bug**: `@gjsify/child_process` carries `runtimes.node: "none"` because th
 nothing to port under Node, and `test.node.mjs` (48 KB) is a parity suite against the real
 `node:child_process`, not a Node port.
 
+## Named imports from a `.blp`
+
+> **No file in this repo imports anything but the default from a `.blp`.**
+
+`gjsify` generates a sidecar beside every Blueprint file — `window.d.blp.ts`, `chat.d.blp.ts`,
+`permission-body.d.blp.ts` — that declares the template's object ids, so a named import looks like
+the obvious way to type them. It does not compile. The repo's TypeScript is 6.0.3 without
+`allowArbitraryExtensions`, so `import … from './chat.blp'` is resolved by the ambient
+`declare module '*.blp'` instead of by the sidecar; that declaration exports a default and nothing
+else, and the named import fails with **TS2614** (*"Module has no exported member"*) pointing at a
+file that plainly has it.
+
+What works, and what every template in the repo therefore does (`window.ts`, `chat.ts`,
+`permission-dialog.ts`): import only the default, pass a literal `InternalChildren` array to
+`GObject.registerClass`, and `declare readonly _id: Type` one field per id. The array and the
+sidecar must agree by hand — `build:app` regenerates the sidecar, so a mismatch shows up there as a
+missing or extra id. The sidecars stay on disk as the record of what the template defines; nothing
+imports them.
+
 ## Why `@gjsify/napi` is not pinned
 
 All `@gjsify/*` packages are pinned to the same exact version. One is absent: `@gjsify/napi`,
