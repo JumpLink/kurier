@@ -228,9 +228,7 @@ export class ConfigRow {
       // agent's description follows it. `core/config-row.ts` sets `description` to the `name` when
       // the agent sent none, which is exactly the case where there is nothing to append.
       tooltipText:
-        control.description === control.name
-          ? control.name
-          : `${control.name} — ${control.description}`,
+        control.description === control.name ? control.name : `${control.name} — ${control.description}`,
       valign: Gtk.Align.CENTER,
       // `flat`: Adwaita's own name for a control with no raised surface of its own, which is what a
       // dropdown sitting on the composer's card has to be — a bordered button inside a card reads as

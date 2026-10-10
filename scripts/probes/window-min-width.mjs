@@ -206,9 +206,17 @@ function configRow() {
       valign: Gtk.Align.CENTER,
       cssClasses: ['flat', 'kurier-config-control'],
     });
-    flow.append(new Adw.Clamp({ child: dropdown, maximumSize: 160, tighteningThreshold: 160, halign: Gtk.Align.START }));
+    flow.append(
+      new Adw.Clamp({ child: dropdown, maximumSize: 160, tighteningThreshold: 160, halign: Gtk.Align.START }),
+    );
   }
-  const caption = new Gtk.Label({ useMarkup: false, xalign: 0, wrap: true, label: '', cssClasses: ['caption'] });
+  const caption = new Gtk.Label({
+    useMarkup: false,
+    xalign: 0,
+    wrap: true,
+    label: '',
+    cssClasses: ['caption'],
+  });
   const box = new Gtk.Box({
     orientation: Gtk.Orientation.VERTICAL,
     spacing: 6,
@@ -446,7 +454,7 @@ for (const width of [480, 420, 360, 320, 280, 240, 200]) {
 
 print(
   '\nRead: nothing here has a minimum near 480, so that floor was a decision rather than a limit —' +
-    '\n      but the sweep does stop at 360 with no floor at all, and that one is the toolkit\'s.' +
-    "\n      A run where every row prints the same number is a compositor that refused to resize.",
+    "\n      but the sweep does stop at 360 with no floor at all, and that one is the toolkit's." +
+    '\n      A run where every row prints the same number is a compositor that refused to resize.',
 );
 window.destroy();
