@@ -63,6 +63,14 @@ jobs:
       - name: Install dependencies (gjsify install --immutable)
         run: gjsify install --immutable
 
+      # The Flatpak builds offline from gjsify-sources.json. A lockfile bump without regenerating
+      # it only fails in release.yml, inside the sandbox, on the first tag (v0.1.1 did).
+      - name: Offline Flatpak sources match the lockfile
+        # node, not git diff or cmp: the container has neither git nor diffutils.
+        run: |
+          gjsify flatpak sources --out /tmp/gjsify-sources.json
+          node -e "const f=require('fs');if(f.readFileSync('gjsify-sources.json','utf8')!==f.readFileSync('/tmp/gjsify-sources.json','utf8')){console.error('gjsify-sources.json is stale: run gjsify flatpak sources');process.exit(1)}"
+
       # The vendored ACP schema against the code. A hand-written copy of a protocol schema drifts,
       # and the drift is silent at runtime: a renamed method is a `-32601` against a live agent, and
       # a field that became required is an agent that ignores what kurier sent.
