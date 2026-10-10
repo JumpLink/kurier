@@ -1,0 +1,22 @@
+{
+  "name": "@kurier/core",
+  "version": "0.1.1",
+  "license": "LGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "description": "Kurier without a surface: which agent to start and how, the session a turn runs in, the view models a chat renders from, and the provider login. No gi://, no yargs, no widget — a host injects its paths, its agent choice and its gate, so the same logic drives the CLI, the window and an embedded widget.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "gjsify tsc --noEmit --project tsconfig.json"
+  },
+  "files": [
+    "src",
+    "data"
+  ],
+  "dependencies": {
+    "@kurier/acp": "*",
+    "@kurier/session": "*"
+  }
+}
