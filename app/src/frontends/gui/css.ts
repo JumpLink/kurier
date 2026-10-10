@@ -196,6 +196,32 @@ export const APP_CSS = `
 .kurier-config-control {
   background-color: transparent;
 }
+
+/* A short status or kind word in a capsule (tool status on a transcript card, tool kind in the approval
+   dialog). Adwaita's \`pill\` is a button shape and does nothing on a label, so the shape lives here;
+   the colour comes from Adwaita's own \`accent\`/\`success\`/\`error\` text classes, tinted behind. */
+.kurier-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: bold;
+  background-color: alpha(@window_fg_color, 0.08);
+}
+.kurier-pill.accent {
+  background-color: alpha(@accent_bg_color, 0.18);
+}
+.kurier-pill.success {
+  background-color: alpha(@success_bg_color, 0.18);
+}
+.kurier-pill.error {
+  background-color: alpha(@error_bg_color, 0.18);
+}
+
+/* A tool call in the transcript. \`card\` supplies the surface; Adwaita sets no padding on it, and a
+   row of icon, title and pill touching the edge reads as a table cell. */
+.kurier-tool-card {
+  padding: 6px 10px;
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
@@ -218,6 +244,8 @@ export const CSS = {
   composerStatus: 'kurier-composer-status',
   configControl: 'kurier-config-control',
   openRow: 'kurier-open-row',
+  pill: 'kurier-pill',
+  toolCard: 'kurier-tool-card',
   dim: DIM,
   title: TITLE,
   mono: MONO,

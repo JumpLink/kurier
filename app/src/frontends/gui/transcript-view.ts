@@ -33,7 +33,10 @@
  * advice for a text-heavy surface. 720 px is the plan's number; it happens to equal the sidebar
  * breakpoint, which is a coincidence — one caps the pane, the other is a measure.
  *
- * No copy button, no timestamps under the bubbles, no per-item controls. Everything on screen is
+ * An agent bubble carries a caption above it — the agent's name and the time the message was recorded —
+ * and a tool call is a card (icon, title, status capsule). Both are read from what the record holds; the
+ * tool's kind and input are not recorded, so see `tool-line.ts` for what the icon is a guess from.
+ * No copy button, no per-item controls. Everything on screen is
  * something the transcript actually holds; a control that points at nothing is the one thing this
  * window's own header forbids.
  */
@@ -56,6 +59,7 @@ import {
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
+import { parseToolLine, toolIcon } from './tool-line.ts';
 
 /**
  * The conversation's measure is `CONTENT_MAX_WIDTH_PX`, not a constant of this file.
@@ -91,6 +95,8 @@ export class TranscriptView {
    */
   #entries: readonly TranscriptEntry[] = [];
   #items: readonly TranscriptItem[] = [];
+  /** Who the agent bubbles are captioned with; set from the open record, before its entries. */
+  #agentName = '';
   /**
    * The queued follow-the-end idle, or `null`. One at a time — and that is a rule about *ownership*,
    * not about how many idles are scheduled; see `#scrollToEnd`.
@@ -282,6 +288,11 @@ export class TranscriptView {
     if (update.attemptFollow) this.#tryFollow();
   }
 
+  /** The name above each agent bubble. Takes effect for rows built after it, so set it before `setEntries`. */
+  setAgentName(name: string): void {
+    this.#agentName = name;
+  }
+
   /**
    * Replace the transcript with these entries.
    *
@@ -352,7 +363,7 @@ export class TranscriptView {
 
   /** Add one item as a new row at the end of the column. */
   #appendRow(item: TranscriptItem): void {
-    const row = buildItem(item);
+    const row = buildItem(item, this.#agentName);
     this.#rows.push(row);
     this.#column.append(row);
   }
@@ -374,7 +385,7 @@ export class TranscriptView {
     const previous = this.#rows[index];
     const item = this.#items[index];
     if (!previous || !item) return;
-    const row = buildItem(item);
+    const row = buildItem(item, this.#agentName);
     const sibling = this.#rows[index - 1] ?? null;
     this.#column.insert_child_after(row, sibling);
     this.#column.remove(previous);
@@ -506,12 +517,12 @@ export class TranscriptView {
   }
 }
 
-function buildItem(item: TranscriptItem): Gtk.Widget {
+function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
   switch (item.kind) {
     case 'user':
       return buildBubble(item.text, Gtk.Align.END, CSS.bubbleUser);
     case 'agent':
-      return buildBubble(item.text, Gtk.Align.START, CSS.bubbleAgent);
+      return buildAgentMessage(item.text, item.at, agentName);
     // `dialog-information-symbolic`, and not because a thought is information. Adwaita has no icon
     // for reasoning: `chat-symbolic` and `lightbulb-symbolic` are not in the theme at all, and
     // `dialog-question-symbolic` — the name the first version used — is a "?" in a diamond that
@@ -522,7 +533,7 @@ function buildItem(item: TranscriptItem): Gtk.Widget {
       // not prose. See `.kurier-thought` and the `monospace` name class.
       return buildDisclosure('dialog-information-symbolic', item, CSS.thought);
     case 'tool':
-      return buildDisclosure('system-run-symbolic', item, CSS.mono);
+      return item.detail === null ? buildToolCard(item.summary) : buildDisclosure('system-run-symbolic', item, CSS.mono);
     case 'system':
       return buildNote(item.text);
   }
@@ -545,6 +556,55 @@ function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widge
     align,
     cssClasses: [CSS.bubble, speaker, CSS.transcriptText],
   });
+}
+
+/**
+ * An agent bubble under a dim caption: who said it, and when.
+ *
+ * The time is the entry's own `at`, formatted in the reader's timezone; an `at` the store carries as
+ * garbage drops the time rather than printing it. A merged run of chunks shows the time of its first.
+ */
+function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Widget {
+  const time = GLib.DateTime.new_from_iso8601(at, null)?.to_local()?.format('%R') ?? null;
+  const caption = [agentName, time].filter((part): part is string => !!part).join(' · ');
+  const bubble = buildBubble(text, Gtk.Align.START, CSS.bubbleAgent);
+  if (caption === '') return bubble;
+  const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
+  column.append(
+    buildLabel({ text: caption, xalign: 0, align: Gtk.Align.START, cssClasses: [CSS.dim, 'caption'] }),
+  );
+  column.append(bubble);
+  return column;
+}
+
+/**
+ * A tool call as a card: icon, bold title, status capsule.
+ *
+ * A line with no recognisable status gets no capsule rather than an invented one.
+ */
+function buildToolCard(summary: string): Gtk.Widget {
+  const line = parseToolLine(summary);
+  const card = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 8,
+    cssClasses: ['card', CSS.toolCard],
+  });
+  card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: 16 }));
+  const title = buildLabel({ text: line.title, xalign: 0, cssClasses: ['heading'] });
+  title.set_hexpand(true);
+  card.append(title);
+  if (line.status !== null) {
+    const tone = { running: 'accent', done: 'success', failed: 'error' }[line.status.tone];
+    card.append(
+      new Gtk.Label({
+        label: line.status.label,
+        useMarkup: false,
+        valign: Gtk.Align.CENTER,
+        cssClasses: [CSS.pill, tone],
+      }),
+    );
+  }
+  return card;
 }
 
 /**

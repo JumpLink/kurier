@@ -678,6 +678,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     });
     // `bind` stopped a turn that belongs to another chat; its question, if any, is already settled.
     this.#permissions.close();
+    this.#transcript.setAgentName(record.agent);
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
     // map, so an index would be a second naming scheme for the same three states.
