@@ -13,14 +13,13 @@
  * nothing to search *for*. `Gtk.DropDown` also hands back an **index**, which is the value-id mapping
  * `core/config-row.ts` exists to own.
  *
- * **A `Gtk.FlowBox` with one control per line, and the number is measured.** `max-children-per-line: 1`
- * is what puts each control on its own line at every width, which sounds wasteful until the alternative
- * is named: at 360 px a row of three dropdowns has ~90 px each, and a model name at 90 px is an
- * ellipsis with no way to read the model. One per line gives every control the full measure, and at
- * 1024 px the row is three lines tall inside the same bottom bar the composer is in. The row does not
- * raise the window's width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
- * `Adw.NavigationSplitView`'s, not kurier's content's, and the dropdowns at a fixed width into whatever width
- * is there.
+ * **A `Gtk.FlowBox` that puts the three controls on one line while they fit, and wraps when they do not.**
+ * Each dropdown asks for at most `CONFIG_CONTROL_WIDTH_PX`, so at the 720 px clamp the model, thought
+ * level and mode share one line, and narrower they wrap (measured with the real widgets: one line at
+ * 720 and 1024, three at 500 and 360, window granted 360) — three side by side at 360 px would leave
+ * about 90 px each, an ellipsis with no way to read the model. The row does not raise the window's
+ * width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
+ * `Adw.NavigationSplitView`'s, not kurier's content's.
  *
  * **Every label that could carry an agent's words says `useMarkup: false` in the constructor.** Not a
  * flag set later: Pango parses on assignment, so a `set_use_markup(false)` after the text is in arrives
@@ -52,8 +51,8 @@ import {
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
 
-/** Width asked of each dropdown; see `#buildControl`. */
-const CONFIG_CONTROL_WIDTH_PX = 200;
+/** Widest a dropdown asks to be; three of them and their labels fit the content clamp on one line. */
+const CONFIG_CONTROL_WIDTH_PX = 160;
 
 export interface ConfigRowOptions {
   /**
@@ -122,10 +121,8 @@ export class ConfigRow {
     });
 
     this.#flow = new Gtk.FlowBox({
-      // **One control per line, at every width.** See the file header: at 360 px a shared line gives
-      // each dropdown about 90 px, which is an ellipsis rather than a model name. Measured at the
-      // phone floor with the real window — three lines, every value readable, nothing dropped.
-      maxChildrenPerLine: 1,
+      // **One line while the controls fit, one control per line when they do not.** See the file header.
+      maxChildrenPerLine: 3,
       // No selection: the row is a set of independent controls, and a highlight moving between them
       // would read as "this one is chosen" — which is not a statement this row makes.
       selectionMode: Gtk.SelectionMode.NONE,
@@ -178,11 +175,8 @@ export class ConfigRow {
         if (!child) break;
         this.#flow.remove(child);
       }
-      // One group per render: the labels share a width so the three dropdowns start at one edge,
-      // which is what makes three lines read as one control row instead of three form fields.
-      const labels = new Gtk.SizeGroup({ mode: Gtk.SizeGroupMode.HORIZONTAL });
       for (const control of this.#view.controls) {
-        this.#flow.append(this.#buildControl(control, labels));
+        this.#flow.append(this.#buildControl(control));
       }
     } finally {
       this.#rendering = false;
@@ -192,7 +186,7 @@ export class ConfigRow {
   }
 
   /** One control: a caption and a dropdown, in a box that shares the measure with the others. */
-  #buildControl(control: ConfigRowControl, labels: Gtk.SizeGroup): Gtk.Widget {
+  #buildControl(control: ConfigRowControl): Gtk.Widget {
     const label = new Gtk.Label({
       // **The agent's own words, with markup off in the constructor.** `opencode`'s model ids and
       // names are arbitrary strings, and `a < b` is a plausible one.
@@ -221,10 +215,6 @@ export class ConfigRow {
       // Only a long list needs it — 400 model ids cannot be scanned; six effort levels can. The
       // decision is a fact about the data and lives in `core/config.ts`.
       enableSearch: control.searchable,
-      // Compact, not a full-width form field: wide enough for a model name to be recognisable, narrow
-      // enough that the 360 px floor still fits label + control (the row's floor is the window's).
-      halign: Gtk.Align.START,
-      widthRequest: CONFIG_CONTROL_WIDTH_PX,
       sensitive: control.selectable,
       tooltipText: control.description,
       valign: Gtk.Align.CENTER,
@@ -242,9 +232,18 @@ export class ConfigRow {
       orientation: Gtk.Orientation.HORIZONTAL,
       spacing: 8,
     });
-    labels.add_widget(label);
     row.append(label);
-    row.append(dropdown);
+    // A long model id would make the dropdown's natural width the line's, and the row would wrap at
+    // 720 px with room to spare. The clamp caps what it *asks* for, so the row is one line when the
+    // three fit and wraps (`FlowBox`) when they do not; the child still shrinks below the cap.
+    row.append(
+      new Adw.Clamp({
+        child: dropdown,
+        maximumSize: CONFIG_CONTROL_WIDTH_PX,
+        tighteningThreshold: CONFIG_CONTROL_WIDTH_PX,
+        halign: Gtk.Align.START,
+      }),
+    );
     return row;
   }
 

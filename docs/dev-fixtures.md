@@ -108,11 +108,12 @@ KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 \
   ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
 ```
 
-**One control per line, at every width, and the row raises no floor.** The three controls sit in a
-`Gtk.FlowBox` with `max-children-per-line: 1`: at 360 px a shared line leaves each dropdown about 90 px,
-which is an ellipsis rather than a model name. Measured with the row on screen, the real window still
-stops at 360 — asked for 320, granted 360 — so the floor is still `Adw.NavigationSplitView`'s and not
-kurier's content's (`scripts/probes/window-min-width.mjs` prints the sweep).
+**One line while the three controls fit, a line each when they do not, and the row raises no floor.** The
+controls sit in a `Gtk.FlowBox` (`max-children-per-line: 3`) with each dropdown inside an `Adw.Clamp` that
+caps what it asks for (`CONFIG_CONTROL_WIDTH_PX`), so a long model id cannot force a wrap. Measured with the
+real widgets in the 720 px content clamp: one line at 1024 and 720, three lines at 500 and 360, and the
+window still stops at 360 — so the floor is `Adw.NavigationSplitView`'s and not kurier's content's
+(`scripts/probes/window-min-width.mjs` prints the sweep).
 
 What the row may show and when is decided in `app/src/core/config-row.ts` and tested on both runtimes;
 the widget only renders.
