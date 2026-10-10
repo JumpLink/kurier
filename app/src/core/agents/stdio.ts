@@ -77,6 +77,19 @@ export interface StdioChannelOptions {
 const DEFAULT_KILL_GRACE_MS = 2000;
 
 /**
+ * The largest piece handed to stdin in one `write`, and it is one pipe page on purpose.
+ *
+ * `stdin.write` already queues: what the pipe cannot take yet waits in the stream's buffer, in
+ * order, so nothing is dropped and the review's "await `drain`" would only move that queue here.
+ * The real failure was on GJS, where the stream's async write is a poll-then-`write()` on a
+ * *blocking* fd: poll says "writable" when one page is free, and a larger write then blocks the
+ * main loop until the agent reads it all. An agent that answers while it reads (every ACP agent)
+ * fills our stdout pipe meanwhile, which nobody can drain from a blocked loop — measured as a frozen
+ * gjs at 256 KB through `cat`. A write of at most a page always fits once poll said yes.
+ */
+const STDIN_CHUNK_BYTES = 4096;
+
+/**
  * How long the "is it installed" host probe may take. Short, because the probe sits on the path of
  * `kurier agents` and of any window that reports launcher state: a slow answer reads as a broken
  * app, and nothing about resolving one program's location is worth more than this.
@@ -120,6 +133,8 @@ export class StdioChannel implements RawChannel {
   #isStdoutDone = false;
   /** stderr has reached EOF (or been torn down), so no further log line can arrive. */
   #isStderrDone = false;
+  /** Why stdin can no longer carry a line — set once, and every later `send` throws it. */
+  #stdinError: Error | undefined = undefined;
 
   constructor(options: StdioChannelOptions) {
     const { program } = options.command;
@@ -133,6 +148,9 @@ export class StdioChannel implements RawChannel {
     const { cwd, env } = actual;
     this.#child = spawn(actual.program, actual.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Its own session, so the agent and everything it starts share one process group that
+      // `terminate` can signal at once. See `#signal`.
+      detached: true,
       ...(cwd ? { cwd } : {}),
       ...(env ? { env: { ...process.env, ...env } } : {}),
       // Only a `.bat`/`.cmd` carrier gets a shell — never every program. See `needsWindowsShell`.
@@ -170,6 +188,9 @@ export class StdioChannel implements RawChannel {
     };
     this.#child.stderr.on('end', onStderrDone);
     this.#child.stderr.on('close', onStderrDone);
+    this.#child.stdin.on('error', (error: Error) => {
+      this.#stdinError = new Error(`${program} stopped reading its stdin: ${error.message}`);
+    });
     this.#child.on('error', (error: Error) => this.#end(error));
     this.#child.on('exit', (code, signal) => {
       // An agent killed mid-write leaves a partial line in the stderr buffer, and that line is
@@ -200,7 +221,11 @@ export class StdioChannel implements RawChannel {
 
   send(data: string): void {
     if (this.#closed) throw new Error(`${this.command.program} is gone — cannot send`);
-    this.#child.stdin.write(`${data}\n`);
+    if (this.#stdinError) throw this.#stdinError;
+    const bytes = Buffer.from(`${data}\n`, 'utf8');
+    for (let offset = 0; offset < bytes.length; offset += STDIN_CHUNK_BYTES) {
+      this.#child.stdin.write(bytes.subarray(offset, offset + STDIN_CHUNK_BYTES));
+    }
   }
 
   onData(listener: (data: string) => void): void {
@@ -221,12 +246,40 @@ export class StdioChannel implements RawChannel {
    */
   terminate(): void {
     if (this.#closed) return;
-    this.#child.kill('SIGTERM');
+    this.#signal('SIGTERM');
     this.#killTimer = setTimeout(() => {
-      if (!this.#closed) this.#child.kill('SIGKILL');
+      if (!this.#closed) this.#signal('SIGKILL');
     }, this.#killGraceMs);
     (this.#killTimer as { unref?: () => void }).unref?.();
     this.#child.stdin.end();
+  }
+
+  /**
+   * Signal the agent's whole process group, not just the agent.
+   *
+   * A signal to the direct child leaves any process it started holding stdout and stderr, and the
+   * end gate waits for both pipes — so `terminate` never ended the channel (measured `NEVER-ENDED`
+   * on gjs and node). `detached: true` makes the agent a session and group leader, so `-pid` reaches
+   * everything it spawned. Without `setsid` (GJS needs the binary) there is no such group and the
+   * kill throws `ESRCH`; then the direct child is all that can be reached.
+   *
+   * Its own session also means the terminal's signals stop reaching the agent. For Ctrl-C that is
+   * the point: `interrupt.ts` decides between `session/cancel` and a close, and a SIGINT that also
+   * hit the agent's group killed it mid-turn before the cancel could land. A closed terminal's
+   * SIGHUP no longer reaches it either; kurier dies of it, the agent's stdin hits EOF, and an ACP
+   * agent ends on that.
+   */
+  #signal(signal: NodeJS.Signals): void {
+    const pid = this.#child.pid;
+    if (pid) {
+      try {
+        process.kill(-pid, signal);
+        return;
+      } catch {
+        // No group of its own — fall through to the child alone.
+      }
+    }
+    this.#child.kill(signal);
   }
 
   /**
@@ -280,7 +333,8 @@ export class StdioChannel implements RawChannel {
    * `onEnd` never fires. Waiting for stderr widens the set of children that can do it — one holding
    * stderr alone used to get through — though the realistic case, a grandchild inheriting both
    * pipes, already hung before this change. Measured `NEVER-ENDED` on gjs and on node either way.
-   * Fixed separately; see docs/reviews/2026-09-30-code-review-findings.md.
+   * `terminate` now signals the whole process group, see `#signal`; a grandchild that leaves the
+   * group on its own (`setsid` of its own) can still hold the channel open.
    */
   #maybeEnd(): void {
     if (!this.#hasExited || !this.#isStdoutDone || !this.#isStderrDone) return;

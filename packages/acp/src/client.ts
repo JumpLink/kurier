@@ -409,11 +409,27 @@ export class AcpClient {
 
   // ─── the wire ──────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * The three ways out onto the wire, and why they differ only in who hears about a failure.
+   *
+   * **A failed write closes the connection on every path**: a transport that threw once has lost
+   * a line, and the next line would arrive at a peer that never saw the one before it. What
+   * differs is the caller. `#send` (kurier's own notifications) throws and `#request` rejects,
+   * because somebody is waiting on the call and has to learn it never went out. `#write` (answers
+   * to the agent) returns quietly, because nobody on kurier's side is waiting for those — the
+   * agent asked, and a closed connection is the only answer it can still get. A closed connection
+   * is the same split: `#send` throws, `#request` rejects, `#write` drops the line.
+   */
   #send(line: string): void {
     if (this.#closed) {
       throw new Error('cannot send on a closed ACP connection');
     }
-    this.transport.write(line);
+    try {
+      this.transport.write(line);
+    } catch (error) {
+      this.close(describeWriteFailure(error));
+      throw error;
+    }
   }
 
   #request(method: string, params: unknown, timeoutMs?: number): Promise<unknown> {
@@ -436,6 +452,7 @@ export class AcpClient {
         this.#pending.delete(id);
         if (pending.timer) clearTimeout(pending.timer);
         reject(error instanceof Error ? error : new Error(String(error)));
+        this.close(describeWriteFailure(error));
       }
     });
   }
@@ -581,7 +598,7 @@ export class AcpClient {
     try {
       this.transport.write(line);
     } catch (error) {
-      this.close(error instanceof Error ? error.message : String(error));
+      this.close(describeWriteFailure(error));
     }
   }
 
@@ -663,4 +680,8 @@ export function contentToText(block: ContentBlock): string {
   if (block.type === 'image') return '[image]';
   if (block.type === 'audio') return '[audio]';
   return '[resource]';
+}
+
+function describeWriteFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

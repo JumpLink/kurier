@@ -221,6 +221,28 @@ export default async () => {
       await expect(client.prompt({ sessionId: 'x', prompt: [] })).rejects.toThrow();
     });
 
+    await it('closes the connection when a write fails, whichever direction it was going', async () => {
+      const broken = (): Transport => ({
+        get closed() {
+          return false;
+        },
+        write: () => {
+          throw new Error('EPIPE');
+        },
+        onMessage: () => {},
+        onClose: () => {},
+        close: () => {},
+      });
+      // A notification kurier sends: the caller hears about it, and the client knows it is closed.
+      const notifying = new AcpClient({ transport: broken() });
+      expect(() => notifying.cancel({ sessionId: 'x' })).toThrow(/EPIPE/);
+      expect(notifying.closed).toBe(true);
+      // A request kurier sends: the promise rejects, and the client is closed the same way.
+      const requesting = new AcpClient({ transport: broken() });
+      await expect(requesting.newSession({ cwd: '/tmp', mcpServers: [] })).rejects.toThrow(/EPIPE/);
+      expect(requesting.closed).toBe(true);
+    });
+
     await it('ignores a response to an unknown id rather than treating it as an error', async () => {
       const { transport, deliver } = manualTransport();
       const client = new AcpClient({ transport });

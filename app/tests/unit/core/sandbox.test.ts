@@ -933,6 +933,87 @@ export default async () => {
         });
       });
     });
+
+    /**
+     * An agent that stops reading its stdin. The write fails asynchronously — on Node as an `EPIPE`
+     * `error` event on the stream — and an unhandled one took the whole process down, the CLI and
+     * every test in the run with it. Measured before the fix: node crashed, gjs logged and went on.
+     */
+    await it('survives an agent that closed its stdin, and ends instead of crashing', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(dir, 'deaf', '#!/bin/sh\nexec 0<&-\nsleep 0.5\nexit 0\n');
+        const channel = new StdioChannel({
+          command: { id: 'deaf', title: 'deaf', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const ended = new Promise<Error | undefined>((resolve) => channel.onEnd(resolve));
+        setTimeout(() => {
+          if (!channel.isClosed) channel.send('x'.repeat(256 * 1024));
+        }, 150);
+        return ended.then((reason) => {
+          expect(channel.isClosed).toBe(true);
+          if (reason) expect(reason.message).toContain(program);
+          expect(() => channel.send('late')).toThrow();
+        });
+      });
+    });
+
+    await it('delivers a large send complete and in order', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        // `exec cat` echoes stdin back, so what arrives on stdout is exactly what got through. `exec`,
+        // not a plain `cat`: a shell left waiting on it is a grandchild that `terminate` cannot reach.
+        const program = writeProgram(dir, 'echo', '#!/bin/sh\nexec cat\n');
+        const channel = new StdioChannel({
+          command: { id: 'echo', title: 'echo', program, args: [] },
+          onStderr: () => {},
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const lines = Array.from({ length: 64 }, (_, i) => `${i}:${'y'.repeat(32 * 1024)}`);
+        const expected = lines.map((line) => `${line}\n`).join('');
+        let received = '';
+        const echoed = new Promise<void>((resolve) => {
+          channel.onData((chunk) => {
+            received += chunk;
+            if (received.length >= expected.length) resolve();
+          });
+        });
+        for (const line of lines) channel.send(line);
+        return echoed.then(() => {
+          const ended = new Promise<Error | undefined>((resolve) => channel.onEnd(resolve));
+          channel.terminate();
+          expect(received).toBe(expected);
+          return ended.then(() => undefined);
+        });
+      });
+    });
+
+    /**
+     * An agent that leaves a child holding its pipes. Signals to the direct child alone leave the
+     * grandchild with stdout and stderr open, so the end gate never closes — measured
+     * `NEVER-ENDED` on gjs and node. The grandchild outlives the test's own deadline on purpose: a
+     * shorter one would end the channel by itself and make the test pass without the fix.
+     */
+    await it('terminate ends the channel even when a grandchild holds the pipes', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(dir, 'parent', '#!/bin/sh\n( sleep 8 ) &\nexec sleep 8\n');
+        const channel = new StdioChannel({
+          command: { id: 'parent', title: 'parent', program, args: [] },
+          onStderr: () => {},
+          killGraceMs: 200,
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const ended = new Promise<string>((resolve) => channel.onEnd(() => resolve('ended')));
+        const deadline = new Promise<string>((resolve) => setTimeout(() => resolve('NEVER-ENDED'), 2000));
+        setTimeout(() => channel.terminate(), 100);
+        return Promise.race([ended, deadline]).then((outcome) => {
+          expect(outcome).toBe('ended');
+        });
+      });
+    });
   });
 };
 
