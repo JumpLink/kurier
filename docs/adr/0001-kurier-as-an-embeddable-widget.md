@@ -45,12 +45,13 @@ opencode **2.0.25** honours `mcpServers` in `session/new`. `scripts/probes/acp-m
 starts `opencode acp` with a scratch `HOME` and `XDG_*` tree and one stdio MCP server exposing
 `probe_echo`. No model call, no login. The server log shows
 `started | recv initialize | recv notifications/initialized | recv tools/list`: opencode spawned
-the server and listed its tools. Not yet measured: whether a server that fails to start is
-reported or dropped silently.
+the server and listed its tools. A server whose command does not exist is **not reported**: `session/new`
+returns a normal result (`sessionId`, `configOptions`), no error. A host that needs to know its server is up must
+check for itself (the probe's second `session/new` shows this).
 
 ## Order of work
 
-Planned; steps 1 to 3 are done.
+Planned; steps 1 to 4 are done.
 
 1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers.
 2. Make paths and settings injectable. **Done:** `KurierPaths` (`packages/core/src/paths.ts` since step 3: data and config dir plus the
@@ -63,6 +64,9 @@ Planned; steps 1 to 3 are done.
    (`packages/core/src/index.ts`); nothing imports a core file by path. The auth policy came along in the
    same step rather than later: it was split between the CLI and a private function in `run.ts`, so a
    window had to re-derive it (`auth.ts`, with `runLogin` and `open` as the surface's hooks).
+4. Plumb `mcpServers`. **Done:** `AgentSessionOptions.mcpServers` (ACP `McpServer[]`, type exported from `@kurier/core`)
+   goes unchanged into `session/new` and the reattach of a stored session. Absent means `[]` in `session/new`
+   and nothing added to a reattach, as before; there is no CLI flag and no GUI setting.
 
    **What stayed in `app/src/core`**, and why: `paths.ts` (the XDG and `KURIER_*` resolver — an app's own
    environment, while the `KurierPaths` *shape* moved), `settings.ts` and `settings-view.ts` (one app's
