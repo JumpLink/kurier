@@ -68,7 +68,13 @@ lotse cancel <id>                          # send session/cancel
 lotse auth [--agent opencode]              # the interactive-login escape hatch
 lotse login [provider]                     # log in through the agent's OAuth flow, no terminal (opencode v2)
 lotse agents                               # the launchers that are registered, and whether the binary is on PATH
+lotse serve [--once]                       # run scheduled tasks; notify when an agent has a question
+lotse questions [--all] [--json]           # the questions agents are waiting on
+lotse answer <id> <text…>                  # yes/no for a permission, text for a reply
 ```
+
+`lotse serve` runs the tasks in `$XDG_CONFIG_HOME/lotse/tasks.json` on a schedule and asks you, by
+desktop notification, when an agent needs a decision. How to set it up: [docs/serve.md](docs/serve.md).
 
 ## Run the surface
 
@@ -109,6 +115,9 @@ the second line of defence, not the first.
 Through 0.1.1 that directory was `$XDG_DATA_HOME/kurier` (and `$XDG_CONFIG_HOME/kurier`). Lotse
 renames each one once on startup, when the new name is free; it never merges two directories and
 keeps using the old one — saying so on stderr — if the move fails.
+
+`lotse serve` keeps its questions, the last run per task and an action log under
+`$XDG_STATE_HOME/lotse/` (mode `0600`). The log holds ids and kinds, never a prompt or a reply.
 
 A session record says what is *reachable*, never what is *allowed*. Nothing in it can grant a
 future call permission on its own — every request the agent makes is checked again, every time. See

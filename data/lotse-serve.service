@@ -1,0 +1,24 @@
+# systemd user unit for `lotse serve` — an example, not installed by anything in this repository.
+#
+#   install -Dm644 data/lotse-serve.service ~/.config/systemd/user/lotse-serve.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now lotse-serve.service
+#
+# Point ExecStart at your own `lotse`. `serve` stops with exit 0 when tasks.json or a prompt file
+# changes (ADR 0003), so `systemctl --user restart lotse-serve` is how an edit takes effect;
+# Restart=on-failure deliberately does not restart that clean stop.
+
+[Unit]
+Description=lotse serve: scheduled agent tasks
+Documentation=https://github.com/JumpLink/lotse/blob/main/docs/serve.md
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/lotse serve --quiet
+Restart=on-failure
+RestartSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target
