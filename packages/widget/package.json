@@ -7,7 +7,8 @@
   "description": "The chat surface, as a widget a host embeds: KurierChat renders one conversation — transcript, composer, model and mode controls, the tool and thought cards, the permission dialog — over @kurier/core's AgentSession. GTK/Adw, no app shell: the host passes the agent choice, the paths, the cwd, its mcpServers and its own permission gate.",
   "exports": {
     ".": "./src/index.ts",
-    "./tool-line": "./src/tool-line.ts"
+    "./tool-line": "./src/tool-line.ts",
+    "./permission-dialog": "./src/permission-dialog.ts"
   },
   "scripts": {
     "check": "gjsify tsc --noEmit --project tsconfig.json"

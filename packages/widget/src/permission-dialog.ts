@@ -141,13 +141,21 @@ const PermissionBody = GObject.registerClass(
  * different: a question can be queued behind an open one and there is no widget for it yet.
  */
 export class PermissionDialog {
-  readonly #window: Adw.Window;
+  /**
+   * What the dialog is presented over.
+   *
+   * **A `Gtk.Widget`, not the window** — `Adw.Dialog.present` takes any widget and walks up to the
+   * root itself, and a widget a host embeds does not know what window it will end up in. `KurierChat`
+   * passes `this`, which is also correct before the chat has been added to anything: the lookup
+   * happens at `present()` time, not here.
+   */
+  readonly #parent: Gtk.Widget;
   #dialog: Adw.AlertDialog | null = null;
   /** The question this dialog is showing, so a second `show` cannot race the first. */
   #current: string | null = null;
 
-  constructor(window: Adw.Window) {
-    this.#window = window;
+  constructor(parent: Gtk.Widget) {
+    this.#parent = parent;
   }
 
   /** The question on screen, or null when nothing is. */
@@ -243,7 +251,7 @@ export class PermissionDialog {
         });
       });
       this.#dialog = dialog;
-      dialog.present(this.#window);
+      dialog.present(this.#parent);
     });
   }
 
