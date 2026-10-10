@@ -81,6 +81,9 @@ otherwise, the choice in `settings.json` above both. An empty session file opens
 your first prompt starts the session. Every dev hook, the stand-in agent that needs no model, and the
 measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
 
+Design decisions are in [docs/adr/](docs/adr/README.md); the embeddable-widget plan is studied in
+[docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
+
 ## Where your data lives
 
 Kurier keeps one record per session — which agent, which directory, the transcript, whether it is
