@@ -35,6 +35,7 @@ export {
   type BundledCatalog,
   type BundledDist,
 } from './agents/catalog.ts';
+export { flatpakAgentModule, type FlatpakAgentModule } from './agents/flatpak-module.ts';
 export {
   detectAgents,
   parseVersionOutput,
