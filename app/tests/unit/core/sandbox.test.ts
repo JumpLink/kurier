@@ -989,6 +989,31 @@ export default async () => {
         });
       });
     });
+
+    /**
+     * An agent that leaves a child holding its pipes. Signals to the direct child alone leave the
+     * grandchild with stdout and stderr open, so the end gate never closes — measured
+     * `NEVER-ENDED` on gjs and node. The grandchild outlives the test's own deadline on purpose: a
+     * shorter one would end the channel by itself and make the test pass without the fix.
+     */
+    await it('terminate ends the channel even when a grandchild holds the pipes', async () => {
+      if (process.platform === 'win32') return;
+      await withTempDir((dir) => {
+        const program = writeProgram(dir, 'parent', '#!/bin/sh\n( sleep 8 ) &\nexec sleep 8\n');
+        const channel = new StdioChannel({
+          command: { id: 'parent', title: 'parent', program, args: [] },
+          onStderr: () => {},
+          killGraceMs: 200,
+          sandboxFacts: NOT_SANDBOXED,
+        });
+        const ended = new Promise<string>((resolve) => channel.onEnd(() => resolve('ended')));
+        const deadline = new Promise<string>((resolve) => setTimeout(() => resolve('NEVER-ENDED'), 2000));
+        setTimeout(() => channel.terminate(), 100);
+        return Promise.race([ended, deadline]).then((outcome) => {
+          expect(outcome).toBe('ended');
+        });
+      });
+    });
   });
 };
 

@@ -148,6 +148,9 @@ export class StdioChannel implements RawChannel {
     const { cwd, env } = actual;
     this.#child = spawn(actual.program, actual.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Its own session, so the agent and everything it starts share one process group that
+      // `terminate` can signal at once. See `#signal`.
+      detached: true,
       ...(cwd ? { cwd } : {}),
       ...(env ? { env: { ...process.env, ...env } } : {}),
       // Only a `.bat`/`.cmd` carrier gets a shell — never every program. See `needsWindowsShell`.
@@ -243,12 +246,40 @@ export class StdioChannel implements RawChannel {
    */
   terminate(): void {
     if (this.#closed) return;
-    this.#child.kill('SIGTERM');
+    this.#signal('SIGTERM');
     this.#killTimer = setTimeout(() => {
-      if (!this.#closed) this.#child.kill('SIGKILL');
+      if (!this.#closed) this.#signal('SIGKILL');
     }, this.#killGraceMs);
     (this.#killTimer as { unref?: () => void }).unref?.();
     this.#child.stdin.end();
+  }
+
+  /**
+   * Signal the agent's whole process group, not just the agent.
+   *
+   * A signal to the direct child leaves any process it started holding stdout and stderr, and the
+   * end gate waits for both pipes — so `terminate` never ended the channel (measured `NEVER-ENDED`
+   * on gjs and node). `detached: true` makes the agent a session and group leader, so `-pid` reaches
+   * everything it spawned. Without `setsid` (GJS needs the binary) there is no such group and the
+   * kill throws `ESRCH`; then the direct child is all that can be reached.
+   *
+   * Its own session also means the terminal's signals stop reaching the agent. For Ctrl-C that is
+   * the point: `interrupt.ts` decides between `session/cancel` and a close, and a SIGINT that also
+   * hit the agent's group killed it mid-turn before the cancel could land. A closed terminal's
+   * SIGHUP no longer reaches it either; kurier dies of it, the agent's stdin hits EOF, and an ACP
+   * agent ends on that.
+   */
+  #signal(signal: NodeJS.Signals): void {
+    const pid = this.#child.pid;
+    if (pid) {
+      try {
+        process.kill(-pid, signal);
+        return;
+      } catch {
+        // No group of its own — fall through to the child alone.
+      }
+    }
+    this.#child.kill(signal);
   }
 
   /**
@@ -302,7 +333,8 @@ export class StdioChannel implements RawChannel {
    * `onEnd` never fires. Waiting for stderr widens the set of children that can do it — one holding
    * stderr alone used to get through — though the realistic case, a grandchild inheriting both
    * pipes, already hung before this change. Measured `NEVER-ENDED` on gjs and on node either way.
-   * Fixed separately; see docs/reviews/2026-09-30-code-review-findings.md.
+   * `terminate` now signals the whole process group, see `#signal`; a grandchild that leaves the
+   * group on its own (`setsid` of its own) can still hold the channel open.
    */
   #maybeEnd(): void {
     if (!this.#hasExited || !this.#isStdoutDone || !this.#isStderrDone) return;
