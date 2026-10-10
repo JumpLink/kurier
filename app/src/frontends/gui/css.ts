@@ -25,24 +25,19 @@ const TITLE = 'title-1';
 const MONO = 'monospace';
 
 export const APP_CSS = `
-/* A tool call's raw input: a diff, a command, whatever the agent said it was about to do. Monospace
-   and selectable, because the one thing the approval dialog must not do is paraphrase it. */
-.tool-input {
-  font-family: ${MONO};
-  font-size: 0.9em;
-}
+/* The gate's body: a tool call's raw input — a diff, a command, whatever the agent said it was about
+   to do. Monospace and selectable, because the one thing the approval dialog must not do is
+   paraphrase it, and a question about a file change that is not legible is a question nobody can
+   answer responsibly.
 
-/* The gate's body. Same reason as .tool-input, and the same failure it prevents: a question about a
-   file change that is not legible is a question nobody can answer responsibly. */
+   The radius is the one thing here that is not about legibility. A \`Gtk.TextView\` paints its own
+   \`@view_bg_color\` with square corners, which left the raw input as the only hard-cornered surface
+   in the window — in the middle of a rounded dialog. 12 px is \`card\`'s own, the same as a tool card:
+   this block is the dialog's version of one. */
 .gate-input {
   font-family: ${MONO};
   font-size: 0.9em;
-}
-
-/* Placeholder copy — an empty transcript, an agent with nothing to offer. Deliberately quiet: these
-   are statements about absence, and absence should not be the loudest thing on screen. */
-.kurier-quiet {
-  opacity: 0.55;
+  border-radius: 12px;
 }
 
 /* The transcript's own line length, set on the text rather than on a container. A label wraps to its
@@ -86,31 +81,39 @@ export const APP_CSS = `
   background-color: alpha(currentColor, 0.10);
 }
 
-/* A message bubble. Adwaita has no name for one: \`Adw.StatusPage\`'s icons and \`.card\` are the
-   toolkit's idea of an inset surface, and a card per message is a wall of borders in a long
-   conversation. So the three things a bubble needs are written out. \`border-radius\` and \`padding\`
-   were verified against the GTK 4.22 parser along with the properties above. */
+/* A message bubble — **the person's own messages only**, which is what makes it a bubble rather than
+   a row type. Adwaita has no name for one: \`Adw.StatusPage\`'s icons and \`.card\` are the toolkit's
+   idea of an inset surface, and a card per message is a wall of borders in a long conversation. So
+   the two things a bubble needs are written out; \`border-radius\` and \`padding\` were verified against
+   the GTK 4.22 parser along with the properties above.
+
+   NO \`margin-bottom\`, and that is the rhythm fix rather than a deletion. The column already carries
+   \`ITEM_SPACING\` between its children (\`transcript-view.ts\`), so a margin here was a second gap —
+   and two gaps that only one file knows about is how the spacing between a bubble and the caption
+   above it came out different from the spacing between two bubbles. */
 .kurier-bubble {
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
+  border-radius: 18px;
+  padding: 10px 14px;
 }
 
 /* The person's own messages, in the accent colour. \`@accent_bg_color\` is a libadwaita named colour,
    so this follows the system light/dark setting for free — the reason this file is not a palette.
    Alpha, not solid: a solid accent block is a header, and a transcript of ten of them is a wall. */
 .kurier-bubble-user {
-  background-color: alpha(@accent_bg_color, 0.20);
+  background-color: alpha(@accent_bg_color, 0.15);
 }
 
-/* The agent's, one step off the window background. Alpha over \`@window_fg_color\` and NOT a second
-   named background colour, because a solid \`@window_bg_color\` is by definition invisible against
-   the window — it would be a bubble-shaped hole in a dark theme and a border-shaped nothing in a
-   light one. \`alpha()\` over the foreground darkens a light surface and lightens a dark one, which
-   is the one expression that is a step away from the background in both. Asymmetric on purpose: the
-   accent belongs to what the person said. */
-.kurier-bubble-agent {
-  background-color: alpha(@window_fg_color, 0.07);
+/* The agent's answer, which is **not** in a bubble at all — and that asymmetry is the decision this
+   class carries. A bubble is right for a short line somebody typed and wrong for the thing the
+   person came to read: an answer is the page's body text, and boxing it costs the reading column its
+   two side paddings while adding an edge the eye has to cross on every paragraph. Every chat surface
+   this window is drawn from does the same, and HIG says it about documents generally.
+
+   So what is left is line spacing. \`line-height\` parses on GTK 4.22 **and applies** — measured, a
+   four-line label grows 71 px → 103 px with this value, which is the check \`css.ts\` demands of every
+   property in it: the parser accepting one proves nothing about it doing anything. */
+.kurier-agent-text {
+  line-height: 1.45;
 }
 
 /* A centred system note — a plan, a mode change, an update this client does not know. Quieter than
@@ -120,7 +123,6 @@ export const APP_CSS = `
 .kurier-note {
   font-size: 0.9em;
   opacity: 0.66;
-  margin-bottom: 8px;
 }
 
 /* The body under a disclosure's summary line, and nothing about its type. \`margin-left\` is
@@ -148,17 +150,22 @@ export const APP_CSS = `
   opacity: 0.72;
 }
 
-/* The composer's frame. The same three properties \`.kurier-bubble\` already proves — background,
-   radius, padding — and for the same reason: it is an inset surface for text, and the toolkit has no
-   name for one. Deliberately NOT \`.kurier-bubble-agent\`'s alpha: the entry is not a message anybody
-   said yet, so it gets the agent bubble's step-away-from-the-window treatment rather than the accent,
-   which belongs to what the person actually said.
-   No \`border\` here — a border on a box that already differs from the window in lightness is the
-   Adwaita-1 \`frame\`-style double edge, and at a 480 px window it reads as a rule across the pane. */
+/* The composer's card, and this rule is deliberately only the two things Adwaita's \`card\` does not
+   decide. The background, the shadow and both colour schemes come from \`card\` itself (the widget
+   carries both classes, see \`composer.ts\`), where the first version of this rule wrote out an
+   \`alpha(@window_fg_color, …)\` of its own — a second opinion about a surface the theme already
+   names, and one that went flat against the raised bottom bar it sat on.
+
+   The radius is wider than \`card\`'s 12 px because this card is the composer's whole footprint, and a
+   tall surface at a small radius reads as a dialog. It matches \`.kurier-bubble\`, which is the other
+   thing in this window shaped like a message.
+
+   The margin is what makes it *float*: the bottom bar is \`flat\` now (\`window.blp\`), so nothing is
+   drawn behind this and the gap is the window's own background. Bottom larger than top, because
+   below it there is only the window edge while above it there is the transcript's own margin. */
 .kurier-composer-frame {
-  background-color: alpha(@window_fg_color, 0.07);
-  border-radius: 12px;
-  margin: 6px 12px;
+  border-radius: 18px;
+  margin: 6px 12px 12px 12px;
 }
 
 /* The entry itself. Nothing visual: the frame is the surface and the text needs no class of its own,
@@ -186,8 +193,11 @@ export const APP_CSS = `
      logical margins in CSS, and the parser rejects them with "No property named …" **while still
      loading the rest of the stylesheet** — so the sheet works and the warning is easy to miss. Both
      logical names were measured as a warning on GTK 4.22.5. */
-  margin-left: 18px;
-  margin-right: 18px;
+  /* 14px lines the caption up with the entry's first character: the composer's row is inset 6 px
+     inside the card and the \`Gtk.TextView\` adds 8 px of its own text margin. A number that does not
+     add up to those two is a caption that hangs under nothing. */
+  margin-left: 14px;
+  margin-right: 14px;
 }
 /* The config row's control. Nothing visual either — this is a marker like \`.kurier-composer-entry\`,
    so the row's dropdowns can be found by class rather than by walking the tree. It exists because a
@@ -196,20 +206,94 @@ export const APP_CSS = `
 .kurier-config-control {
   background-color: transparent;
 }
+
+/* A short status or kind word in a capsule (tool status on a transcript card, tool kind in the approval
+   dialog). Adwaita's \`pill\` is a button shape and does nothing on a label, so the shape lives here;
+   the colour comes from Adwaita's own \`accent\`/\`success\`/\`error\` text classes, tinted behind.
+
+   600 rather than \`bold\`, and 2px rather than 1px: the capsule sits beside \`.kurier-tool-title\` at
+   500, and a full bold next to it made the *status* of a call louder than the call. The weight is
+   numeric for the same reason \`.kurier-session-title\` is — the two are one scale, and \`bold\` is a
+   step off it. */
+.kurier-pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 600;
+  background-color: alpha(@window_fg_color, 0.08);
+}
+.kurier-pill.accent {
+  background-color: alpha(@accent_bg_color, 0.18);
+}
+.kurier-pill.success {
+  background-color: alpha(@success_bg_color, 0.18);
+}
+.kurier-pill.error {
+  background-color: alpha(@error_bg_color, 0.18);
+}
+
+/* A tool call in the transcript, and the weight is what this rule is about. \`card\` supplies the
+   surface — Adwaita sets no padding on it, and a row of icon, title and pill touching the edge reads
+   as a table cell — but \`card\`'s *raised* surface was the loudest thing in a column whose answer is
+   unboxed (\`.kurier-agent-text\`), so the machinery outranked the thing the person came to read. What
+   is kept of the card is its shape: the shadow goes and the fill becomes a tint of the foreground,
+   which is the trick \`.kurier-thought-card\` already used — the two now differ by one step on one
+   scale instead of by kind.
+
+   NO \`border-radius\`, deliberately. \`card\`'s own 12 px is right for a one-line row, and the 18 px of
+   \`.kurier-bubble\` and \`.kurier-composer-frame\` belongs to the two surfaces that are a whole message
+   tall. Writing the theme's number out here would be a second opinion that drifts from it.
+
+   The padding is one step under the bubble's 10/14, which puts this window's insets on one scale. */
+.kurier-tool-card {
+  padding: 10px 12px;
+  box-shadow: none;
+  background-color: alpha(@window_fg_color, 0.05);
+}
+
+/* An empty-state page's icon, smaller than Adw.StatusPage's 128 px (96 px under \`compact\`): these pages
+   say "nothing yet", and a hero-sized glyph says more than that. 64 px is the size the theme itself
+   uses for its in-app empty lists. */
+.kurier-calm image.icon {
+  -gtk-icon-size: 64px;
+}
+
+/* A thought in the same frame as a tool card, one step quieter again, so the answer stays the loudest
+   thing in the column. Only the fill: the widget carries both classes and the rule above has already
+   taken the shadow off. The body's own dimming is \`.kurier-thought\`. */
+.kurier-thought-card {
+  background-color: alpha(@window_fg_color, 0.03);
+}
+
+/* The title on a tool card. 0.9em is the size \`.kurier-disclosure\` gives a tool line that *expands*,
+   and the same call rendered as a card and as a row should not be two type sizes. It was \`heading\` —
+   bold at full size — which made a tool's name louder than the agent's sentence under it; the weight
+   that is left is the sidebar title's 500, enough to scan a column of them by. The icon is what marks
+   the row as machinery. */
+.kurier-tool-title {
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+/* A tool line that carries only a status. It gets no card — there is nothing on it to name — so the
+   inset lives here instead: the same 12 px the cards around it pad with, which is what puts its icon
+   in their icon column. Without it the row hangs to the left of everything it belongs to, which is
+   what made the lone "Done" read as orphaned rather than as the end of the call above it. */
+.kurier-tool-status {
+  padding: 2px 12px;
+}
 `.trim();
 
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
 export const CSS = {
   transcriptText: 'kurier-transcript-text',
-  toolInput: 'tool-input',
   gateInput: 'gate-input',
-  quiet: 'kurier-quiet',
   sessionTitle: 'kurier-session-title',
   dateHeader: 'kurier-date-header',
   disclosure: 'kurier-disclosure',
   bubble: 'kurier-bubble',
   bubbleUser: 'kurier-bubble-user',
-  bubbleAgent: 'kurier-bubble-agent',
+  agentText: 'kurier-agent-text',
   note: 'kurier-note',
   disclosureBody: 'kurier-disclosure-body',
   thought: 'kurier-thought',
@@ -218,6 +302,12 @@ export const CSS = {
   composerStatus: 'kurier-composer-status',
   configControl: 'kurier-config-control',
   openRow: 'kurier-open-row',
+  pill: 'kurier-pill',
+  toolCard: 'kurier-tool-card',
+  toolTitle: 'kurier-tool-title',
+  toolStatus: 'kurier-tool-status',
+  calm: 'kurier-calm',
+  thoughtCard: 'kurier-thought-card',
   dim: DIM,
   title: TITLE,
   mono: MONO,

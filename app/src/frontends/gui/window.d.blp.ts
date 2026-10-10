@@ -31,12 +31,13 @@ export declare const InternalChildren: [
     'noAgentPage',
     'noAgentBody',
     'noAgentCommands',
+    'noAgentCommand',
+    'noAgentCopy',
     'noAgentDocs',
     'noAgentPreferences',
     'transcriptHost',
     'contentHeader',
     'noticeBanner',
-    'configHost',
     'composerHost',
     'cwdCaption',
 ];
@@ -52,12 +53,13 @@ export interface Children {
     _noAgentPage: Adw.StatusPage;
     _noAgentBody: Gtk.Label;
     _noAgentCommands: Gtk.Box;
-    _noAgentDocs: Gtk.Label;
+    _noAgentCommand: Gtk.Label;
+    _noAgentCopy: Gtk.Button;
+    _noAgentDocs: Gtk.LinkButton;
     _noAgentPreferences: Gtk.Button;
     _transcriptHost: Adw.Bin;
     _contentHeader: Adw.HeaderBar;
     _noticeBanner: Adw.Banner;
-    _configHost: Adw.Bin;
     _composerHost: Adw.Bin;
     _cwdCaption: Gtk.Label;
 }

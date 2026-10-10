@@ -64,6 +64,7 @@
  */
 
 import Adw from '@girs/adw-1';
+import Gdk from '@girs/gdk-4.0';
 import Gio from '@girs/gio-2.0';
 import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
@@ -225,14 +226,6 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   declare readonly _contentStack: Gtk.Stack;
   declare readonly _contentHeader: Adw.HeaderBar;
-  /**
-   * Holds the agent's config row, directly above the composer in the same bottom bar.
-   *
-   * Its own field rather than a part of the composer because the two have different clocks: the
-   * composer re-renders on every turn state move, this re-renders when the agent answers about its
-   * options. One host per widget keeps that split visible in the markup.
-   */
-  declare readonly _configHost: Adw.Bin;
   /** Holds the composer, as the content pane's bottom bar. Plan §7 step 4. */
   declare readonly _composerHost: Adw.Bin;
   /** One dim line under the composer naming the directory a new chat will run in. Hidden otherwise. */
@@ -241,7 +234,9 @@ export class MainWindow extends Adw.ApplicationWindow {
   declare readonly _noAgentPage: Adw.StatusPage;
   declare readonly _noAgentBody: Gtk.Label;
   declare readonly _noAgentCommands: Gtk.Box;
-  declare readonly _noAgentDocs: Gtk.Label;
+  declare readonly _noAgentCommand: Gtk.Label;
+  declare readonly _noAgentCopy: Gtk.Button;
+  declare readonly _noAgentDocs: Gtk.LinkButton;
   declare readonly _noAgentPreferences: Gtk.Button;
 
   readonly #sessions: SessionList;
@@ -250,12 +245,13 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
   readonly #composer: Composer;
   /**
-   * The agent's own configuration, directly above the composer. Plan §7 step 7.
+   * The agent's own configuration, on the composer card's bottom line. Plan §7 step 7.
    *
-   * **Its own field rather than a part of the composer, because the two have different clocks.** The
-   * composer re-renders on every turn state move; this re-renders when the agent answers about its
-   * options. A combined widget would mean every streamed update rebuilt the model dropdown, and every
-   * model change rebuilt the composer's status line.
+   * **Its own field and its own object even though its widget now sits inside the composer's card,
+   * because the two have different clocks.** The composer re-renders on every turn state move; this
+   * re-renders when the agent answers about its options. A combined *widget* would mean every streamed
+   * update rebuilt the model dropdown, and every model change rebuilt the composer's status line — so
+   * the composer is handed `ConfigRow.widget` to place and nothing to call.
    */
   readonly #config: ConfigRow;
   /**
@@ -385,6 +381,12 @@ export class MainWindow extends Adw.ApplicationWindow {
     // are rebuilt on every click. One view, `setEntries` on each open, is also the reason a session
     // switch cannot leak a row from the previous transcript — the rebuild is total, not a diff.
     this.#transcript = new TranscriptView();
+    // **The window's own agent, named now rather than at `#open`.** A first prompt creates its session
+    // inside the controller, so that path never calls `#open` — and a caption that only `#open` fills
+    // leaves the *first* answer of a new chat with a bare timestamp and no speaker. `#open` still
+    // overrides this with the record's own agent: a stored session may have run on the other copy
+    // (`agentSource`), and the caption has to name that one, not the window's.
+    this.#transcript.setAgentName(options.agent.id);
     // **Before the controller, and that order is deliberate.** `onConfig` is a closure over this
     // field, so a controller that emitted a config view from its own constructor would reach a
     // `#config` that does not exist yet — the crash `AgentSession`'s constructor comment describes for
@@ -438,6 +440,11 @@ export class MainWindow extends Adw.ApplicationWindow {
       // did exactly that, and then the controller's constructor emitted its own state into a composer
       // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
       input: composerInput(this.#agent.snapshot, this.#unavailable),
+      // **The config row's widget, into the composer's own card.** `Adw.ToolbarView` has exactly one
+      // bottom bar and that one belongs to the composer, so the row used to be a `Gtk.Box` of the
+      // template's stacked above it — two surfaces reading as two panes. It is now one card with two
+      // lines. The *row* is still this file's (`#config`, its own clock); only its widget travels.
+      config: this.#config.widget,
       onSend: (text) => this.#onSend(text),
       // **Stop takes the dialog down with it, and names the reason before it does.** The window
       // contributes only the ordering — `agent.stop()` settles the question itself — so the two calls
@@ -450,19 +457,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         this.#agent.stop();
       },
     });
-    // **The four TypeScript-built widgets into the template's four hosts, and nothing else.** The
+    // **The three TypeScript-built widgets into the template's three hosts, and nothing else.** The
     // shell is markup; what an agent says is code, and code cannot be written into a template. Each
     // `Adw.Bin` is a placeholder with exactly one child, so this is a substitution rather than a
-    // nesting — the tree that renders is the tree `window.blp` draws.
+    // nesting — the tree that renders is the tree `window.blp` draws. The config row is the one
+    // exception and no longer has a host: the composer places it, because it is inside its card.
     this._sidebarHost.child = this.#sessions.widget;
     this._transcriptHost.child = this.#transcript.widget;
     this._composerHost.child = this.#composer.widget;
-    // **The config row goes inside the composer's bottom bar, not into `Adw.ToolbarView`'s own.**
-    // `Adw.ToolbarView` has exactly one bottom bar, and that one belongs to the composer. The row is
-    // the template's box above it, so it lands "directly above the composer" in the plan's sense (§7
-    // step 7) rather than as a sibling that could be reordered or, worse, given its own raised border
-    // and read as a second pane.
-    this._configHost.child = this.#config.widget;
 
     // **After** the content, and the order is load-bearing. The content is the template's, so it is
     // already in place — but the breakpoint still has to come after `super()` returned, and it is
@@ -486,18 +488,14 @@ export class MainWindow extends Adw.ApplicationWindow {
   #showNoAgent(view: Extract<EmptyStateView, { kind: 'no-agent' }>, hasPreferences: boolean): void {
     this._noAgentPage.title = view.title;
     this._noAgentBody.label = view.body;
-    for (const command of view.commands) {
-      const label = new Gtk.Label({
-        label: command,
-        selectable: true,
-        useMarkup: false,
-        wrap: true,
-        xalign: 0,
-      });
-      label.add_css_class('monospace');
-      this._noAgentCommands.append(label);
-    }
-    this._noAgentDocs.label = `or see ${view.docsUrl}`;
+    // The page has room for one command and `emptyStateView` offers one; a second would need a second card.
+    const command = view.commands[0] ?? '';
+    this._noAgentCommand.label = command;
+    this._noAgentCopy.connect('clicked', () => {
+      Gdk.Display.get_default()?.get_clipboard().set(command);
+    });
+    this._noAgentDocs.label = view.docsUrl;
+    this._noAgentDocs.uri = view.docsUrl;
     this._noAgentPreferences.visible = hasPreferences;
     this._contentStack.visibleChildName = 'no-agent';
   }
@@ -583,7 +581,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this._contentStack.visibleChildName = this.#unavailable ? 'no-agent' : 'new';
     this._contentPage.title = APP_NAME;
     this._contentHeader.showTitle = false;
-    this._cwdCaption.label = `in ${displayCwd(chat.cwd, chat.home)}`;
+    this._cwdCaption.label = `Working in ${displayCwd(chat.cwd, chat.home)}`;
     this._cwdCaption.visible = !this.#unavailable;
     this._split.showContent = true;
   }
@@ -679,6 +677,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     });
     // `bind` stopped a turn that belongs to another chat; its question, if any, is already settled.
     this.#permissions.close();
+    this.#transcript.setAgentName(record.agent);
     this.#transcript.setEntries(record.turns);
     // Named, not indexed: `'closed'`/`'open'`/`'empty'` read at the assignment and a `Gtk.Stack` is a
     // map, so an index would be a second naming scheme for the same three states.
@@ -1341,13 +1340,14 @@ GObject.registerClass(
       'contentHeader',
       'contentStack',
       'transcriptHost',
-      'configHost',
       'composerHost',
       'cwdCaption',
       'noticeBanner',
       'noAgentPage',
       'noAgentBody',
       'noAgentCommands',
+      'noAgentCommand',
+      'noAgentCopy',
       'noAgentDocs',
       'noAgentPreferences',
     ],

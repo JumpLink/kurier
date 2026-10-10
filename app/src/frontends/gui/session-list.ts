@@ -87,15 +87,20 @@ export class SessionList {
 
     this.widget = new Gtk.Stack({ vexpand: true });
     this.widget.add_named(new Gtk.ScrolledWindow({ child: this.#list, vexpand: true }), 'list');
+    // One quiet line and no second placeholder: the `+` in the sidebar's header bar is the affordance,
+    // and the content pane already carries the call to action. `valign: START` so it sits where the
+    // first row would, not in the middle of an empty pane.
     this.widget.add_named(
-      new Adw.StatusPage({
-        iconName: 'mail-send-receive-symbolic',
-        title: 'No sessions yet',
-        // Says where sessions come from. The `<tt>` is markup and works because `description` is the
-        // one `Adw.StatusPage` field that is Pango; see `window.ts` `#open`.
-        description: 'Chats you start here, or with <tt>kurier start</tt>, appear here.',
+      new Gtk.Label({
+        label: 'No sessions yet',
+        useMarkup: false,
+        wrap: true,
+        valign: Gtk.Align.START,
+        marginTop: 18,
+        marginStart: 12,
+        marginEnd: 12,
         vexpand: true,
-        cssClasses: ['compact'],
+        cssClasses: [CSS.dim, 'caption'],
       }),
       'empty',
     );

@@ -20,10 +20,18 @@ export declare const GTypeName: 'KurierPermissionBody';
  * which is the property that matters. `status/open-todos/blueprint.md` carries the
  * upstream half.
  */
-export declare const InternalChildren: ['titleLabel', 'kindLabel', 'locationsLabel', 'namesLabel', 'rawInput'];
+export declare const InternalChildren: [
+    'kindIcon',
+    'titleLabel',
+    'kindLabel',
+    'locationsLabel',
+    'namesLabel',
+    'rawInput',
+];
 
 /** The `_`-prefixed members GJS installs for them. Merge it into the class interface. */
 export interface Children {
+    _kindIcon: Gtk.Image;
     _titleLabel: Gtk.Label;
     _kindLabel: Gtk.Label;
     _locationsLabel: Gtk.Label;

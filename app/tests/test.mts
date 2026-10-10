@@ -50,6 +50,7 @@ import loginApi from './unit/core/login-api.test.ts';
 import server from './unit/core/server.test.ts';
 
 import hookValue from './unit/gui/hook-value.test.ts';
+import toolLine from './unit/gui/tool-line.test.ts';
 
 import smoke from './unit/smoke.test.ts';
 
@@ -98,5 +99,6 @@ run({
   loginApi,
   server,
   hookValue,
+  toolLine,
   smoke,
 });

@@ -33,7 +33,12 @@
  * advice for a text-heavy surface. 720 px is the plan's number; it happens to equal the sidebar
  * breakpoint, which is a coincidence — one caps the pane, the other is a measure.
  *
- * No copy button, no timestamps under the bubbles, no per-item controls. Everything on screen is
+ * **The person's messages are bubbles and the agent's answers are not**, which is `buildAgentMessage`'s
+ * own argument: a bubble suits a line somebody typed, and the answer is the body text of the page. An
+ * answer carries a caption above it — the agent's name and the time the message was recorded — and a
+ * tool call is a card (icon, title, status capsule). Both are read from what the record holds; the
+ * tool's kind and input are not recorded, so see `tool-line.ts` for what the icon is a guess from.
+ * No copy button, no per-item controls. Everything on screen is
  * something the transcript actually holds; a control that points at nothing is the one thing this
  * window's own header forbids.
  */
@@ -56,6 +61,7 @@ import {
 import { toTranscriptItems, type DisclosureItem, type TranscriptItem } from '../../core/transcript-items.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
+import { parseToolLine, toolIcon, TOOL_FALLBACK_ICON, type ToolLine } from './tool-line.ts';
 
 /**
  * The conversation's measure is `CONTENT_MAX_WIDTH_PX`, not a constant of this file.
@@ -67,8 +73,17 @@ import { CSS } from './css.ts';
  * also ellipsizing.
  */
 
-/** Gap between two bubbles, in logical pixels. Smaller than the bubble's own internal padding. */
-const ITEM_SPACING = 4;
+/**
+ * Gap between two items in the column, in logical pixels.
+ *
+ * **Larger than any item's own internal padding, and it is the only gap there is.** It was 4 px
+ * against a 10 px `margin-bottom` on `.kurier-bubble`, which made the rhythm the sum of two numbers
+ * in two files — and only bubbles paid the margin, so the space under an answer and the space under
+ * a tool card were different for no reason anybody chose. The margin is gone (`css.ts`) and this is
+ * the whole measure: one turn should read as one block with air around it, which at this text size
+ * is about one blank line.
+ */
+const ITEM_SPACING = 16;
 
 export class TranscriptView {
   /** Pack this where the conversation goes. A `Gtk.ScrolledWindow` around a clamped column. */
@@ -91,6 +106,8 @@ export class TranscriptView {
    */
   #entries: readonly TranscriptEntry[] = [];
   #items: readonly TranscriptItem[] = [];
+  /** Who the agent bubbles are captioned with; set from the open record, before its entries. */
+  #agentName = '';
   /**
    * The queued follow-the-end idle, or `null`. One at a time — and that is a rule about *ownership*,
    * not about how many idles are scheduled; see `#scrollToEnd`.
@@ -178,10 +195,13 @@ export class TranscriptView {
     this.#column = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
       spacing: ITEM_SPACING,
-      // The clamp caps the *content*; these margins are what stops the first and last bubble from
-      // touching the pane's own edges once it has.
-      marginTop: 12,
-      marginBottom: 12,
+      // The clamp caps the *content*; these margins are what stops the first and last item from
+      // touching the pane's own edges once it has. Taller than wide, because the pane's vertical
+      // neighbours are a header bar and the composer card, while sideways there is only the clamp's
+      // own empty space — at the 360 px floor the clamp hands over the full width and 12 px is all
+      // the inset the text can afford.
+      marginTop: 18,
+      marginBottom: 18,
       marginStart: 12,
       marginEnd: 12,
     });
@@ -282,6 +302,11 @@ export class TranscriptView {
     if (update.attemptFollow) this.#tryFollow();
   }
 
+  /** The name above each agent bubble. Takes effect for rows built after it, so set it before `setEntries`. */
+  setAgentName(name: string): void {
+    this.#agentName = name;
+  }
+
   /**
    * Replace the transcript with these entries.
    *
@@ -352,7 +377,7 @@ export class TranscriptView {
 
   /** Add one item as a new row at the end of the column. */
   #appendRow(item: TranscriptItem): void {
-    const row = buildItem(item);
+    const row = buildItem(item, this.#agentName);
     this.#rows.push(row);
     this.#column.append(row);
   }
@@ -374,7 +399,7 @@ export class TranscriptView {
     const previous = this.#rows[index];
     const item = this.#items[index];
     if (!previous || !item) return;
-    const row = buildItem(item);
+    const row = buildItem(item, this.#agentName);
     const sibling = this.#rows[index - 1] ?? null;
     this.#column.insert_child_after(row, sibling);
     this.#column.remove(previous);
@@ -506,12 +531,20 @@ export class TranscriptView {
   }
 }
 
-function buildItem(item: TranscriptItem): Gtk.Widget {
+/**
+ * The kind icon in front of a tool or thought row — one size for all of them, including the
+ * status-only row, which used to be a step smaller. The three row shapes share an icon column
+ * (`.kurier-tool-status` pads to the card's own inset), and a column only reads as one if the things
+ * in it are the same width.
+ */
+const ROW_ICON_PX = 16;
+
+function buildItem(item: TranscriptItem, agentName: string): Gtk.Widget {
   switch (item.kind) {
     case 'user':
       return buildBubble(item.text, Gtk.Align.END, CSS.bubbleUser);
     case 'agent':
-      return buildBubble(item.text, Gtk.Align.START, CSS.bubbleAgent);
+      return buildAgentMessage(item.text, item.at, agentName);
     // `dialog-information-symbolic`, and not because a thought is information. Adwaita has no icon
     // for reasoning: `chat-symbolic` and `lightbulb-symbolic` are not in the theme at all, and
     // `dialog-question-symbolic` — the name the first version used — is a "?" in a diamond that
@@ -520,23 +553,29 @@ function buildItem(item: TranscriptItem): Gtk.Widget {
     case 'thought':
       // Proportional and dim: the body of a thought is commentary on the answer, and a command is
       // not prose. See `.kurier-thought` and the `monospace` name class.
-      return buildDisclosure('dialog-information-symbolic', item, CSS.thought);
-    case 'tool':
-      return buildDisclosure('system-run-symbolic', item, CSS.mono);
+      return buildThoughtCard(buildDisclosure('dialog-information-symbolic', item, CSS.thought));
+    case 'tool': {
+      // A payload is what the disclosure opens onto, so a line without one is not a disclosure.
+      if (item.detail !== null) return buildDisclosure(TOOL_FALLBACK_ICON, item, CSS.mono);
+      const line = parseToolLine(item.summary);
+      return line.title === '' ? buildToolStatus(line.status) : buildToolCard(line);
+    }
     case 'system':
       return buildNote(item.text);
   }
 }
 
 /**
- * One message, in the speaker's own colour and on the speaker's own side.
+ * One message the person typed: a bubble, on their own side.
  *
  * `halign` is set on the **bubble**, not on the label inside it, and that is the part that is easy to
  * get backwards: a child of a vertical `Gtk.Box` is given its natural width unless it expands, so
  * the alignment has to be on the widget the box places. A wrapping label's natural width is the
- * *unwrapped* text, so a short answer is a short bubble and a long one is capped by the clamp and
+ * *unwrapped* text, so a short prompt is a short bubble and a long one is capped by the clamp and
  * wraps there — which is what makes the column read as a conversation rather than as full-width
  * paragraphs.
+ *
+ * **Only the person's messages get one**, and `buildAgentMessage` says why the answer does not.
  */
 function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widget {
   return buildLabel({
@@ -544,6 +583,92 @@ function buildBubble(text: string, align: Gtk.Align, speaker: string): Gtk.Widge
     xalign: 0,
     align,
     cssClasses: [CSS.bubble, speaker, CSS.transcriptText],
+  });
+}
+
+/**
+ * The agent's answer under a dim caption: who said it, and when.
+ *
+ * **Unboxed, at the column's full width, and that is the asymmetry the surface is built on.** A
+ * bubble is right for a line somebody typed and wrong for the thing the person came here to read: an
+ * answer is this window's body text, and a box around it costs the measure its two side paddings
+ * while adding an edge the eye crosses on every paragraph. `.kurier-agent-text` is therefore line
+ * spacing and nothing else (`css.ts`), and `halign` stays at `buildLabel`'s `FILL` — the label takes
+ * the column, so one answer wraps at one width however long it gets.
+ *
+ * The caption stays. It is the only thing on screen that says *which* agent answered, and on a
+ * transcript resumed from another copy (`agentSource`) that is not a detail.
+ *
+ * The time is the entry's own `at`, formatted in the reader's timezone; an `at` the store carries as
+ * garbage drops the time rather than printing it. A merged run of chunks shows the time of its first.
+ */
+function buildAgentMessage(text: string, at: string, agentName: string): Gtk.Widget {
+  const time = GLib.DateTime.new_from_iso8601(at, null)?.to_local()?.format('%R') ?? null;
+  const caption = [agentName, time].filter((part): part is string => !!part).join(' · ');
+  const body = buildLabel({ text, xalign: 0, cssClasses: [CSS.agentText, CSS.transcriptText] });
+  if (caption === '') return body;
+  const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4 });
+  column.append(
+    buildLabel({ text: caption, xalign: 0, align: Gtk.Align.START, cssClasses: [CSS.dim, 'caption'] }),
+  );
+  column.append(body);
+  return column;
+}
+
+/**
+ * A tool call as a card: icon, title, status capsule.
+ *
+ * The title is `.kurier-tool-title`, not Adwaita's `heading`, and `css.ts` says why: a tool's name
+ * at full size and full weight outranked the answer it belongs to.
+ *
+ * A line with no recognisable status gets no capsule rather than an invented one.
+ */
+function buildToolCard(line: ToolLine): Gtk.Widget {
+  const card = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 10,
+    cssClasses: ['card', CSS.toolCard],
+  });
+  card.append(new Gtk.Image({ iconName: toolIcon(line.title), pixelSize: ROW_ICON_PX }));
+  const title = buildLabel({ text: line.title, xalign: 0, cssClasses: [CSS.toolTitle] });
+  title.set_hexpand(true);
+  card.append(title);
+  if (line.status !== null) card.append(buildTonePill(line.status));
+  return card;
+}
+
+/**
+ * A tool line that carries a status and no title — the second half of one call.
+ *
+ * It is a caption rather than a card because there is nothing to name: a card here would need a
+ * heading the agent never sent, and the line belongs to the call above it anyway.
+ */
+function buildToolStatus(status: ToolLine['status']): Gtk.Widget {
+  // No card, but the card's geometry: `.kurier-tool-status` carries the same horizontal inset and
+  // the spacing matches `buildToolCard`'s, so the icon and the pill sit in the columns the calls
+  // above and below put theirs in.
+  const row = new Gtk.Box({
+    orientation: Gtk.Orientation.HORIZONTAL,
+    spacing: 10,
+    cssClasses: [CSS.toolStatus],
+  });
+  row.append(new Gtk.Image({ iconName: TOOL_FALLBACK_ICON, pixelSize: ROW_ICON_PX, cssClasses: [CSS.dim] }));
+  row.append(
+    status === null
+      ? buildLabel({ text: 'Tool call', xalign: 0, cssClasses: [CSS.dim, 'caption'] })
+      : buildTonePill(status),
+  );
+  return row;
+}
+
+/** A status word in its tone's capsule, on a label (Adwaita's `pill` is a button shape). */
+function buildTonePill(status: NonNullable<ToolLine['status']>): Gtk.Label {
+  const tone = { running: 'accent', done: 'success', failed: 'error' }[status.tone];
+  return new Gtk.Label({
+    label: status.label,
+    useMarkup: false,
+    valign: Gtk.Align.CENTER,
+    cssClasses: [CSS.pill, tone],
   });
 }
 
@@ -564,6 +689,16 @@ function buildNote(text: string): Gtk.Widget {
  * the same head is returned as a plain row and no chevron is drawn at all — a disclosure that opens
  * onto nothing is a control that points at nothing, and this file's own header forbids those.
  */
+/** A thought in the tool cards' frame, one step quieter (`.kurier-thought-card`); still the same disclosure. */
+function buildThoughtCard(disclosure: Gtk.Widget): Gtk.Widget {
+  const card = new Gtk.Box({
+    orientation: Gtk.Orientation.VERTICAL,
+    cssClasses: ['card', CSS.toolCard, CSS.thoughtCard],
+  });
+  card.append(disclosure);
+  return card;
+}
+
 function buildDisclosure(iconName: string, item: DisclosureItem, bodyClass: string): Gtk.Widget {
   // The expander draws its own chevron, so the icon here is the *kind* — a tool call, a thought —
   // not the open/closed state. Verified to exist with `Gtk.IconTheme.has_icon`; a name the theme
@@ -577,7 +712,7 @@ function buildDisclosure(iconName: string, item: DisclosureItem, bodyClass: stri
     // wrapped label's natural width is the whole unwrapped line.
     hexpand: true,
   });
-  head.append(new Gtk.Image({ iconName, pixelSize: 16 }));
+  head.append(new Gtk.Image({ iconName, pixelSize: ROW_ICON_PX }));
   head.append(buildLabel({ text: item.summary, xalign: 0, cssClasses: [] }));
 
   // The class goes on the row here and on the expander below, never on both: `font-size` multiplies

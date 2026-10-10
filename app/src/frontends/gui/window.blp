@@ -74,16 +74,19 @@ template $KurierMainWindow: Adw.ApplicationWindow {
     content: Adw.NavigationPage contentPage {
       child: Adw.ToolbarView {
         vexpand: true;
-        // **The composer is the bottom bar, and `RAISED_BORDER` is a measured choice.** Plan §7
-        // step 4 puts it here and §3 draws it under the conversation. The style is what decides
-        // whether the bar reads as part of the pane or as a floating panel: `FLAT` (the default,
-        // and what the sidebar's own `Adw.ToolbarView` uses) draws nothing under it, so the
-        // composer's rounded frame would sit directly on the transcript's own background with no
-        // separation at all. `RAISED` gives an opaque background plus a persistent border, the one
-        // shape that reads correctly in both light and dark without a shadow that then has to be
-        // explained. (`RAISED_BORDER` was that shape's name until a newer libadwaita dropped the
-        // member; `raised` is what its typelibs still understand.)
-        bottom-bar-style: raised;
+        // **The composer is the bottom bar, and `flat` is what lets it float.** Plan §7 step 4 puts
+        // it here and §3 draws it under the conversation. The style decides whether the bar reads as
+        // a strip welded to the window or as one object sitting in the pane, and the answer changed
+        // when the composer's frame became an Adwaita `card`: `raised` draws its own opaque
+        // background plus a persistent border *behind* that card, so there were two surfaces — a
+        // full-width band with a rounded box floating inside it, and a rule across the pane marking
+        // the band's top edge. `flat` draws nothing, so the card's own shadow is the only separation
+        // and the gap around it is the window's background, in both colour schemes.
+        //
+        // What `raised` was solving is still real and is solved in `css.ts` instead: a frame with no
+        // surface of its own would sit invisibly on the transcript's background. `card` is that
+        // surface, named by the theme rather than by us.
+        bottom-bar-style: flat;
         [top]
         // `show-title: false`, and **that is not cosmetic.** An `Adw.HeaderBar` inside an
         // `Adw.NavigationPage` shows that page's title, so naming this page up front printed the
@@ -140,10 +143,28 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               // kurier rather than about the agent — no agent is running yet, and copy that implies
               // otherwise is a small lie in the first screen anybody sees. "Start a new chat" names the
               // button in the sidebar's header bar, which exists now.
-              description: _("Pick a session from the list, or start a new chat.");
+              description: _("Pick a session from the list, or start a new chat. The agent starts when you send your first message.");
               // `vexpand` so it centres in the pane: an empty area with content jammed under the
               // header reads as a layout bug rather than as a deliberate empty state.
               vexpand: true;
+
+              styles [
+                "compact",
+                "kurier-calm",
+              ]
+
+              // The one action of the page. `win.new-chat` is the same action as the sidebar's `+` and
+              // `<Ctrl>n`, so the button adds no path of its own.
+              child: Gtk.Button {
+                label: _("New chat");
+                action-name: "win.new-chat";
+                halign: center;
+
+                styles [
+                  "suggested-action",
+                  "pill",
+                ]
+              };
             };
           }
           StackPage {
@@ -157,6 +178,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
             };
           }
@@ -169,6 +191,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
 
               child: Gtk.Box {
@@ -183,22 +206,51 @@ template $KurierMainWindow: Adw.ApplicationWindow {
                   max-width-chars: 56;
                 }
 
+                // The install command as a card: a command is something to copy, so the copy button
+                // sits on it rather than somewhere the eye has to travel to. The label is selectable
+                // too, for a partial copy. Filled from `emptyStateView`, never written here.
                 Gtk.Box noAgentCommands {
-                  orientation: vertical;
+                  orientation: horizontal;
                   spacing: 6;
                   halign: center;
-                }
-
-                Gtk.Label noAgentDocs {
-                  use-markup: false;
-                  selectable: true;
-                  wrap: true;
-                  justify: center;
 
                   styles [
-                    "dim-label",
-                    "caption",
+                    "card",
                   ]
+
+                  Gtk.Label noAgentCommand {
+                    use-markup: false;
+                    selectable: true;
+                    wrap: true;
+                    xalign: 0;
+                    hexpand: true;
+                    margin-start: 12;
+                    margin-top: 8;
+                    margin-bottom: 8;
+
+                    styles [
+                      "monospace",
+                    ]
+                  }
+
+                  Gtk.Button noAgentCopy {
+                    icon-name: "edit-copy-symbolic";
+                    tooltip-text: _("Copy");
+                    valign: center;
+                    margin-end: 6;
+
+                    styles [
+                      "flat",
+                    ]
+
+                    accessibility {
+                      label: _("Copy");
+                    }
+                  }
+                }
+
+                Gtk.LinkButton noAgentDocs {
+                  halign: center;
                 }
 
                 Gtk.Button noAgentPreferences {
@@ -208,6 +260,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
                   visible: false;
 
                   styles [
+                    "suggested-action",
                     "pill",
                   ]
                 }
@@ -227,20 +280,22 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               vexpand: true;
               styles [
                 "compact",
+                "kurier-calm",
               ]
             };
           }
         };
-        // **The bar is a vertical box of [config row, composer], in that order.** One bottom bar, two
-        // things in it, and the order is the plan's: what you pick here applies to what you are about
-        // to send in the entry below it. A `Gtk.Box` rather than a second `Adw.ToolbarView` bottom bar
-        // because there is only one bottom bar, and because a second raised surface would read as two
-        // panes stacked rather than as one control area.
+        // **The bar is a vertical box of [composer, cwd line].** The config row used to be a third
+        // `Adw.Bin` at the top of this box, because `Adw.ToolbarView` has exactly one bottom bar and
+        // the composer owns it — but stacking it here gave the bottom of the pane two surfaces that
+        // read as two panes. It is now inside the composer's card (`composer.ts`,
+        // `ComposerOptions.config`), which is one object with two lines. The order the plan asks for
+        // (§7 step 7: what you pick applies to what you are about to send) is kept by the card's own
+        // layout, not by this box.
         [bottom]
         Gtk.Box {
           orientation: vertical;
           spacing: 0;
-          Adw.Bin configHost {}
           Adw.Bin composerHost {}
           // Where a new chat will run — one dim line, only while a new chat is waiting. `use-markup:
           // false` is in the template so it holds before the first label is assigned: the path is the
@@ -258,7 +313,8 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               ellipsize: middle;
               margin-start: 16;
               margin-end: 16;
-              margin-bottom: 8;
+              margin-top: 4;
+              margin-bottom: 12;
 
               styles [
                 "dim-label",

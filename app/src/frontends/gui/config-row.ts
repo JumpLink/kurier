@@ -1,11 +1,25 @@
 /**
- * The config row: the agent's own model, thought level and mode, above the composer.
+ * The config row: the agent's own model, thought level and mode, at the composer's bottom edge.
  *
  * **It is at the composer and not in the header, and the plan says why (plan §5).** What you pick
  * applies to *the next thing you are about to send*, which is where a person looks when picking it; the
  * header already carries the title and Stop; and a 400-entry searchable dropdown is not a header
- * widget. So it sits in the content pane, directly above the entry — the same place the composer
- * reads for "what is this conversation for", one step earlier.
+ * widget. So it sits in the content pane, with the entry — the same place the composer reads for "what
+ * is this conversation for".
+ *
+ * **Inside the composer's card, not in a strip above it, and that cost the per-control captions.**
+ * `Composer` packs this widget along the card's bottom edge next to the Send button, which is where
+ * every chat surface this window is drawn from puts the model picker. The row therefore has no clamp
+ * and no margins of its own — the card is the surface and the composer owns both — and it has room for
+ * three controls plus a button only with the captions gone: a `name` label and a 160 px dropdown three
+ * times over already filled the 720 px column on its own (measured), so keeping the labels would have
+ * wrapped the row to three lines at *every* width rather than only at the phone floor.
+ *
+ * **So the name moved to the dropdown, where a person and a screen reader can still get at it.** The
+ * tooltip names the control and adds the agent's description when it sent one — `core/config-row.ts`
+ * signals "it sent none" by making `description` the `name` — and `AccessibleProperty.LABEL` is the
+ * name on its own. An unlabelled dropdown with neither would be three anonymous controls, which is the
+ * failure no screenshot shows.
  *
  * **`Gtk.DropDown`, not `Adw.DropDown`, and not `Adw.ComboRow`.** There is no `Adw.DropDown` at all,
  * and a `Gtk.DropDown` over a `Gtk.StringList` with a `Gtk.PropertyExpression` is what the 400-entry
@@ -13,20 +27,26 @@
  * nothing to search *for*. `Gtk.DropDown` also hands back an **index**, which is the value-id mapping
  * `core/config-row.ts` exists to own.
  *
- * **A `Gtk.FlowBox` with one control per line, and the number is measured.** `max-children-per-line: 1`
- * is what puts each control on its own line at every width, which sounds wasteful until the alternative
- * is named: at 360 px a row of three dropdowns has ~90 px each, and a model name at 90 px is an
- * ellipsis with no way to read the model. One per line gives every control the full measure, and at
- * 1024 px the row is three lines tall inside the same bottom bar the composer is in. The row does not
- * raise the window's width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
- * `Adw.NavigationSplitView`'s, not kurier's content's, and the dropdowns `hexpand` into whatever width
- * is there.
+ * **A `Gtk.FlowBox` that puts the three controls on one line while they fit, and wraps when they do not.**
+ * Each dropdown asks for at most `CONFIG_CONTROL_WIDTH_PX`, so at the 720 px clamp the model, thought
+ * level and mode share one line, and narrower they wrap (measured with the real widgets: one line at
+ * 720 and 1024, three at 500 and 360, window granted 360) — three side by side at 360 px would leave
+ * about 90 px each, an ellipsis with no way to read the model. The row does not raise the window's
+ * width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
+ * `Adw.NavigationSplitView`'s, not kurier's content's.
+ *
+ * **What the cap does not do is make a dropdown narrow.** `Adw.Clamp` caps a *natural* width; the
+ * minimum passes straight through, so a clamp around a dropdown whose longest value is 32 characters
+ * measures the dropdown's own 287 px (the probe prints both). The row asks for 293 and the floor is
+ * 360, so this costs nothing today — but a control that has to fit a narrow pane needs an ellipsis,
+ * not a clamp.
  *
  * **Every label that could carry an agent's words says `useMarkup: false` in the constructor.** Not a
  * flag set later: Pango parses on assignment, so a `set_use_markup(false)` after the text is in arrives
  * too late (measured, `css.ts`; the plan §12 lists this as the most likely way a surface becomes the
- * theatre it exists to replace). An agent-supplied label here is a model name, and `a < b` is a
- * plausible model name.
+ * theatre it exists to replace). That is `#caption`, which carries the agent's own refusal sentence.
+ * The agent's other words here are value names inside a `Gtk.StringList`, which `Gtk.DropDown` renders
+ * through labels of its own that have no markup at all — and `a < b` is a plausible model name.
  *
  * **Rebuilt from the view on every change, never diffed.** The same reason `Composer` and
  * `SessionList` do it: a half-updated row is the shape of the bug, and a rebuilt dropdown is one line
@@ -39,7 +59,6 @@
 
 import Adw from '@girs/adw-1';
 import Gtk from '@girs/gtk-4.0';
-import Pango from '@girs/pango-1.0';
 
 import {
   configSelection,
@@ -49,8 +68,10 @@ import {
   type ConfigRowControl,
   type ConfigRowView,
 } from '../../core/config-row.ts';
-import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
+
+/** Widest a dropdown asks to be; three of them and the Send button fit the content clamp on one line. */
+const CONFIG_CONTROL_WIDTH_PX = 160;
 
 export interface ConfigRowOptions {
   /**
@@ -65,12 +86,11 @@ export interface ConfigRowOptions {
 
 export class ConfigRow {
   /**
-   * Pack this into the content pane directly above the composer. Starts `visible: false`: a window with
-   * no agent must not have a gap where a row would be.
+   * Hand this to `Composer`, which packs it along the inside of its card. Starts `visible: false`: a
+   * window with no agent must not have a gap where a row would be.
    */
   readonly widget: Gtk.Widget;
 
-  readonly #clamp: Adw.Clamp;
   readonly #box: Gtk.Box;
   readonly #flow: Gtk.FlowBox;
   readonly #caption: Gtk.Label;
@@ -119,37 +139,36 @@ export class ConfigRow {
     });
 
     this.#flow = new Gtk.FlowBox({
-      // **One control per line, at every width.** See the file header: at 360 px a shared line gives
-      // each dropdown about 90 px, which is an ellipsis rather than a model name. Measured at the
-      // phone floor with the real window — three lines, every value readable, nothing dropped.
-      maxChildrenPerLine: 1,
+      // **One line while the controls fit, one control per line when they do not.** See the file header.
+      maxChildrenPerLine: 3,
       // No selection: the row is a set of independent controls, and a highlight moving between them
       // would read as "this one is chosen" — which is not a statement this row makes.
       selectionMode: Gtk.SelectionMode.NONE,
       rowSpacing: 6,
       columnSpacing: 6,
+      // **START, or the three controls spread themselves across the card.** A `Gtk.FlowBox` gives
+      // every child in a line the same share of the width it was given, so at `FILL` the model sat at
+      // the card's left edge, the mode at its right, and the thought level exactly between them —
+      // three unrelated controls reading as a toolbar. `START` hands the box its *natural* width when
+      // the pane has it, which is the three packed together, and its available width when the pane
+      // does not — so the wrapping at the 360 px floor is unchanged (measured: two lines, then one).
+      halign: Gtk.Align.START,
     });
 
+    // **No margins and no clamp.** Both used to be here because the row was its own strip in the
+    // bottom bar; inside the composer's card the inset is the card's padding and the width cap is the
+    // composer's clamp, and a second set of either would be this file holding an opinion about a
+    // surface it does not own. `valign: CENTER` so the controls line up with the Send button beside
+    // them rather than stretching to its row's height.
     this.#box = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
       spacing: 6,
-      marginTop: 8,
-      marginBottom: 2,
-      marginStart: 12,
-      marginEnd: 12,
+      valign: Gtk.Align.CENTER,
+      hexpand: true,
     });
     this.#box.append(this.#flow);
     this.#box.append(this.#caption);
-
-    // **The same clamp as the transcript and the composer, imported rather than written out.** Three
-    // numbers that happen to be equal is a coincidence that survives exactly until somebody changes
-    // one of them, and this row sits between the other two in the same column.
-    this.#clamp = new Adw.Clamp({
-      child: this.#box,
-      maximumSize: CONTENT_MAX_WIDTH_PX,
-      tighteningThreshold: CONTENT_MAX_WIDTH_PX,
-    });
-    this.widget = this.#clamp;
+    this.widget = this.#box;
   }
 
   /** A new view. Rendered whole — see the header on why this is not a diff. */
@@ -159,9 +178,10 @@ export class ConfigRow {
   }
 
   #render(): void {
-    // `visible` on the clamp, because the clamp **is** the widget the parent lays out: hiding the inner
-    // box instead would leave the margins of a box that is not there.
-    this.#clamp.visible = this.#view.visible;
+    // `visible` on the box, because the box **is** the widget the composer lays out. It used to be the
+    // clamp around it, for the same reason: hiding something further in leaves the parent allocating
+    // space for a row that is not there.
+    this.#box.visible = this.#view.visible;
     if (!this.#view.visible) {
       this.#caption.label = '';
       this.#caption.visible = false;
@@ -185,21 +205,8 @@ export class ConfigRow {
     this.#caption.visible = this.#caption.label !== '';
   }
 
-  /** One control: a caption and a dropdown, in a box that shares the measure with the others. */
+  /** One control: a dropdown, clamped so it shares the measure with the others. */
   #buildControl(control: ConfigRowControl): Gtk.Widget {
-    const label = new Gtk.Label({
-      // **The agent's own words, with markup off in the constructor.** `opencode`'s model ids and
-      // names are arbitrary strings, and `a < b` is a plausible one.
-      useMarkup: false,
-      xalign: 0,
-      label: control.name,
-      cssClasses: ['caption'],
-      // The tooltip is the agent's `description` when it sent one. On the *label*, not the dropdown,
-      // because the description is about the control rather than about the current value.
-      tooltipText: control.description,
-      ellipsize: Pango.EllipsizeMode.END,
-    });
-
     const list = new Gtk.StringList();
     for (const value of control.values) list.append(value.name);
 
@@ -215,12 +222,25 @@ export class ConfigRow {
       // Only a long list needs it — 400 model ids cannot be scanned; six effort levels can. The
       // decision is a fact about the data and lives in `core/config.ts`.
       enableSearch: control.searchable,
-      hexpand: true,
       sensitive: control.selectable,
-      tooltipText: control.description,
+      // **Names the control, then describes it.** With no caption beside it this tooltip is where a
+      // person reads *which* setting they are about to change, so the name comes first and the
+      // agent's description follows it. `core/config-row.ts` sets `description` to the `name` when
+      // the agent sent none, which is exactly the case where there is nothing to append.
+      tooltipText:
+        control.description === control.name ? control.name : `${control.name} — ${control.description}`,
       valign: Gtk.Align.CENTER,
-      cssClasses: [CSS.configControl],
+      // `flat`: Adwaita's own name for a control with no raised surface of its own, which is what a
+      // dropdown sitting on the composer's card has to be — a bordered button inside a card reads as
+      // a second card. The theme keeps the hover and the pressed state, so it is still visibly a
+      // control.
+      cssClasses: ['flat', CSS.configControl],
     });
+    // **The one thing a caption was still doing.** An icon-less dropdown announces its *value*, so
+    // without this a screen reader reads "claude-opus-5, button" three times with nothing saying
+    // which of the three settings it is. The name on its own, not the tooltip's sentence: the
+    // description is help text, and an accessible name is a label.
+    dropdown.update_property([Gtk.AccessibleProperty.LABEL], [control.name]);
 
     dropdown.connect('notify::selected', () => this.#onSelected(control, dropdown));
     // Registered here rather than returned, because `#render` throws the reference away and the one
@@ -229,16 +249,15 @@ export class ConfigRow {
     // of the row is.
     this.#dropdowns.set(control.id, dropdown);
 
-    const row = new Gtk.Box({
-      orientation: Gtk.Orientation.HORIZONTAL,
-      spacing: 8,
-      hexpand: true,
+    // A long model id would make the dropdown's natural width the line's, and the row would wrap at
+    // 720 px with room to spare. The clamp caps what it *asks* for, so the row is one line when the
+    // three fit and wraps (`FlowBox`) when they do not; the child still shrinks below the cap.
+    return new Adw.Clamp({
+      child: dropdown,
+      maximumSize: CONFIG_CONTROL_WIDTH_PX,
+      tighteningThreshold: CONFIG_CONTROL_WIDTH_PX,
+      halign: Gtk.Align.START,
     });
-    // The label takes its natural width and the dropdown takes the rest, so a long model name eats the
-    // measure it needs and a short one (`Mode`) leaves the dropdown wide.
-    row.append(label);
-    row.append(dropdown);
-    return row;
   }
 
   /**

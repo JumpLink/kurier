@@ -18,24 +18,41 @@ import Adw from 'gi://Adw?version=1';
 import Gdk from 'gi://Gdk?version=4.0';
 import Gtk from 'gi://Gtk?version=4.0';
 
-/** Every icon name `app/src/frontends/gui/` hard-codes, with the widget that asks for it. */
+/**
+ * Every icon name `app/src/frontends/gui/` hard-codes, with the widget that asks for it.
+ *
+ * **Names in use, and only those** — so a `MISSING` here is a broken-image placeholder somewhere on
+ * screen rather than an expected line. The absent names the comments record as findings
+ * (`send-symbolic`, `arrow-up-symbolic`, `chat-symbolic`, `lightbulb-symbolic`,
+ * `dialog-question-symbolic`) are re-checked by passing them as arguments; keeping them in this list
+ * would make every run report a miss and there would be nothing left for a real one to say.
+ */
 const NAMES = [
-  // window.ts — the unopened page and the session that replaced it.
+  // window.blp — the unopened page, the session that replaced it, and the no-agent page.
   'mail-send-receive-symbolic',
-  'utilities-terminal-symbolic',
-  // window.blp — the sidebar's New chat button.
+  // window.blp — the sidebar's New chat button and the window menu.
   'list-add-symbolic',
-  // session-list.ts — the empty and unreadable states.
+  'open-menu-symbolic',
+  // session-list.ts and window.blp — the empty and unreadable states.
   'dialog-warning-symbolic',
-  // transcript-view.ts — the two closed lines.
-  'system-run-symbolic',
+  // transcript-view.ts — the thought card's closed line.
   'dialog-information-symbolic',
   // composer.ts — the one button, in both of its shapes.
-  'send-symbolic',
-  'mail-send-symbolic',
-  'go-next-symbolic',
+  'go-up-symbolic',
   'process-stop-symbolic',
-  'media-playback-stop-symbolic',
+  // login-dialog.ts — the method rows.
+  'go-next-symbolic',
+  // tool-line.ts — the icon a tool card and the approval dialog's header pick from the tool's kind,
+  // and the fallback for a line that matches none of them.
+  'document-open-symbolic',
+  'document-edit-symbolic',
+  'edit-delete-symbolic',
+  'folder-symbolic',
+  'edit-find-symbolic',
+  'network-workgroup-symbolic',
+  'system-run-symbolic',
+  // window.blp — the no-agent page's copy button.
+  'edit-copy-symbolic',
 ];
 
 Adw.init();

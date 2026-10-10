@@ -108,11 +108,14 @@ KU_APP_AGENT=stand-in KU_STANDIN_CONFIG=1 KU_STANDIN_CONFIG_REFUSE=1 \
   ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
 ```
 
-**One control per line, at every width, and the row raises no floor.** The three controls sit in a
-`Gtk.FlowBox` with `max-children-per-line: 1`: at 360 px a shared line leaves each dropdown about 90 px,
-which is an ellipsis rather than a model name. Measured with the row on screen, the real window still
-stops at 360 — asked for 320, granted 360 — so the floor is still `Adw.NavigationSplitView`'s and not
-kurier's content's (`scripts/probes/window-min-width.mjs` prints the sweep).
+**One line while the three controls fit, wrapped when they do not, and the row raises no floor.** The
+controls sit in a `Gtk.FlowBox` (`max-children-per-line: 3`) with each dropdown inside an `Adw.Clamp` that
+caps what it asks for (`CONFIG_CONTROL_WIDTH_PX`), so a long model id cannot force a wrap. The row sits on
+the composer's card rather than in a strip of its own, so the width cap around it is the composer's clamp.
+The window stops at 360 however the row wraps — so the floor is `Adw.NavigationSplitView`'s and not kurier's content's. The row's own
+minimum is 293 px with a 32-character model id, which is where "raises no floor" comes from rather than
+from the clamp: a clamp caps a natural width and passes the minimum through
+(`scripts/probes/window-min-width.mjs` prints both, and the sweep).
 
 What the row may show and when is decided in `app/src/core/config-row.ts` and tested on both runtimes;
 the widget only renders.
@@ -348,7 +351,7 @@ KU_APP_PERMISSION=1 ./node_modules/.bin/gjsify run app/dist/kurier-app.gjs.mjs
 
 The floor itself — 360 px, `WINDOW_MIN_WIDTH_PX` — is stated once, in `AGENTS.md`, along with whose
 limit it is. What is here is how to reproduce it, and what it costs elsewhere: the same 360 px is what
-forces one control per line in the config row above.
+makes the config row on the composer's card wrap.
 
 ```sh
 gjs -m scripts/probes/window-min-width.mjs        # the sweep, with no floor of its own
@@ -356,6 +359,11 @@ gjs -m scripts/probes/window-min-width.mjs 320    # what a different floor does
 ```
 
 Pass a number to reproduce a different floor, or nothing to see what the window does without one.
+
+**Run it on a headless mutter, not on the desktop session.** `set_default_size` on a mapped window is a
+request, and this machine's session compositor granted none of them: the sweep printed the window's
+two-pane minimum seven times, which reads like a layout that refuses to be narrow. The probe's own header
+has the `dbus-run-session`/`mutter --headless` invocation and the numbers that come out of it.
 
 ## Probes
 
