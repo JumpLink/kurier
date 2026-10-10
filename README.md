@@ -82,7 +82,8 @@ your first prompt starts the session. Every dev hook, the stand-in agent that ne
 measured GTK behaviour are in [docs/dev-fixtures.md](docs/dev-fixtures.md).
 
 Design decisions are in [docs/adr/](docs/adr/README.md); the embeddable-widget plan is studied in
-[docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md).
+[docs/architecture/embeddable-widget-study.md](docs/architecture/embeddable-widget-study.md). The
+GUI's look and screenshots of every state are in [docs/design/](docs/design/README.md).
 
 ## Where your data lives
 
