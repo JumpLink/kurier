@@ -38,7 +38,6 @@ export declare const InternalChildren: [
     'transcriptHost',
     'contentHeader',
     'noticeBanner',
-    'configHost',
     'composerHost',
     'cwdCaption',
 ];
@@ -61,7 +60,6 @@ export interface Children {
     _transcriptHost: Adw.Bin;
     _contentHeader: Adw.HeaderBar;
     _noticeBanner: Adw.Banner;
-    _configHost: Adw.Bin;
     _composerHost: Adw.Bin;
     _cwdCaption: Gtk.Label;
 }

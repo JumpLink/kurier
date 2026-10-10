@@ -23,6 +23,14 @@
  * bar's `flat` style (`window.blp`) that is what makes the composer read as one object floating in
  * the pane rather than as a strip welded to the bottom of the window.
  *
+ * **The card has two lines: the entry across the top, then the agent's settings and Send.** The
+ * config row used to be its own strip above the composer in a box of the template's; it is now
+ * `ComposerOptions.config`, packed inside this card along its bottom edge, which is where the model
+ * picker sits in every chat surface this window is drawn from. The win is that there is one object at
+ * the bottom of the pane instead of two stacked ones — and the entry gets the card's full width
+ * because the button came out of its row. What the move cost is the row's per-control captions, and
+ * `config-row.ts` records the measurement that forced that.
+ *
  * **Nothing here is markup, and that is structural rather than a flag.** The Send button's label is
  * our own word. The entry is a `Gtk.TextView`, which has no markup rendering at all — there is no
  * `set_use_markup` anywhere near a typed message. The one label that *could* have taken somebody
@@ -121,6 +129,15 @@ export interface ComposerOptions {
    * a renderer rather than a second opinion.
    */
   readonly input: ComposerInput;
+  /**
+   * `ConfigRow.widget`, packed along the inside of the card next to Send.
+   *
+   * **A widget to place, not a row to drive.** The composer never calls a method on it, never reads it
+   * and never shows or hides it — `ConfigRow` does all of that on the agent's answer, on its own clock
+   * (`window.ts`'s field comment). Passing the widget rather than the object is what keeps that true:
+   * there is nothing here to call.
+   */
+  readonly config: Gtk.Widget;
 }
 
 export class Composer {
@@ -180,16 +197,19 @@ export class Composer {
       // **Icon only, in a circle, and the label is gone from the button rather than hidden.** It is
       // still the *one* widget whose content is swapped (see the file header) — what changed is that
       // one `iconName` is now the whole swap, where an `Adw.ButtonContent` existed only to carry a
-      // word next to the icon. Removing the word is what makes the control a disc that fits inside
-      // the card next to the entry instead of a pill that sets the card's height; at the 360 px floor
-      // it is also about 60 px of row width handed back to the text.
+      // word next to the icon. Removing the word is what makes the control a disc on the card's
+      // bottom line instead of a pill that sets that line's height — and at the 360 px floor it is
+      // the ~60 px that lets three config dropdowns share the line with it at all.
       //
       // **The word has to survive somewhere, and it does — in `#render`, as the tooltip and as
       // `AccessibleProperty.LABEL`.** An icon-only button with neither is a control a screen reader
       // announces as nothing at all, which is a failure that no screenshot shows.
       iconName: SEND_ICON,
-      // END, so the button sits at the bottom of the entry rather than stretching to the scroller's
-      // height when the entry has grown to three lines.
+      // END, and it means something different than it did beside the entry. The button is on the
+      // card's bottom line now, and that line is one row tall until the config row wraps — at the
+      // 360 px floor it is two. `CENTER` then parks the disc in the gap *between* the two rows of
+      // dropdowns; `END` keeps it on the card's inside corner, which is where it is at every other
+      // width.
       valign: Gtk.Align.END,
       // `circular` is Adwaita's own name for the shape, so it follows the theme's metrics rather than
       // a radius this file would then have to keep in step with the button's padding.
@@ -207,22 +227,31 @@ export class Composer {
       cssClasses: [CSS.composerStatus, 'caption'],
     });
 
-    const row = new Gtk.Box({
-      orientation: Gtk.Orientation.HORIZONTAL,
+    // **The card's bottom line: the agent's settings on the left, Send on the right.** The config row
+    // hexpands and the button does not, so the disc is pinned to the card's inside corner at every
+    // width — and with no agent attached the row is invisible and the line is the button alone, which
+    // is what a composer with nothing to configure should look like.
+    const controls = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 6 });
+    controls.append(options.config);
+    controls.append(this.#button);
+
+    // **One inset for the whole card, and the two lines inside it.** Even on all four sides: the card
+    // is the surface, so the inset is the card's padding and a wider left margin than top margin
+    // would read as a text box inside a card rather than as one control. The entry's own 8 px text
+    // margins sit inside this.
+    const inner = new Gtk.Box({
+      orientation: Gtk.Orientation.VERTICAL,
       spacing: 6,
-      // Even on all four sides: the card is the surface now, so the inset is the card's padding and
-      // a wider left margin than top margin would read as a text box inside a card rather than as
-      // one control. The entry's own 8 px text margins sit inside this.
       marginTop: 6,
       marginBottom: 6,
       marginStart: 6,
       marginEnd: 6,
     });
-    row.append(scroller);
-    row.append(this.#button);
+    inner.append(scroller);
+    inner.append(controls);
 
     const column = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 2 });
-    column.append(row);
+    column.append(inner);
     column.append(this.#status);
 
     // `append`, not `child:` constructor property: `Gtk.Box` has no such property (only

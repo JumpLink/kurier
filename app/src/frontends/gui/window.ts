@@ -226,14 +226,6 @@ export class MainWindow extends Adw.ApplicationWindow {
    */
   declare readonly _contentStack: Gtk.Stack;
   declare readonly _contentHeader: Adw.HeaderBar;
-  /**
-   * Holds the agent's config row, directly above the composer in the same bottom bar.
-   *
-   * Its own field rather than a part of the composer because the two have different clocks: the
-   * composer re-renders on every turn state move, this re-renders when the agent answers about its
-   * options. One host per widget keeps that split visible in the markup.
-   */
-  declare readonly _configHost: Adw.Bin;
   /** Holds the composer, as the content pane's bottom bar. Plan §7 step 4. */
   declare readonly _composerHost: Adw.Bin;
   /** One dim line under the composer naming the directory a new chat will run in. Hidden otherwise. */
@@ -253,12 +245,13 @@ export class MainWindow extends Adw.ApplicationWindow {
   /** The composer, as the content pane's bottom bar. Plan §7 step 4. */
   readonly #composer: Composer;
   /**
-   * The agent's own configuration, directly above the composer. Plan §7 step 7.
+   * The agent's own configuration, on the composer card's bottom line. Plan §7 step 7.
    *
-   * **Its own field rather than a part of the composer, because the two have different clocks.** The
-   * composer re-renders on every turn state move; this re-renders when the agent answers about its
-   * options. A combined widget would mean every streamed update rebuilt the model dropdown, and every
-   * model change rebuilt the composer's status line.
+   * **Its own field and its own object even though its widget now sits inside the composer's card,
+   * because the two have different clocks.** The composer re-renders on every turn state move; this
+   * re-renders when the agent answers about its options. A combined *widget* would mean every streamed
+   * update rebuilt the model dropdown, and every model change rebuilt the composer's status line — so
+   * the composer is handed `ConfigRow.widget` to place and nothing to call.
    */
   readonly #config: ConfigRow;
   /**
@@ -447,6 +440,11 @@ export class MainWindow extends Adw.ApplicationWindow {
       // did exactly that, and then the controller's constructor emitted its own state into a composer
       // that did not exist yet. Reading the snapshot cannot be stale, because it is the thing itself.
       input: composerInput(this.#agent.snapshot, this.#unavailable),
+      // **The config row's widget, into the composer's own card.** `Adw.ToolbarView` has exactly one
+      // bottom bar and that one belongs to the composer, so the row used to be a `Gtk.Box` of the
+      // template's stacked above it — two surfaces reading as two panes. It is now one card with two
+      // lines. The *row* is still this file's (`#config`, its own clock); only its widget travels.
+      config: this.#config.widget,
       onSend: (text) => this.#onSend(text),
       // **Stop takes the dialog down with it, and names the reason before it does.** The window
       // contributes only the ordering — `agent.stop()` settles the question itself — so the two calls
@@ -459,19 +457,14 @@ export class MainWindow extends Adw.ApplicationWindow {
         this.#agent.stop();
       },
     });
-    // **The four TypeScript-built widgets into the template's four hosts, and nothing else.** The
+    // **The three TypeScript-built widgets into the template's three hosts, and nothing else.** The
     // shell is markup; what an agent says is code, and code cannot be written into a template. Each
     // `Adw.Bin` is a placeholder with exactly one child, so this is a substitution rather than a
-    // nesting — the tree that renders is the tree `window.blp` draws.
+    // nesting — the tree that renders is the tree `window.blp` draws. The config row is the one
+    // exception and no longer has a host: the composer places it, because it is inside its card.
     this._sidebarHost.child = this.#sessions.widget;
     this._transcriptHost.child = this.#transcript.widget;
     this._composerHost.child = this.#composer.widget;
-    // **The config row goes inside the composer's bottom bar, not into `Adw.ToolbarView`'s own.**
-    // `Adw.ToolbarView` has exactly one bottom bar, and that one belongs to the composer. The row is
-    // the template's box above it, so it lands "directly above the composer" in the plan's sense (§7
-    // step 7) rather than as a sibling that could be reordered or, worse, given its own raised border
-    // and read as a second pane.
-    this._configHost.child = this.#config.widget;
 
     // **After** the content, and the order is load-bearing. The content is the template's, so it is
     // already in place — but the breakpoint still has to come after `super()` returned, and it is
@@ -1347,7 +1340,6 @@ GObject.registerClass(
       'contentHeader',
       'contentStack',
       'transcriptHost',
-      'configHost',
       'composerHost',
       'cwdCaption',
       'noticeBanner',

@@ -277,16 +277,17 @@ template $KurierMainWindow: Adw.ApplicationWindow {
             };
           }
         };
-        // **The bar is a vertical box of [config row, composer], in that order.** One bottom bar, two
-        // things in it, and the order is the plan's: what you pick here applies to what you are about
-        // to send in the entry below it. A `Gtk.Box` rather than a second `Adw.ToolbarView` bottom bar
-        // because there is only one bottom bar, and because a second raised surface would read as two
-        // panes stacked rather than as one control area.
+        // **The bar is a vertical box of [composer, cwd line].** The config row used to be a third
+        // `Adw.Bin` at the top of this box, because `Adw.ToolbarView` has exactly one bottom bar and
+        // the composer owns it — but stacking it here gave the bottom of the pane two surfaces that
+        // read as two panes. It is now inside the composer's card (`composer.ts`,
+        // `ComposerOptions.config`), which is one object with two lines. The order the plan asks for
+        // (§7 step 7: what you pick applies to what you are about to send) is kept by the card's own
+        // layout, not by this box.
         [bottom]
         Gtk.Box {
           orientation: vertical;
           spacing: 0;
-          Adw.Bin configHost {}
           Adw.Bin composerHost {}
           // Where a new chat will run — one dim line, only while a new chat is waiting. `use-markup:
           // false` is in the template so it holds before the first label is assigned: the path is the
