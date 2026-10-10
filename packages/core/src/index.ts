@@ -132,6 +132,16 @@ export {
 
 // ── The login an agent asks for, and the login kurier can arrange ────────────────────────────────
 export {
+  arrangeAuth,
+  authPlan,
+  describeAuthMethod,
+  describeAuthMethods,
+  loginCommandFor,
+  type AuthArrangement,
+  type AuthHooks,
+  type AuthPlan,
+} from './auth.ts';
+export {
   SERVER_KILL_GRACE_MS,
   SERVER_START_TIMEOUT_MS,
   serverCommand,

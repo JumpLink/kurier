@@ -1,43 +1,22 @@
 /**
  * `kurier auth` — trap 1 of the plan, given a command.
  *
- * Measured against `opencode acp` 2.0.19:
- *
- * ```
- * "authMethods":[{"description":"Run `opencode auth login` in the terminal",
- *                 "name":"Login with opencode","id":"opencode-login"}]
- * ```
- *
- * Note the shape: no `type` tag, and a `description` the schema does not define. Read as the
- * protocol's *agent* auth method — the kind where the client is expected to arrange the login
- * itself — the sentence in that description is an instruction to the client. Without this command,
- * `kurier start` dies on `-32000 auth_required` with a stack trace instead of a sentence.
- *
- * Two paths, and both are real:
- *
- * - **The agent can run the login itself** (`kind: 'terminal'`, or it handed over `args`). The
- *   agent gets `authenticate` with its own method id, and it does the rest in a terminal it
- *   already owns. That is the protocol's designed path and it is preferred.
- * - **Nobody but the client can.** `kurier` runs the adapter's login command as a child process
- *   with inherited stdio, so whatever the login wants to open — a browser, a device code, a
- *   terminal menu — reaches the person sitting there. Then the agent is asked again.
- *
- * Either way the login is a **person at a terminal**. It is never forwarded over the ACP channel
- * and never stored: there is nowhere in Scheibe 1 that could keep a credential, which is the
- * honest reason rather than a missing feature.
+ * Without this command `kurier start` dies on `-32000 auth_required` with a stack trace instead of a
+ * sentence. What it does about that is decided in `@kurier/core`'s `auth.ts`: which of the two paths an
+ * agent's `authMethods` allow, what the login command is, and the order the two handshakes run in. What
+ * is here is the terminal: the flags, the lines, the exit codes, and the one thing a window would have
+ * to do differently — running the login with **inherited stdio**, because a login that opens a browser
+ * cannot open one from a process whose stdio is a pipe.
  */
 
 import { spawn } from 'node:child_process';
 
 import type { CommandModule } from 'yargs';
 
-import { classifyAuthMethods } from '@kurier/acp/gate';
-
 import {
-  DEFAULT_AGENT,
-  OPENCODE_LOGIN,
+  arrangeAuth,
   currentSandboxFacts,
-  openAgent,
+  describeAuthMethod,
   toHostCommand,
   which,
   type AgentCommand,
@@ -47,25 +26,6 @@ import {
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
-
-/**
- * The login command per adapter. A program to run, not a permission to hold.
- *
- * For the bundled copy it is the copy's own program with its own environment: a login run through the
- * person's `opencode` would land in their config, and the bundled agent would never see it.
- */
-function loginCommandFor(agent: AgentCommand): AgentCommand {
-  if (agent.id !== DEFAULT_AGENT)
-    throw new Error(`no login command is known for agent "${agent.id}" — run the agent's own login`);
-  return agent.bundled
-    ? { ...agent, args: OPENCODE_LOGIN.args }
-    : {
-        id: OPENCODE_LOGIN.id,
-        title: OPENCODE_LOGIN.title,
-        program: OPENCODE_LOGIN.program,
-        args: OPENCODE_LOGIN.args,
-      };
-}
 
 const command = (paths: KurierPaths): CommandModule => ({
   command: 'auth',
@@ -93,76 +53,46 @@ const command = (paths: KurierPaths): CommandModule => ({
       return;
     }
 
-    // First, ask: maybe the agent can do this itself, which is the protocol's own path.
-    const first = await openAgent({
+    const result = await arrangeAuth({
       command: launcher,
       gate: silentGate(),
+      runLogin: runInteractively,
       onLog: (line) => {
         if (!quiet) err(`  [agent] ${line}`);
       },
+      onMethod: (method) => err(`  ${describeAuthMethod(method)}`),
+      onStep: (message) => err(`\n${message}`),
     });
-    let terminalMethodId: string | null = null;
-    let agentMethodId: string | null = null;
-    try {
-      const auth = classifyAuthMethods(first.client.authMethods);
-      if (auth.none) {
+
+    switch (result.kind) {
+      case 'none':
         out(`${launcher.title} needs no authentication.`);
         return;
-      }
-      terminalMethodId = auth.terminal[0]?.id ?? null;
-      agentMethodId = auth.agent[0]?.id ?? null;
-      for (const method of [...auth.terminal, ...auth.agent]) {
-        const description = (method as { description?: string }).description;
-        err(`  ${method.name} (${method.id})${description ? ` — ${description}` : ''}`);
-      }
-      if (terminalMethodId) {
-        err(`\nasking ${launcher.title} to authenticate itself…`);
-        await first.client.authenticate({ methodId: terminalMethodId });
-        out(`logged in — ${launcher.title} authenticated with "${terminalMethodId}"`);
+      case 'authenticated':
+        out(
+          result.viaLogin
+            ? `logged in — ${launcher.title} accepted "${result.methodId}"`
+            : `logged in — ${launcher.title} authenticated with "${result.methodId}"`,
+        );
         return;
-      }
-    } finally {
-      first.close();
-    }
-
-    // Second path: the client arranges it. The child inherits stdio, because a login that opens a
-    // browser cannot open one from a process whose stdio is a pipe.
-    if (!agentMethodId) {
-      err('the agent advertised an auth method without an id — nothing kurier can do with it');
-      process.exitCode = 1;
-      return;
-    }
-    const login = loginCommandFor(launcher);
-    const found = which(login.program);
-    if (!found) {
-      err(`${login.program} is not on PATH — run \`${login.program} ${login.args.join(' ')}\` yourself`);
-      process.exitCode = 1;
-      return;
-    }
-    err(`\nrunning \`${login.program} ${login.args.join(' ')}\` — a person has to finish this one:`);
-    const code = await runInteractively(login);
-    if (code !== 0) {
-      err(`login command exited with ${code} — not authenticated`);
-      process.exitCode = code;
-      return;
-    }
-
-    // Ask the agent again, so the answer is the agent's own rather than kurier's assumption.
-    const second = await openAgent({
-      command: launcher,
-      gate: silentGate(),
-      onLog: (line) => {
-        if (!quiet) err(`  [agent] ${line}`);
-      },
-    });
-    try {
-      await second.client.authenticate({ methodId: agentMethodId });
-      out(`logged in — ${launcher.title} accepted "${agentMethodId}"`);
-    } catch (error) {
-      err(`the agent did not accept the login: ${error instanceof Error ? error.message : String(error)}`);
-      process.exitCode = 1;
-    } finally {
-      second.close();
+      case 'unusable':
+        err('the agent advertised an auth method without an id — nothing kurier can do with it');
+        process.exitCode = 1;
+        return;
+      case 'login-missing':
+        err(
+          `${result.command.program} is not on PATH — run \`${result.command.program} ${result.command.args.join(' ')}\` yourself`,
+        );
+        process.exitCode = 1;
+        return;
+      case 'login-failed':
+        err(`login command exited with ${result.code} — not authenticated`);
+        process.exitCode = result.code;
+        return;
+      case 'refused':
+        err(`the agent did not accept the login: ${result.message}`);
+        process.exitCode = 1;
+        return;
     }
   },
 });
@@ -170,8 +100,8 @@ const command = (paths: KurierPaths): CommandModule => ({
 /**
  * Run a command with stdio inherited from this process, and resolve with its exit code.
  *
- * Routed through the same host rewrite as the ACP channel (`sandbox.ts`), because a login is a host
- * program for exactly the reason the agent is: it opens a browser and keeps its credentials under
+ * Routed through the same host rewrite as the ACP channel (`agents/sandbox.ts`), because a login is a
+ * host program for exactly the reason the agent is: it opens a browser and keeps its credentials under
  * the person's own home. A `kurier auth` that only worked on a desktop install would be a second
  * version of the same bug.
  */
