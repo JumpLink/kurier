@@ -33,13 +33,17 @@ import type { CommandModule } from 'yargs';
 
 import { classifyAuthMethods } from '@kurier/acp/gate';
 
-import { DEFAULT_AGENT } from '../../core/agents/launcher.ts';
-import { OPENCODE_LOGIN } from '../../core/agents/opencode.ts';
-import { currentSandboxFacts, toHostCommand } from '../../core/agents/sandbox.ts';
-import { which, type AgentCommand } from '../../core/agents/stdio.ts';
-import { openAgent } from '../../core/run.ts';
+import {
+  DEFAULT_AGENT,
+  OPENCODE_LOGIN,
+  currentSandboxFacts,
+  openAgent,
+  toHostCommand,
+  which,
+  type AgentCommand,
+  type KurierPaths,
+} from '@kurier/core';
 
-import type { KurierPaths } from '../../core/paths.ts';
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';

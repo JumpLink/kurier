@@ -16,8 +16,8 @@ import {
   failureToShow,
   isQuotaExhausted,
   staleDialog,
-} from '../../../src/core/failure.ts';
-import type { AgentAttachment } from '../../../src/core/turn.ts';
+  type AgentAttachment,
+} from '@kurier/core';
 
 /**
  * ACP's own "log in first", exactly as `@kurier/acp` raises it: an `RpcError` carrying the wire

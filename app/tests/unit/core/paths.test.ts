@@ -6,14 +6,18 @@ import { join, relative } from 'node:path';
 
 import { createSessionStore, newSession } from '@kurier/session';
 
-import { gatherResolveContext } from '../../../src/core/agents/probe.ts';
-import { isolationDirs, isolationEnv, prepareIsolation } from '../../../src/core/agents/isolation.ts';
+import {
+  gatherResolveContext,
+  isolationDirs,
+  isolationEnv,
+  kurierPathsUnder,
+  prepareIsolation,
+} from '@kurier/core';
 import { DEFAULT_NOTICES, writeNotices } from '../../../src/core/notices.ts';
 import { saveSettings } from '../../../src/core/settings.ts';
 import {
   dataDir,
   kurierPaths,
-  kurierPathsUnder,
   noticesFile,
   sessionsFile,
   settingsFile,

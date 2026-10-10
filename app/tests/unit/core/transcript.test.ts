@@ -2,7 +2,7 @@ import { describe, expect, it } from '@gjsify/unit';
 
 import type { SessionNotification, SessionUpdate } from '@kurier/acp/types';
 
-import { toTranscript } from '../../../src/core/transcript.ts';
+import { toTranscript } from '@kurier/core';
 
 const AT = '2026-09-30T10:00:00.000Z';
 

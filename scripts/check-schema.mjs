@@ -385,7 +385,7 @@ const PAYLOAD_PRIMITIVES = {
 // and it is the one whose two arms disagree about what `currentValue` is: a value id for `select`,
 // a boolean for `boolean`. A TypeScript mirror of that union cannot be narrowed without casts (see
 // the note on `SessionConfigOption` in `types.ts`), so the wire type is flat and the validation
-// lives in `app/src/core/config.ts`. That trade is only safe while this check is true, so it is
+// lives in `packages/core/src/config.ts`. That trade is only safe while this check is true, so it is
 // asserted here rather than trusted:
 //
 // - both arms must exist in the schema and both must be named in `KNOWN_CONFIG_OPTION_TYPES`, so a

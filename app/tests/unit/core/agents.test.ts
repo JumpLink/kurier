@@ -4,16 +4,16 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { which } from '../../../src/core/agents/stdio.ts';
 import {
   DEFAULT_AGENT,
   LAUNCHERS,
   findLauncher,
   launcherIds,
   requireLauncher,
-} from '../../../src/core/agents/launcher.ts';
-import type { SandboxFacts } from '../../../src/core/agents/sandbox.ts';
-import type { AgentDetection } from '../../../src/core/agents/detect.ts';
+  which,
+  type AgentDetection,
+  type SandboxFacts,
+} from '@kurier/core';
 import { agentsReport, settingsReport } from '../../../src/frontends/cli/agents.ts';
 
 const SANDBOXED: SandboxFacts = { flatpakInfoExists: true };

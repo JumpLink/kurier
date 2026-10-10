@@ -2,7 +2,7 @@ import { describe, expect, it } from '@gjsify/unit';
 
 import { labelOf, newSession, type TranscriptEntry } from '@kurier/session';
 
-import { toTranscriptItems, type TranscriptItem } from '../../../src/core/transcript-items.ts';
+import { toTranscriptItems, type TranscriptItem } from '@kurier/core';
 
 const AT = '2026-09-30T10:00:00.000Z';
 const LATER = '2026-09-30T10:00:01.000Z';

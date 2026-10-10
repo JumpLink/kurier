@@ -10,8 +10,7 @@
 import type { SessionNotification } from '@kurier/acp/types';
 import { labelOf, type SessionRecord } from '@kurier/session';
 
-import { chunkToText } from '../../core/policy.ts';
-import { describeUsage } from '../../core/usage.ts';
+import { chunkToText, describeUsage } from '@kurier/core';
 
 export function out(line = ''): void {
   process.stdout.write(`${line}\n`);

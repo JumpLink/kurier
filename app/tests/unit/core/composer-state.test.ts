@@ -1,13 +1,14 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import {
+  agentStatus,
   composerView,
   keepsDraft,
   offersStop,
+  type AgentAttachment,
   type ComposerInput,
   type TurnState,
-} from '../../../src/core/composer-state.ts';
-import { agentStatus, type AgentAttachment } from '../../../src/core/turn.ts';
+} from '@kurier/core';
 
 const ALL: readonly TurnState[] = ['idle', 'thinking', 'waiting-for-you', 'stopped', 'gone'];
 

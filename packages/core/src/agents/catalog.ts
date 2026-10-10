@@ -1,10 +1,10 @@
 /**
  * The bundled-agent catalog: which agents a build ships inside itself, validated once at load.
  *
- * **Where the data lives.** `app/data/bundled-agents.json` is a list somebody refreshes by reading a
+ * **Where the data lives.** `packages/core/data/bundled-agents.json` is a list somebody refreshes by reading a
  * release page, so it carries its own dates and pins (version, per-arch url, sha256, size). It is imported
  * with an import attribute and inlined by the bundler, exactly like `free-models.json`: nothing reads
- * `app/data/` at runtime, and there is no `app/src` in the bundle to read from anyway.
+ * the data directory at runtime, and there is no source tree in the bundle to read from anyway.
  *
  * **Why the copy is OFF PATH.** `/app/bin` is on a Flatpak's PATH. A bundled `opencode` there would be
  * found by `which()` before the host is asked and would shadow the person's own opencode — the one that
@@ -23,7 +23,7 @@
  * that rule is a review rule for whoever edits the file.
  */
 
-import raw from '../../../data/bundled-agents.json' with { type: 'json' };
+import raw from '../../data/bundled-agents.json' with { type: 'json' };
 
 /** Where bundled agents are unpacked. Off PATH on purpose — see the file header. */
 export const BUNDLED_PREFIX = '/app/extra/agents';

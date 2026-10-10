@@ -11,7 +11,7 @@
 
 import Adw from '@girs/adw-1';
 
-import type { FailureNotice } from '../../core/failure.ts';
+import type { FailureNotice } from '@kurier/core';
 
 /** The dismissal, and the only string in here that is not part of a sentence. */
 const CLOSE_RESPONSE = 'close';

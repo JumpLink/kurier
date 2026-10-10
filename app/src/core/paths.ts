@@ -1,5 +1,5 @@
 /**
- * Where kurier keeps things.
+ * Where kurier keeps things — this app's answer, resolved from the environment.
  *
  * The one promise: **nothing is ever written inside the repository.** A session file holds the text
  * of a person's conversations with an agent, and this repository is public — a stray session file
@@ -8,10 +8,16 @@
  *
  * Every function takes the environment as an argument, so a test says "with `XDG_DATA_HOME` set to
  * this" instead of mutating the world to find out where the code writes.
+ *
+ * The `KurierPaths` shape itself, and `kurierPathsUnder(root)` for a host that hands kurier a
+ * directory, are in `@kurier/core`: core takes the paths and never resolves them, and XDG plus the
+ * `KURIER_*` overrides are a decision only an app gets to make.
  */
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+
+import type { KurierPaths } from '@kurier/core';
 
 /** `$XDG_DATA_HOME`, or the XDG default. An explicit value must be absolute, per the spec. */
 export function xdgDataHome(env: NodeJS.ProcessEnv = process.env): string {
@@ -57,20 +63,6 @@ export function noticesFile(env: NodeJS.ProcessEnv = process.env): string {
   return explicit || join(dataDir(env), 'notices.json');
 }
 
-/**
- * Every place kurier writes, as one value. Built once where the process starts (`kurierPaths()` for the
- * app and the CLI, `kurierPathsUnder()` for a host that embeds kurier) and handed down, so nothing
- * below the entry reads `HOME`, `XDG_*` or `KURIER_*` itself. A bundled agent's `HOME` and `XDG_*`
- * follow `dataDir` (`agents/isolation.ts`), so moving `dataDir` moves them too.
- */
-export interface KurierPaths {
-  readonly dataDir: string;
-  readonly configDir: string;
-  readonly sessionsFile: string;
-  readonly settingsFile: string;
-  readonly noticesFile: string;
-}
-
 /** The app's defaults: XDG, with the `KURIER_*` overrides, exactly as the functions above resolve them. */
 export function kurierPaths(env: NodeJS.ProcessEnv = process.env): KurierPaths {
   return {
@@ -79,18 +71,5 @@ export function kurierPaths(env: NodeJS.ProcessEnv = process.env): KurierPaths {
     sessionsFile: sessionsFile(env),
     settingsFile: settingsFile(env),
     noticesFile: noticesFile(env),
-  };
-}
-
-/** Everything under one root: `<root>/data` and `<root>/config`, the layout a host app gives kurier. */
-export function kurierPathsUnder(root: string): KurierPaths {
-  const data = join(root, 'data');
-  const config = join(root, 'config');
-  return {
-    dataDir: data,
-    configDir: config,
-    sessionsFile: join(data, 'sessions.json'),
-    settingsFile: join(config, 'settings.json'),
-    noticesFile: join(data, 'notices.json'),
   };
 }

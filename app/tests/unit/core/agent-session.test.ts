@@ -3,15 +3,18 @@ import { describe, expect, it } from '@gjsify/unit';
 import { AcpClient } from '@kurier/acp/client';
 import type { AgentSource, SessionRecord, TranscriptEntry } from '@kurier/session';
 
-import { AgentSession, type AgentSnapshot } from '../../../src/core/agent-session.ts';
-import type { ConfigRowView } from '../../../src/core/config-row.ts';
-import { composerView } from '../../../src/core/composer-state.ts';
-import { unsavedMessage } from '../../../src/core/conversation.ts';
-import { failureNotice } from '../../../src/core/failure.ts';
-import type { PermissionQuestion } from '../../../src/core/permission.ts';
-import { OPENCODE_COMMAND } from '../../../src/core/agents/opencode.ts';
-import type { RecordedResolution } from '../../../src/core/agents/resolve.ts';
-import type { AgentCommand } from '../../../src/core/agents/stdio.ts';
+import {
+  AgentSession,
+  OPENCODE_COMMAND,
+  composerView,
+  failureNotice,
+  unsavedMessage,
+  type AgentCommand,
+  type AgentSnapshot,
+  type ConfigRowView,
+  type PermissionQuestion,
+  type RecordedResolution,
+} from '@kurier/core';
 import { FixtureAgent, type FixtureAgentOptions } from '../../support/fixture-agent.ts';
 
 const SESSION = { id: 'ses_fixture_0001', cwd: '/fixture' };

@@ -26,13 +26,21 @@ import { runAdwaitaApp } from '@gjsify/adwaita-app';
 
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 
-import { chooseAgent } from '../../core/agents/dev-agent.ts';
-import { BUNDLED_AGENTS } from '../../core/agents/catalog.ts';
-import { gatherCwdFacts, gatherResolveContext, gatherResolveContextAsync } from '../../core/agents/probe.ts';
-import { NO_AGENT_MESSAGE, resolveDefaultWithNote, resolveRecorded } from '../../core/agents/resolve.ts';
-import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
-import { resolveCwd } from '../../core/cwd.ts';
-import { emptyStateView, noticeView } from '../../core/empty-state.ts';
+import {
+  BUNDLED_AGENTS,
+  NO_AGENT_MESSAGE,
+  chooseAgent,
+  currentSandboxFacts,
+  emptyStateView,
+  gatherCwdFacts,
+  gatherResolveContext,
+  gatherResolveContextAsync,
+  isSandboxed,
+  noticeView,
+  resolveCwd,
+  resolveDefaultWithNote,
+  resolveRecorded,
+} from '@kurier/core';
 import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
 import { kurierPaths } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';

@@ -8,7 +8,7 @@
  * keeps the result in its own store. A pasted key is handed to opencode in one call and held nowhere else
  * (`AGENTS.md` § Privacy: memory only, never persisted).
  *
- * `app/data/login-providers.json` is the one list kurier owns: providers it deliberately does not offer
+ * `packages/core/data/login-providers.json` is the one list kurier owns: providers it deliberately does not offer
  * (`excluded`, each with its reason), the featured order (`preferred`) and the European ones (`europe`). A
  * provider that is in none is still shown, after the featured ones — a new provider upstream is a row, not a code
  * change, and the file is only touched to *remove* or *reorder*.
@@ -16,7 +16,7 @@
  * Pure: no process, no network. The shape parsed here was measured against opencode 2.0.22.
  */
 
-import raw from '../../../data/login-providers.json' with { type: 'json' };
+import raw from '../../data/login-providers.json' with { type: 'json' };
 
 export interface LoginFieldOption {
   readonly value: string;

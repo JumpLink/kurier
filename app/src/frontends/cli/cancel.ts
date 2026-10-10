@@ -12,8 +12,7 @@
 
 import type { CommandModule } from 'yargs';
 
-import type { KurierPaths } from '../../core/paths.ts';
-import { openAgent } from '../../core/run.ts';
+import { openAgent, type KurierPaths } from '@kurier/core';
 import { createSessionStore } from '@kurier/session';
 
 import { agentForRecorded } from './choose.ts';

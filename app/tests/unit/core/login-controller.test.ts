@@ -2,9 +2,15 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { LoginController, type LoginSession, type LoginState } from '../../../src/core/login/controller.ts';
-import type { LoginMode, OAuthStatus } from '../../../src/core/login/flow.ts';
-import type { LoginMethod, LoginProvider } from '../../../src/core/login/providers.ts';
+import {
+  LoginController,
+  type LoginMethod,
+  type LoginMode,
+  type LoginProvider,
+  type LoginSession,
+  type LoginState,
+  type OAuthStatus,
+} from '@kurier/core';
 
 const DEVICE: LoginMethod = { id: 'device', kind: 'oauth', label: 'Device code', fields: [] };
 const KEY: LoginMethod = { id: 'key', kind: 'key', label: 'API key', fields: [] };

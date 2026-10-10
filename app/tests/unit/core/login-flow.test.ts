@@ -3,16 +3,16 @@
 import { describe, expect, it } from '@gjsify/unit';
 
 import {
-  answersFor,
   EXPIRY_GRACE_MS,
   MAX_POLL_FAILURES,
   POLL_MS,
+  answersFor,
   runLogin,
   type LoginApi,
   type LoginHooks,
   type LoginMode,
   type OAuthStatus,
-} from '../../../src/core/login/flow.ts';
+} from '@kurier/core';
 
 interface Script {
   mode?: LoginMode;

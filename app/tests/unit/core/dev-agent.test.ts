@@ -3,14 +3,16 @@ import { describe, expect, it } from '@gjsify/unit';
 import { isAbsolute } from 'node:path';
 
 import {
+  DEFAULT_AGENT,
+  LAUNCHERS,
   STAND_IN_AGENT_ID,
   chooseAgent,
+  isolationDirs,
+  launcherIds,
   standInCommand,
   standInScriptPath,
-} from '../../../src/core/agents/dev-agent.ts';
-import { isolationDirs } from '../../../src/core/agents/isolation.ts';
-import { DEFAULT_AGENT, LAUNCHERS, launcherIds } from '../../../src/core/agents/launcher.ts';
-import type { ResolvedAgent } from '../../../src/core/agents/resolve.ts';
+  type ResolvedAgent,
+} from '@kurier/core';
 
 export default async () => {
   await describe('dev-agent — the stand-in is not a launcher', async () => {

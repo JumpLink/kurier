@@ -75,18 +75,28 @@ import Gtk from '@girs/gtk-4.0';
 
 import { labelOf, type AgentSource, type SessionRecord, type TranscriptEntry } from '@kurier/session';
 
-import { AgentSession, type AgentSnapshot } from '../../core/agent-session.ts';
-import type { RecordedResolution } from '../../core/agents/resolve.ts';
-import type { AgentCommand } from '../../core/agents/stdio.ts';
-import { displayCwd } from '../../core/cwd.ts';
-import type { EmptyStateView, NoticeView } from '../../core/empty-state.ts';
-import type { AgentAttachment } from '../../core/turn.ts';
-import { keepsDraft, type ComposerInput } from '../../core/composer-state.ts';
-import { parseConfigOptionSpec, type ConfigRowView } from '../../core/config-row.ts';
-import { LoginController } from '../../core/login/controller.ts';
-import { loginUnavailableReason, openLoginSession } from '../../core/login/session.ts';
-import { failureAction, failureToShow, staleDialog, type FailureNotice } from '../../core/failure.ts';
-import { agentStatus } from '../../core/turn.ts';
+import {
+  AgentSession,
+  LoginController,
+  agentStatus,
+  displayCwd,
+  failureAction,
+  failureToShow,
+  keepsDraft,
+  loginUnavailableReason,
+  openLoginSession,
+  parseConfigOptionSpec,
+  staleDialog,
+  type AgentAttachment,
+  type AgentCommand,
+  type AgentSnapshot,
+  type ComposerInput,
+  type ConfigRowView,
+  type EmptyStateView,
+  type FailureNotice,
+  type NoticeView,
+  type RecordedResolution,
+} from '@kurier/core';
 import {
   APP_NAME,
   COLLAPSE_WIDTH_PX,

@@ -38,9 +38,8 @@ import Adw from '@girs/adw-1';
 import GLib from '@girs/glib-2.0';
 import Gtk from '@girs/gtk-4.0';
 
-import { optionLabel } from '../../src/core/permission.ts';
+import { optionLabel, type PermissionQuestion, type PermissionView } from '@kurier/core';
 import { PermissionDialog } from '../../src/frontends/gui/permission-dialog.ts';
-import type { PermissionQuestion, PermissionView } from '../../src/core/permission.ts';
 import type { PermissionOption } from '@kurier/acp/types';
 
 Adw.init();

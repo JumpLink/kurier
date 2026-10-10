@@ -8,12 +8,7 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import {
-  BUNDLED_AGENTS,
-  BUNDLED_PREFIX,
-  bundledProgram,
-  parseBundledCatalog,
-} from '../../../src/core/agents/catalog.ts';
+import { BUNDLED_AGENTS, BUNDLED_PREFIX, bundledProgram, parseBundledCatalog } from '@kurier/core';
 import manifest from '../../../../eu.jumplink.Kurier.json' with { type: 'json' };
 import pkg from '../../../../package.json' with { type: 'json' };
 

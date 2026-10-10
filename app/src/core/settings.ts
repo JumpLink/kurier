@@ -16,19 +16,16 @@
  * cases kurier does not know what is in it). `saveSettings` is the one writer that applies it.
  *
  * `AgentChoice` names a launcher id *and* a source, so "the bundled opencode" and "my opencode" are two
- * different choices: they keep separate logins and histories (`core/agents/isolation.ts`).
+ * different choices: they keep separate logins and histories (`core/agents/isolation.ts`). The choice
+ * itself, and `describeChoice`, are in `@kurier/core` with the resolution that reads them; this file is
+ * only the file it is kept in.
  */
 
 import { chmodSync, readFileSync, renameSync } from 'node:fs';
 
+import type { AgentChoice } from '@kurier/core';
+
 import { writePrivateFile } from './private-file.ts';
-
-export type AgentChoiceSource = 'host' | 'bundled';
-
-export interface AgentChoice {
-  readonly id: string;
-  readonly source: AgentChoiceSource;
-}
 
 export interface Settings {
   readonly version: 1;
@@ -61,11 +58,6 @@ function unknownField(path: string, key: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** "the bundled opencode" / "your own opencode" — one phrase, so every message names a choice alike. */
-export function describeChoice(choice: AgentChoice): string {
-  return choice.source === 'bundled' ? `the bundled ${choice.id}` : `your own ${choice.id}`;
 }
 
 /**

@@ -4,8 +4,14 @@
 
 import { describe, expect, it } from '@gjsify/unit';
 
-import { DOCS_URL, INSTALL_COMMAND, emptyStateView, noticeView } from '../../../src/core/empty-state.ts';
-import { NO_AGENT_MESSAGE, type ResolvedAgent } from '../../../src/core/agents/resolve.ts';
+import {
+  DOCS_URL,
+  INSTALL_COMMAND,
+  NO_AGENT_MESSAGE,
+  emptyStateView,
+  noticeView,
+  type ResolvedAgent,
+} from '@kurier/core';
 
 const FOUND: ResolvedAgent = {
   command: { id: 'opencode', title: 'OpenCode', program: 'opencode', args: ['acp'] },

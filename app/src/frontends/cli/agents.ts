@@ -10,20 +10,21 @@
 
 import type { CommandModule } from 'yargs';
 
-import { resolveAgent, detectAgents, type AgentDetection } from '../../core/agents/detect.ts';
-import { DEFAULT_AGENT, LAUNCHERS, launcherIds } from '../../core/agents/launcher.ts';
-import { gatherAgentFacts } from '../../core/agents/probe.ts';
-import type { AgentCommand } from '../../core/agents/stdio.ts';
-import type { KurierPaths } from '../../core/paths.ts';
 import {
+  DEFAULT_AGENT,
+  LAUNCHERS,
+  NO_AGENT_REMEDY,
   describeChoice,
-  parseChoiceSpec,
-  readSettings,
-  saveSettings,
-  type Settings,
-} from '../../core/settings.ts';
+  detectAgents,
+  gatherAgentFacts,
+  launcherIds,
+  resolveAgent,
+  type AgentCommand,
+  type AgentDetection,
+  type KurierPaths,
+} from '@kurier/core';
+import { parseChoiceSpec, readSettings, saveSettings, type Settings } from '../../core/settings.ts';
 
-import { NO_AGENT_REMEDY } from '../../core/empty-state.ts';
 import { err, out, pickArgv } from './output.ts';
 
 const SOURCE_LABEL = { host: 'host', bundled: 'bundled', none: 'not found' } as const;
