@@ -388,6 +388,12 @@ export class MainWindow extends Adw.ApplicationWindow {
     // are rebuilt on every click. One view, `setEntries` on each open, is also the reason a session
     // switch cannot leak a row from the previous transcript — the rebuild is total, not a diff.
     this.#transcript = new TranscriptView();
+    // **The window's own agent, named now rather than at `#open`.** A first prompt creates its session
+    // inside the controller, so that path never calls `#open` — and a caption that only `#open` fills
+    // leaves the *first* answer of a new chat with a bare timestamp and no speaker. `#open` still
+    // overrides this with the record's own agent: a stored session may have run on the other copy
+    // (`agentSource`), and the caption has to name that one, not the window's.
+    this.#transcript.setAgentName(options.agent.id);
     // **Before the controller, and that order is deliberate.** `onConfig` is a closure over this
     // field, so a controller that emitted a config view from its own constructor would reach a
     // `#config` that does not exist yet — the crash `AgentSession`'s constructor comment describes for
