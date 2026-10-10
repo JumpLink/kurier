@@ -26,6 +26,10 @@ import {
   sessionsCommand,
   startCommand,
 } from './frontends/cli/index.ts';
+import { kurierPaths } from './core/paths.ts';
+
+// The one place the process environment becomes paths; everything below is handed them.
+const paths = kurierPaths();
 
 function reportError(err: unknown): void {
   console.error(err instanceof Error ? err.message : String(err));
@@ -34,13 +38,13 @@ function reportError(err: unknown): void {
 
 const parseArgs = () =>
   yargs(hideBin(process.argv))
-    .command(startCommand)
-    .command(sessionsCommand)
-    .command(resumeCommand)
-    .command(cancelCommand)
-    .command(authCommand)
-    .command(loginCommand)
-    .command(agentsCommand)
+    .command(startCommand(paths))
+    .command(sessionsCommand(paths))
+    .command(resumeCommand(paths))
+    .command(cancelCommand(paths))
+    .command(authCommand(paths))
+    .command(loginCommand(paths))
+    .command(agentsCommand(paths))
     .demandCommand(1, 'Please provide a command — `kurier --help` lists them all.')
     .strictCommands()
     .scriptName('kurier')

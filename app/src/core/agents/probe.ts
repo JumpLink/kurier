@@ -8,11 +8,11 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 import { BUNDLED_AGENTS, bundledProgram } from './catalog.ts';
-import { dataDir } from '../paths.ts';
 import { detectAgents, parseVersionOutput, type AgentFacts } from './detect.ts';
 import { isolationDirs } from './isolation.ts';
 import { LAUNCHERS } from './launcher.ts';
 import type { CwdFacts } from '../cwd.ts';
+import type { KurierPaths } from '../paths.ts';
 import type { ResolveContext } from './resolve.ts';
 import {
   FLATPAK_SPAWN,
@@ -69,7 +69,7 @@ export function gatherAgentFacts(
 
 /**
  * The facts without a blocking child: every host question is awaited, and no `--version` is read. The
- * answer a surface shows after the cheap `gatherResolveContext(env, false, false)` has been drawn.
+ * answer a surface shows after the cheap `gatherResolveContext(paths, false, false)` has been drawn.
  */
 export async function gatherAgentFactsAsync(
   launchers: readonly AgentCommand[] = LAUNCHERS,
@@ -87,25 +87,23 @@ export async function gatherAgentFactsAsync(
   );
 }
 
-export async function gatherResolveContextAsync(
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<ResolveContext> {
-  return resolveContextFrom(env, await gatherAgentFactsAsync());
+export async function gatherResolveContextAsync(paths: KurierPaths): Promise<ResolveContext> {
+  return resolveContextFrom(paths, await gatherAgentFactsAsync());
 }
 
 /** The impure half of resolution: probe this machine once, and say where a bundled copy keeps its state. */
 export function gatherResolveContext(
-  env: NodeJS.ProcessEnv = process.env,
+  paths: KurierPaths,
   readVersions = true,
   probeHost = true,
 ): ResolveContext {
-  return resolveContextFrom(env, gatherAgentFacts(LAUNCHERS, readVersions, probeHost));
+  return resolveContextFrom(paths, gatherAgentFacts(LAUNCHERS, readVersions, probeHost));
 }
 
-function resolveContextFrom(env: NodeJS.ProcessEnv, facts: readonly AgentFacts[]): ResolveContext {
+function resolveContextFrom(paths: KurierPaths, facts: readonly AgentFacts[]): ResolveContext {
   return {
     detections: detectAgents(facts),
-    isolationFor: (id) => isolationDirs(dataDir(env), id),
+    isolationFor: (id) => isolationDirs(paths.dataDir, id),
     bundledAvailable: (id) => {
       const entry = BUNDLED_AGENTS.find((candidate) => candidate.id === id);
       return entry !== undefined && existsSync(bundledProgram(entry));

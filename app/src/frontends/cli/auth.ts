@@ -39,6 +39,7 @@ import { currentSandboxFacts, toHostCommand } from '../../core/agents/sandbox.ts
 import { which, type AgentCommand } from '../../core/agents/stdio.ts';
 import { openAgent } from '../../core/run.ts';
 
+import type { KurierPaths } from '../../core/paths.ts';
 import { agentForNew } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
@@ -62,7 +63,7 @@ function loginCommandFor(agent: AgentCommand): AgentCommand {
       };
 }
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'auth',
   describe: 'arrange the login an agent asked for, so a session does not die on -32000',
   builder: (yargs) =>
@@ -76,7 +77,7 @@ const command: CommandModule = {
   handler: async (argv) => {
     const raw = argv as Record<string, unknown>;
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
-    const resolved = agentForNew(pickArgv<string>(raw, 'agent'));
+    const resolved = agentForNew(paths, pickArgv<string>(raw, 'agent'));
     if (!resolved) return;
     const launcher = resolved.command;
     if (resolved.isolation) {
@@ -160,7 +161,7 @@ const command: CommandModule = {
       second.close();
     }
   },
-};
+});
 
 /**
  * Run a command with stdio inherited from this process, and resolve with its exit code.

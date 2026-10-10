@@ -1,10 +1,19 @@
 import { describe, expect, it } from '@gjsify/unit';
 
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 
+import { createSessionStore, newSession } from '@kurier/session';
+
+import { gatherResolveContext } from '../../../src/core/agents/probe.ts';
+import { isolationDirs, isolationEnv, prepareIsolation } from '../../../src/core/agents/isolation.ts';
+import { DEFAULT_NOTICES, writeNotices } from '../../../src/core/notices.ts';
+import { saveSettings } from '../../../src/core/settings.ts';
 import {
   dataDir,
+  kurierPaths,
+  kurierPathsUnder,
   noticesFile,
   sessionsFile,
   settingsFile,
@@ -77,6 +86,69 @@ export default async () => {
 
     await it('defaults to notices.json in the data directory', async () => {
       expect(noticesFile({ KURIER_DATA_DIR: '/opt/kd' })).toBe('/opt/kd/notices.json');
+    });
+  });
+
+  await describe('kurierPaths — the defaults', async () => {
+    await it("reproduces today's paths", async () => {
+      expect(kurierPaths({})).toStrictEqual({
+        dataDir: join(XDG_DEFAULT, 'kurier'),
+        configDir: join(homedir(), '.config', 'kurier'),
+        sessionsFile: join(XDG_DEFAULT, 'kurier', 'sessions.json'),
+        settingsFile: join(homedir(), '.config', 'kurier', 'settings.json'),
+        noticesFile: join(XDG_DEFAULT, 'kurier', 'notices.json'),
+      });
+    });
+
+    await it('keeps the legacy environment knobs working', async () => {
+      const env = {
+        XDG_DATA_HOME: '/x/data',
+        XDG_CONFIG_HOME: '/x/config',
+        KURIER_SESSIONS_FILE: '/y/s.json',
+        KURIER_NOTICES_FILE: '/y/n.json',
+      };
+      const paths = kurierPaths(env);
+      expect(paths.dataDir).toBe('/x/data/kurier');
+      expect(paths.configDir).toBe('/x/config/kurier');
+      expect(paths.settingsFile).toBe('/x/config/kurier/settings.json');
+      expect(paths.sessionsFile).toBe('/y/s.json');
+      expect(paths.noticesFile).toBe('/y/n.json');
+      expect(kurierPaths({ KURIER_DATA_DIR: '/d' }).noticesFile).toBe('/d/notices.json');
+    });
+  });
+
+  await describe('kurierPathsUnder — an injected root', async () => {
+    await it('puts every file under the root', async () => {
+      const paths = kurierPathsUnder('/host/app/kurier');
+      for (const path of Object.values(paths)) expect(path.startsWith('/host/app/kurier/')).toBe(true);
+    });
+
+    await it('redirects what core writes: sessions, settings, notices, agent HOME and XDG', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'kurier-paths-'));
+      try {
+        const paths = kurierPathsUnder(root);
+        createSessionStore(paths.sessionsFile).create(
+          newSession({ id: 'a', agent: 'opencode', cwd: '/tmp', at: '2026-09-30T10:00:00.000Z' }),
+        );
+        saveSettings(paths.settingsFile, { version: 1, agent: null });
+        writeNotices(paths.noticesFile, DEFAULT_NOTICES);
+
+        const dirs = gatherResolveContext(paths, false, false).isolationFor('opencode');
+        expect(dirs).toStrictEqual(isolationDirs(paths.dataDir, 'opencode'));
+        const env = isolationEnv(dirs);
+        prepareIsolation(env);
+        for (const key of ['HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME']) {
+          expect(env[key]!.startsWith(`${root}/`)).toBe(true);
+          expect(statSync(env[key]!).isDirectory()).toBe(true);
+        }
+
+        const written = readdirSync(root, { recursive: true, withFileTypes: false }).map(String);
+        expect(written.includes(relative(root, paths.sessionsFile))).toBe(true);
+        expect(written.includes(relative(root, paths.settingsFile))).toBe(true);
+        expect(written.includes(relative(root, paths.noticesFile))).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
   });
 };

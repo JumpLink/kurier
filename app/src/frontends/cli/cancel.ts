@@ -12,7 +12,7 @@
 
 import type { CommandModule } from 'yargs';
 
-import { sessionsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import { openAgent } from '../../core/run.ts';
 import { createSessionStore } from '@kurier/session';
 
@@ -20,7 +20,7 @@ import { agentForRecorded } from './choose.ts';
 import { silentGate } from './gate.ts';
 import { err, out, pickArgv } from './output.ts';
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'cancel <id>',
   describe: 'send session/cancel for a session (Ctrl-C does the same inside a running turn)',
   builder: (yargs) =>
@@ -34,7 +34,7 @@ const command: CommandModule = {
     const id = pickArgv<string>(raw, 'id') ?? '';
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
 
-    const store = createSessionStore(sessionsFile());
+    const store = createSessionStore(paths.sessionsFile);
     const record = store.get(id);
     const agentId = pickArgv<string>(raw, 'agent') ?? record?.agent;
     if (!agentId) {
@@ -48,7 +48,7 @@ const command: CommandModule = {
       return;
     }
 
-    const resolved = agentForRecorded(agentId, record?.agentSource);
+    const resolved = agentForRecorded(paths, agentId, record?.agentSource);
     if (!resolved) return;
     const launcher = resolved.command;
     const handle = await openAgent({
@@ -77,6 +77,6 @@ const command: CommandModule = {
       handle.close();
     }
   },
-};
+});
 
 export const cancelCommand = command;
