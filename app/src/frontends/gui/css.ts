@@ -1,11 +1,9 @@
 /**
- * The app's CSS: the chat widget's sheet plus the three rules that are this window's own.
+ * The app's CSS: the three rules that are this window's own, and nothing of the chat's.
  *
- * **One provider, one sheet, and that is the reason this file concatenates rather than loads.**
- * `@kurier/widget` hands over its rules as a string (`WIDGET_CSS`) instead of installing a
- * `Gtk.CssProvider` of its own, because two providers on one display is a second opinion about
- * priority and an embedded widget cannot decide that for the app around it. So the app owns the
- * provider (`main.ts`) and this file owns what goes into it.
+ * **Two providers on the display, and no rule is in both.** `KurierChat` installs `@kurier/widget`'s
+ * sheet itself (`installWidgetCss`), so a host that embeds it alone is styled; the app's provider
+ * (`main.ts`) carries only the sidebar.
  *
  * What is left here is what the *window* has and a chat has not: the sidebar. Everything about the
  * transcript, the composer, the tool cards and the approval dialog travelled with the widget, along
@@ -17,14 +15,12 @@
  * them look like the pages the widget would have drawn there.
  */
 
-import { CSS as WIDGET_CSS_CLASSES, WIDGET_CSS } from '@kurier/widget';
+import { CSS as WIDGET_CSS_CLASSES } from '@kurier/widget';
 
 /** Adwaita name classes, declared so a typo is a visible gap rather than a silently plain widget. */
 const DIM = 'dim-label';
 
 export const APP_CSS = `
-${WIDGET_CSS}
-
 /* A session title in the sidebar. Ellipsized, not wrapped: a title is an agent's own words and can
    be arbitrarily long, and a sidebar row that wraps makes the whole list unreadable at a glance. */
 .kurier-session-title {

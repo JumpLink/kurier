@@ -55,9 +55,9 @@ The tables above are the plan; `packages/core` followed them with four deltas wo
 split of `window.ts` came out with five deltas worth recording.
 
 - **`css.ts` and `constants.ts` were split rather than moved**, which is what made the move commit
-  edit-free. The widget owns `WIDGET_CSS` and `CONTENT_MAX_WIDTH_PX`; the app's `APP_CSS`
-  interpolates `${WIDGET_CSS}` and adds its three sidebar rules, so there is still **one**
-  `Gtk.CssProvider` on the display and `main.ts` did not change. The app's `constants.ts` kept what
+  edit-free. The widget owns `WIDGET_CSS` and `CONTENT_MAX_WIDTH_PX`; `KurierChat`
+  installs it itself (`installWidgetCss`, once per display) and the app's `APP_CSS` keeps only its
+  three sidebar rules, so a host that embeds the widget alone is styled and no rule is in both sheets. The app's `constants.ts` kept what
   only an app has: the app id, name and version, the window geometry, `COLLAPSE_WIDTH_PX` and the
   dev-hook prefix.
 - **The two idle pages are the host's widgets, not the widget's copy.** `closed` and `no-agent` are

@@ -62,6 +62,7 @@ import {
 } from '@kurier/core';
 
 import { Composer } from './composer.ts';
+import { installWidgetCss } from './css.ts';
 import { ConfigRow } from './config-row.ts';
 import { FailureDialog } from './failure-dialog.ts';
 import { LoginDialog } from './login-dialog.ts';
@@ -218,6 +219,7 @@ export class KurierChat extends Adw.Bin {
 
   constructor(options: KurierChatOptions) {
     super();
+    installWidgetCss();
 
     this.#unavailable = options.noAgent?.sendReason;
     this.#newChat = options.newChat;

@@ -28,7 +28,6 @@
 
 export { KurierChat, type HostGateAnswer, type KurierChatOptions } from './chat.ts';
 
-// ── The stylesheet, which the host loads ─────────────────────────────────────────────────────────
-// Not a `Gtk.CssProvider`: a second provider on the display is a second opinion about priority, and
-// an embedded widget does not get to have one. `css.ts` says it at length.
-export { CSS, WIDGET_CSS } from './css.ts';
+// The stylesheet is installed by `KurierChat` itself; only the class-name map is public, for a host
+// that styles its own widgets next to the chat (kurier's app reuses `calm`).
+export { CSS } from './css.ts';

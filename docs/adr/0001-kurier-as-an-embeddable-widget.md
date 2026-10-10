@@ -95,8 +95,8 @@ Planned; steps 1 to 5 are done.
    `noAgentPage`; the widget decides *when* to show them, the app decides what they say. `win.login`
    stays an app menu action over the widget's `hasLogin`/`openLogin()`.
 
-   The CSS is split the same way: the widget exports `WIDGET_CSS`, the app's `APP_CSS` interpolates it
-   and adds its three sidebar rules, so there is one stylesheet at runtime and one owner per rule.
+   The CSS is split the same way: the widget installs its own sheet (`installWidgetCss`, once per display),
+   and the app's `APP_CSS` holds its three sidebar rules, so one owner per rule and a host needs no CSS.
 6. Inline provider onboarding.
 7. API docs.
 8. Flatpak module generator from `bundled-agents.json`.

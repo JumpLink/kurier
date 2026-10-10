@@ -7,12 +7,11 @@
  * here would be a way of fighting it. What is left is the handful of things the toolkit has no name
  * for.
  *
- * **A host loads this, and that is why it is a string rather than a `Gtk.CssProvider`.** The widget
- * does not install a provider of its own: a second provider on the display is a second opinion
- * about priority, and the order two of them resolve in is not something an embedded widget can
- * decide for the app around it. So `WIDGET_CSS` is handed to the host, which concatenates its own
- * rules and loads one sheet — `app/src/frontends/gui/css.ts` in kurier's own app is exactly that
- * consumer.
+ * **The widget installs this itself, once per display.** `KurierChat` calls `installWidgetCss()` from
+ * its constructor, so a host that embeds it alone gets a styled chat without knowing a stylesheet
+ * exists. The provider sits at application priority and carries only `kurier-*` selectors plus the
+ * few Adwaita name classes below, so it cannot disagree with a host's own sheet about a rule; the
+ * host must therefore *not* load `WIDGET_CSS` as well (it is not exported for that reason).
  *
  * **There is no width cap in this file, and that is a measurement rather than an omission.** GTK 4
  * removed `max-width` and `max-width-chars` as CSS properties: both are rejected by the theme parser
@@ -26,6 +25,9 @@
  * 1.9.3. An unverified property in here is a silently dropped line, which is the failure this
  * file's own header is about.
  */
+
+import Gdk from '@girs/gdk-4.0';
+import Gtk from '@girs/gtk-4.0';
 
 /** Adwaita name classes, declared so a typo is a visible gap rather than a silently plain widget. */
 const DIM = 'dim-label';
@@ -296,3 +298,15 @@ export const CSS = {
   title: TITLE,
   mono: MONO,
 } as const;
+
+const installedOn = new WeakSet<Gdk.Display>();
+
+/** Load the widget's sheet on the default display, once. Called by `KurierChat`; idempotent. */
+export function installWidgetCss(): void {
+  const display = Gdk.Display.get_default();
+  if (!display || installedOn.has(display)) return;
+  installedOn.add(display);
+  const provider = new Gtk.CssProvider();
+  provider.load_from_string(WIDGET_CSS);
+  Gtk.StyleContext.add_provider_for_display(display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+}

@@ -51,7 +51,7 @@
  *
  * The bubbles' and the composer's padding come from `css.ts`, and a probe with its own copy of those
  * rules would measure a layout nobody ships. So the probe reads `app/src/frontends/gui/css.ts`, takes
- * the `APP_CSS` template literal out of it, substitutes the three name constants, and loads that. If
+ * the `APP_CSS` template literal out of it, substitutes the three name constants (plus the widget sheet), and loads that. If
  * the stylesheet changes, this measures the change.
  *
  * ## How to run it so the sweep means anything
@@ -115,8 +115,8 @@ function readSheet(relative, name) {
  * second copy of the stylesheet is a second thing to keep in step with the first.
  *
  * **Two files since ADR 0001 step 5**, because the sheet is: the chat's rules are
- * `@kurier/widget`'s `WIDGET_CSS` and the app's own three are `APP_CSS`, which interpolates the
- * first. Reading only the app's file would measure a window with no transcript padding at all —
+ * `@kurier/widget`'s `WIDGET_CSS` and the app's own three are `APP_CSS`; the widget installs
+ * its sheet itself, so both are loaded here. Reading only the app's file would measure a window with no transcript padding at all —
  * which is exactly the kind of quietly-wrong baseline this function exists to avoid.
  */
 function loadRealStylesheet() {
@@ -124,8 +124,7 @@ function loadRealStylesheet() {
   const widget = readSheet('packages/widget/src/css.ts', 'WIDGET_CSS');
   if (app === null || widget === null) return null;
   // The three interpolated Adwaita name classes. Everything else in the sheet is literal.
-  const css = app
-    .replace('${WIDGET_CSS}', widget)
+  const css = (widget + '\n' + app)
     .replaceAll('${MONO}', 'monospace')
     .replaceAll('${DIM}', 'dim-label')
     .replaceAll('${TITLE}', 'title-1');
