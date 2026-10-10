@@ -27,7 +27,7 @@
  * parses on assignment: `css.ts` and `transcript-view.ts` both record that a later
  * `set_use_markup(false)` is too late.
  *
- * **The placeholder is a visible line, not `Gtk.TextView:placeholder-text`.** That property exists on
+ * **The status line is the placeholder that matters; `placeholder-text` is only a hint on top.** That property exists on
  * the GTK 4.22.5 this runs against (measured: `scripts/probes/composer-props.mjs`) and does **not**
  * exist in the `@girs/gtk-4.0` 4.6.0 typings this repo compiles against — so writing it would be a
  * type error here and a silently absent placeholder on any older GTK. `#status` carries the same
@@ -141,6 +141,10 @@ export class Composer {
       // navigation inside the composer, which at the 360 px phone floor has nowhere else to go.
       cssClasses: [CSS.composerEntry],
     });
+    // The typings (4.6.0) do not know `placeholder-text`; the GTK this runs on does (see the header and
+    // `scripts/probes/composer-props.mjs`). Set after construction through a cast, so an older GTK gets a
+    // plain JS property and no placeholder instead of a thrown constructor.
+    (this.#entry as Gtk.TextView & { placeholderText?: string }).placeholderText = 'Ask the agent…';
     // Enter sends, Shift+Enter does not — the convention in every chat surface this window is drawn
     // from, and without it a multi-line entry is a trap: the person types what looks like a message
     // and gets a newline instead. It goes through the SAME `#activate()` as the button, so there is

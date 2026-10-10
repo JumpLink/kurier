@@ -19,7 +19,7 @@
  * ellipsis with no way to read the model. One per line gives every control the full measure, and at
  * 1024 px the row is three lines tall inside the same bottom bar the composer is in. The row does not
  * raise the window's width floor: `scripts/probes/window-min-width.mjs` measures that the floor is
- * `Adw.NavigationSplitView`'s, not kurier's content's, and the dropdowns `hexpand` into whatever width
+ * `Adw.NavigationSplitView`'s, not kurier's content's, and the dropdowns at a fixed width into whatever width
  * is there.
  *
  * **Every label that could carry an agent's words says `useMarkup: false` in the constructor.** Not a
@@ -51,6 +51,9 @@ import {
 } from '../../core/config-row.ts';
 import { CONTENT_MAX_WIDTH_PX } from './constants.ts';
 import { CSS } from './css.ts';
+
+/** Width asked of each dropdown; see `#buildControl`. */
+const CONFIG_CONTROL_WIDTH_PX = 200;
 
 export interface ConfigRowOptions {
   /**
@@ -175,8 +178,11 @@ export class ConfigRow {
         if (!child) break;
         this.#flow.remove(child);
       }
+      // One group per render: the labels share a width so the three dropdowns start at one edge,
+      // which is what makes three lines read as one control row instead of three form fields.
+      const labels = new Gtk.SizeGroup({ mode: Gtk.SizeGroupMode.HORIZONTAL });
       for (const control of this.#view.controls) {
-        this.#flow.append(this.#buildControl(control));
+        this.#flow.append(this.#buildControl(control, labels));
       }
     } finally {
       this.#rendering = false;
@@ -186,14 +192,14 @@ export class ConfigRow {
   }
 
   /** One control: a caption and a dropdown, in a box that shares the measure with the others. */
-  #buildControl(control: ConfigRowControl): Gtk.Widget {
+  #buildControl(control: ConfigRowControl, labels: Gtk.SizeGroup): Gtk.Widget {
     const label = new Gtk.Label({
       // **The agent's own words, with markup off in the constructor.** `opencode`'s model ids and
       // names are arbitrary strings, and `a < b` is a plausible one.
       useMarkup: false,
       xalign: 0,
       label: control.name,
-      cssClasses: ['caption'],
+      cssClasses: [CSS.dim, 'caption'],
       // The tooltip is the agent's `description` when it sent one. On the *label*, not the dropdown,
       // because the description is about the control rather than about the current value.
       tooltipText: control.description,
@@ -215,7 +221,10 @@ export class ConfigRow {
       // Only a long list needs it — 400 model ids cannot be scanned; six effort levels can. The
       // decision is a fact about the data and lives in `core/config.ts`.
       enableSearch: control.searchable,
-      hexpand: true,
+      // Compact, not a full-width form field: wide enough for a model name to be recognisable, narrow
+      // enough that the 360 px floor still fits label + control (the row's floor is the window's).
+      halign: Gtk.Align.START,
+      widthRequest: CONFIG_CONTROL_WIDTH_PX,
       sensitive: control.selectable,
       tooltipText: control.description,
       valign: Gtk.Align.CENTER,
@@ -232,10 +241,8 @@ export class ConfigRow {
     const row = new Gtk.Box({
       orientation: Gtk.Orientation.HORIZONTAL,
       spacing: 8,
-      hexpand: true,
     });
-    // The label takes its natural width and the dropdown takes the rest, so a long model name eats the
-    // measure it needs and a short one (`Mode`) leaves the dropdown wide.
+    labels.add_widget(label);
     row.append(label);
     row.append(dropdown);
     return row;
