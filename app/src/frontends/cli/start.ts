@@ -15,7 +15,7 @@ import type { CommandModule } from 'yargs';
 
 import { conversationRecord } from '../../core/conversation.ts';
 import { installInterruptHandler } from '../../core/interrupt.ts';
-import { sessionsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
 import { createSessionStore } from '@kurier/session';
@@ -26,7 +26,7 @@ import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'start [prompt..]',
   describe: 'open a session with an agent and run one prompt turn',
   builder: (yargs) =>
@@ -58,11 +58,11 @@ const command: CommandModule = {
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
     const text = prompt.join(' ').trim();
 
-    const resolved = agentForNew(pickArgv<string>(raw, 'agent'));
+    const resolved = agentForNew(paths, pickArgv<string>(raw, 'agent'));
     if (!resolved) return;
     const launcher = resolved.command;
     const terminal = processTerminal();
-    const store = createSessionStore(sessionsFile());
+    const store = createSessionStore(paths.sessionsFile);
     const at = () => new Date().toISOString();
 
     // Installed before the agent exists, so there is no window in which a process is running that
@@ -138,6 +138,6 @@ const command: CommandModule = {
       terminal.close();
     }
   },
-};
+});
 
 export const startCommand = command;

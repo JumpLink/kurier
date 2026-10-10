@@ -123,7 +123,7 @@ Widget needs:
 | # | Step | Size |
 |---|---|---|
 | 1 | Probe: does opencode honour `mcpServers` (scratch HOME, trivial stdio MCP)? Does `/api/integration` report connected providers? | S |
-| 2 | Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
+| 2 | **Done** (`KurierPaths`, see the ADR). Make paths/settings injectable: remove `paths.ts` / `settings.ts` imports from the files that will move; define `KurierChatOptions` | M |
 | 3 | Create `@kurier/core` (LGPL): move `core/agents/*`, `agent-session`, `turn`, `failure`, `login/*`, view-model files; move `bundled-agents.json` + `login-providers.json` + `free-models.json` or make them injectable; keep the tests green on GJS and Node | L |
 | 4 | Plumb `mcpServers` through `AgentSession` (new + reattach) and the permission-policy hook; unit tests with the fixture agent | S |
 | 5 | Create `@kurier/widget`: move leaf widgets (`composer`, `transcript-view`, `config-row`, dialogs, css); then extract `KurierChat` from `window.ts`, with `MainWindow` consuming it. Blueprint (`.blp`) compile must work from a package | L |

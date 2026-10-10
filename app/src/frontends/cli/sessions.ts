@@ -8,13 +8,13 @@
 
 import type { CommandModule } from 'yargs';
 
-import { sessionsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import { LOCAL_PRINCIPAL, createSessionStore, forPrincipal } from '@kurier/session';
 import type { SessionRecord } from '@kurier/session';
 
 import { err, pickArgv, showSession, showSessionTable } from './output.ts';
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'sessions',
   describe: 'list the sessions kurier has recorded',
   builder: (yargs) =>
@@ -25,7 +25,7 @@ const command: CommandModule = {
       .strict(),
   handler: (argv) => {
     const raw = argv as Record<string, unknown>;
-    const store = createSessionStore(sessionsFile());
+    const store = createSessionStore(paths.sessionsFile);
     const principal = pickArgv<string>(raw, 'principal') ?? LOCAL_PRINCIPAL;
     // `--all` is the only way past the principal filter, and it has to be asked for: the model is
     // "policy per principal, not per session", so a listing that silently mixed them would be a
@@ -48,6 +48,6 @@ const command: CommandModule = {
       );
     }
   },
-};
+});
 
 export const sessionsCommand = command;

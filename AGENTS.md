@@ -30,7 +30,8 @@ layer, `fs/read_text_file`/`fs/write_text_file` can be refused outright, and `se
 `transport.ts`). That is postbote's `store`-knows-no-backend rule one layer up, and it is what lets
 the same protocol code run as the Node unit test and the GJS integration test.
 
-`@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME`, a
+`@kurier/session`'s store takes a path and never decides one: the app resolves `$XDG_DATA_HOME` once into a
+`KurierPaths` (`core/paths.ts`, passed to the commands and the window; `kurierPathsUnder(root)` for a host), a
 test passes a temp dir.
 
 ## The CLI
@@ -68,7 +69,7 @@ use the agent the session recorded. A **bundled copy runs inside the sandbox** (
 The two copies keep separate histories, so `kurier start` records `SessionRecord.agentSource`
 (`host`|`bundled`; **absent = host**, the old records) and `resolveRecorded` resumes on that copy — a copy
 that is gone is an error naming why, never a fall to the other. The window resolves with
-`gatherResolveContext(env, false)`: no `--version` spawn, so it never waits on a child before it appears.
+`gatherResolveContext(paths, false)`: no `--version` spawn, so it never waits on a child before it appears.
 
 **One turn, not a REPL**, and that is a decision rather than a missing feature. A REPL needs
 somewhere to put the approval surface, and the plan puts the surface in a later slice; a REPL now

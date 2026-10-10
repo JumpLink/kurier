@@ -34,7 +34,7 @@ import { currentSandboxFacts, isSandboxed } from '../../core/agents/sandbox.ts';
 import { resolveCwd } from '../../core/cwd.ts';
 import { emptyStateView, noticeView } from '../../core/empty-state.ts';
 import { markSeen, readNotices, writeNotices } from '../../core/notices.ts';
-import { noticesFile, sessionsFile, settingsFile } from '../../core/paths.ts';
+import { kurierPaths } from '../../core/paths.ts';
 import { backupPath, readSettings, saveSettings } from '../../core/settings.ts';
 import { settingsChoicesView } from '../../core/settings-view.ts';
 import { APP_CSS } from './css.ts';
@@ -52,6 +52,7 @@ void Gtk;
  * exist at all, and why a state that only a click can reach is a state nobody has checked.
  */
 const hooks = readHooks();
+const paths = kurierPaths();
 
 /**
  * What the settings said about themselves: an unreadable file, or a choice that is not available here.
@@ -72,14 +73,11 @@ const settingsNotes: string[] = [];
  */
 let nothingFound = false;
 const agent = chooseAgent(hooks.agent, () => {
-  const { settings, problem } = readSettings(settingsFile());
+  const { settings, problem } = readSettings(paths.settingsFile);
   if (problem) settingsNotes.push(problem);
   // No `--version` spawn. Inside a Flatpak this still asks the host, synchronously (up to 5 s per
   // launcher), before the window exists — only the preferences dialog is asynchronous (see below).
-  const { agent: found, note } = resolveDefaultWithNote(
-    gatherResolveContext(process.env, false),
-    settings.agent,
-  );
+  const { agent: found, note } = resolveDefaultWithNote(gatherResolveContext(paths, false), settings.agent);
   if (note) settingsNotes.push(note);
   if (!found || hooks.noAgent) {
     nothingFound = true;
@@ -97,7 +95,7 @@ const emptyView = noAgent ? emptyStateView({ agent: null }) : null;
  * again) and the copy that runs. `KU_APP_NOTICE` forces the bundled condition — the copy does not exist
  * outside a Flatpak.
  */
-const noticesPath = noticesFile();
+const noticesPath = paths.noticesFile;
 const noticesRead = readNotices(noticesPath);
 if (noticesRead.problem) console.log(`kurier: ${noticesRead.problem}`);
 const notice = noAgent
@@ -164,8 +162,8 @@ const status = await runAdwaitaApp({
                   id,
                   source,
                   sandboxed
-                    ? await gatherResolveContextAsync(process.env)
-                    : gatherResolveContext(process.env, false, false),
+                    ? await gatherResolveContextAsync(paths)
+                    : gatherResolveContext(paths, false, false),
                 );
               } catch (error) {
                 return { problem: error instanceof Error ? error.message : String(error) };
@@ -178,9 +176,9 @@ const status = await runAdwaitaApp({
         // is all that runs, and inside a Flatpak the host rows say "Checking…" until `detect` answers.
         // Outside a Flatpak there is no host question, so `detect` is `null` and the cheap rows are final.
         load: (detected) => {
-          const file = settingsFile();
+          const file = paths.settingsFile;
           const { settings, problem, problemKind } = readSettings(file);
-          const context = detected ?? gatherResolveContext(process.env, false, false);
+          const context = detected ?? gatherResolveContext(paths, false, false);
           return settingsChoicesView(context.detections, BUNDLED_AGENTS, settings, {
             bundledAvailable: context.bundledAvailable,
             problem,
@@ -192,26 +190,26 @@ const status = await runAdwaitaApp({
         detect: sandboxed
           ? async () => {
               try {
-                return await gatherResolveContextAsync(process.env);
+                return await gatherResolveContextAsync(paths);
               } catch {
                 // A probe that threw means "no host answer": the cheap rows, now final.
-                return gatherResolveContext(process.env, false, false);
+                return gatherResolveContext(paths, false, false);
               }
             }
           : null,
-        save: (choice) => saveSettings(settingsFile(), { version: 1, agent: choice }),
+        save: (choice) => saveSettings(paths.settingsFile, { version: 1, agent: choice }),
       },
       createSession: (record) => {
-        createSessionStore(sessionsFile()).create(record);
+        createSessionStore(paths.sessionsFile).create(record);
       },
-      loadSessions: () => forPrincipal(createSessionStore(sessionsFile()).all(), LOCAL_PRINCIPAL),
+      loadSessions: () => forPrincipal(createSessionStore(paths.sessionsFile).all(), LOCAL_PRINCIPAL),
       // **One store for the window's lifetime, not one per call.** The window reads the file once at
       // startup and appends a batch per streamed chunk; a fresh store per append would re-read and
       // re-parse a file that may hold thirty conversations, for every token an agent emits. The store is
       // a synchronous JSON file with no cache of its own, so this is the only place that can be improved,
       // and "improve it" is a change to `@kurier/session` rather than a decision for a surface.
       appendTurns: (sessionId, entries) => {
-        createSessionStore(sessionsFile()).append(sessionId, entries);
+        createSessionStore(paths.sessionsFile).append(sessionId, entries);
       },
     }),
 });

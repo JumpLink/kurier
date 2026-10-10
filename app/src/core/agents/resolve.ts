@@ -50,7 +50,7 @@ export function bundledCommand(entry: BundledAgent, dirs: IsolationDirs): AgentC
 
 export interface ResolveContext {
   readonly detections: readonly AgentDetection[];
-  /** Where a bundled copy keeps its state: `isolationDirs(dataDir(), id)`. */
+  /** Where a bundled copy keeps its state: `isolationDirs(paths.dataDir, id)`. */
   readonly isolationFor: (id: string) => IsolationDirs;
   /**
    * Whether the bundled program for `id` exists, whether or not a host install shadows it in

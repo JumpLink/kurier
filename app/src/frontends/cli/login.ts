@@ -30,6 +30,7 @@ import { createLoginApi, LoginApiError } from '../../core/login/api.ts';
 import { answersFor, runLogin, type LoginHooks } from '../../core/login/flow.ts';
 import type { LoginMethod, LoginProvider } from '../../core/login/providers.ts';
 
+import type { KurierPaths } from '../../core/paths.ts';
 import { agentForNew } from './choose.ts';
 import { err, out, pickArgv } from './output.ts';
 
@@ -105,7 +106,7 @@ async function readSecret(prompt: string): Promise<string | null> {
   });
 }
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'login [provider]',
   describe: 'log in to a provider (browser login or API key) through the agent, with no terminal login',
   builder: (yargs) =>
@@ -127,7 +128,7 @@ const command: CommandModule = {
       .strict(),
   handler: async (argv) => {
     const raw = argv as Record<string, unknown>;
-    const resolved = agentForNew(pickArgv<string>(raw, 'agent'));
+    const resolved = agentForNew(paths, pickArgv<string>(raw, 'agent'));
     if (!resolved) return;
     const agent = resolved.command;
 
@@ -280,6 +281,6 @@ const command: CommandModule = {
       setTimeout(() => process.exit(process.exitCode ?? 0), 50);
     }
   },
-};
+});
 
 export const loginCommand = command;

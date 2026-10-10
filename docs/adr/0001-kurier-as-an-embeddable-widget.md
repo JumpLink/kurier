@@ -50,10 +50,13 @@ reported or dropped silently.
 
 ## Order of work
 
-Planned, not implemented, except step 1.
+Planned; steps 1 and 2 are done.
 
 1. Probe `mcpServers` (done, above); probe whether `/api/integration` reports connected providers.
-2. Make paths and settings injectable.
+2. Make paths and settings injectable. **Done:** `KurierPaths` (`core/paths.ts`: data and config dir plus the
+   sessions, settings and notices files; a bundled agent's `HOME`/`XDG_*` follow `dataDir`) is built once at the
+   app and CLI entry (`kurierPaths()`, defaults and `KURIER_*` knobs unchanged) and passed down; a host builds
+   its own with `kurierPathsUnder(root)`.
 3. Create `@kurier/core`.
 4. Plumb `mcpServers` through `AgentSession` (new and reattach).
 5. Create `@kurier/widget`; split `KurierChat` out of `window.ts`.

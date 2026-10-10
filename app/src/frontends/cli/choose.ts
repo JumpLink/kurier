@@ -8,7 +8,7 @@
  */
 
 import { requireLauncher } from '../../core/agents/launcher.ts';
-import { settingsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import { readSettings } from '../../core/settings.ts';
 import { gatherResolveContext } from '../../core/agents/probe.ts';
 import {
@@ -29,13 +29,13 @@ function announce(agent: ResolvedAgent): ResolvedAgent {
 }
 
 /** An agent for a new session, or for `auth`: the explicit launcher, else the default resolution. */
-export function agentForNew(explicit: string | undefined): ResolvedAgent | null {
+export function agentForNew(paths: KurierPaths, explicit: string | undefined): ResolvedAgent | null {
   if (explicit) {
     return { command: requireLauncher(explicit), source: 'host', version: null, isolation: null };
   }
-  const { settings, problem } = readSettings(settingsFile());
+  const { settings, problem } = readSettings(paths.settingsFile);
   if (problem) err(`  ${problem}`);
-  const { agent: found, note } = resolveDefaultWithNote(gatherResolveContext(), settings.agent);
+  const { agent: found, note } = resolveDefaultWithNote(gatherResolveContext(paths), settings.agent);
   if (note) err(`  ${note}`);
   if (!found) {
     err(NO_AGENT_MESSAGE);
@@ -49,9 +49,13 @@ export function agentForNew(explicit: string | undefined): ResolvedAgent | null 
  * The agent a recorded session names, on the copy that started it. `requireLauncher` first, so an unknown
  * id gets its menu; a copy that is gone prints why and sets the exit code.
  */
-export function agentForRecorded(id: string, source: ResolvedSource | undefined): ResolvedAgent | null {
+export function agentForRecorded(
+  paths: KurierPaths,
+  id: string,
+  source: ResolvedSource | undefined,
+): ResolvedAgent | null {
   requireLauncher(id);
-  const found = resolveRecorded(id, source, gatherResolveContext());
+  const found = resolveRecorded(id, source, gatherResolveContext(paths));
   if ('problem' in found) {
     err(found.problem);
     process.exitCode = 1;

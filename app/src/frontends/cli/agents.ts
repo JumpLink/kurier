@@ -14,7 +14,7 @@ import { resolveAgent, detectAgents, type AgentDetection } from '../../core/agen
 import { DEFAULT_AGENT, LAUNCHERS, launcherIds } from '../../core/agents/launcher.ts';
 import { gatherAgentFacts } from '../../core/agents/probe.ts';
 import type { AgentCommand } from '../../core/agents/stdio.ts';
-import { settingsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import {
   describeChoice,
   parseChoiceSpec,
@@ -72,7 +72,7 @@ export function settingsReport(file: string, settings: Settings, problem: string
   return lines;
 }
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'agents',
   describe: 'list the agent launchers kurier knows how to start',
   builder: (yargs) =>
@@ -83,7 +83,7 @@ const command: CommandModule = {
       })
       .strict(),
   handler: (argv) => {
-    const file = settingsFile();
+    const file = paths.settingsFile;
     const use = pickArgv<string>(argv as Record<string, unknown>, 'use');
     if (use !== undefined) {
       const parsed = parseChoiceSpec(use, launcherIds());
@@ -117,6 +117,6 @@ const command: CommandModule = {
     if (note) err(note);
     err('* the default for --agent');
   },
-};
+});
 
 export const agentsCommand = command;

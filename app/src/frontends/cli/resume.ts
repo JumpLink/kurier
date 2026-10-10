@@ -12,7 +12,7 @@
 import type { CommandModule } from 'yargs';
 
 import { installInterruptHandler } from '../../core/interrupt.ts';
-import { sessionsFile } from '../../core/paths.ts';
+import type { KurierPaths } from '../../core/paths.ts';
 import { openAgent, runTurn, withAuthHint } from '../../core/run.ts';
 import { toTranscript } from '../../core/transcript.ts';
 import { createSessionStore } from '@kurier/session';
@@ -23,7 +23,7 @@ import { commandGate } from './gate.ts';
 import { err, out, pickArgv, showUpdate } from './output.ts';
 import { processTerminal } from './terminal.ts';
 
-const command: CommandModule = {
+const command = (paths: KurierPaths): CommandModule => ({
   command: 'resume <id> [prompt..]',
   describe: 'reattach a recorded session and optionally run one prompt turn',
   builder: (yargs) =>
@@ -50,7 +50,7 @@ const command: CommandModule = {
     const quiet = pickArgv<boolean>(raw, 'quiet') === true;
     const text = prompt.join(' ').trim();
 
-    const store = createSessionStore(sessionsFile());
+    const store = createSessionStore(paths.sessionsFile);
     const record = store.get(id);
     if (!record) {
       err(`no session with id ${id} — \`kurier sessions\` lists what kurier has`);
@@ -67,7 +67,7 @@ const command: CommandModule = {
       process.exitCode = 1;
       return;
     }
-    const resolved = agentForRecorded(record.agent, record.agentSource);
+    const resolved = agentForRecorded(paths, record.agent, record.agentSource);
     if (!resolved) return;
     const launcher = resolved.command;
     const terminal = processTerminal();
@@ -138,6 +138,6 @@ const command: CommandModule = {
       terminal.close();
     }
   },
-};
+});
 
 export const resumeCommand = command;
