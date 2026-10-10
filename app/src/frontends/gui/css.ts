@@ -25,15 +25,10 @@ const TITLE = 'title-1';
 const MONO = 'monospace';
 
 export const APP_CSS = `
-/* A tool call's raw input: a diff, a command, whatever the agent said it was about to do. Monospace
-   and selectable, because the one thing the approval dialog must not do is paraphrase it. */
-.tool-input {
-  font-family: ${MONO};
-  font-size: 0.9em;
-}
-
-/* The gate's body. Same reason as .tool-input, and the same failure it prevents: a question about a
-   file change that is not legible is a question nobody can answer responsibly.
+/* The gate's body: a tool call's raw input — a diff, a command, whatever the agent said it was about
+   to do. Monospace and selectable, because the one thing the approval dialog must not do is
+   paraphrase it, and a question about a file change that is not legible is a question nobody can
+   answer responsibly.
 
    The radius is the one thing here that is not about legibility. A \`Gtk.TextView\` paints its own
    \`@view_bg_color\` with square corners, which left the raw input as the only hard-cornered surface
@@ -43,12 +38,6 @@ export const APP_CSS = `
   font-family: ${MONO};
   font-size: 0.9em;
   border-radius: 12px;
-}
-
-/* Placeholder copy — an empty transcript, an agent with nothing to offer. Deliberately quiet: these
-   are statements about absence, and absence should not be the loudest thing on screen. */
-.kurier-quiet {
-  opacity: 0.55;
 }
 
 /* The transcript's own line length, set on the text rather than on a container. A label wraps to its
@@ -298,9 +287,7 @@ export const APP_CSS = `
 /** Class names the window file uses, exported so a typo is a compile error rather than plain text. */
 export const CSS = {
   transcriptText: 'kurier-transcript-text',
-  toolInput: 'tool-input',
   gateInput: 'gate-input',
-  quiet: 'kurier-quiet',
   sessionTitle: 'kurier-session-title',
   dateHeader: 'kurier-date-header',
   disclosure: 'kurier-disclosure',
