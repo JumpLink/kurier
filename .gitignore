@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# `gjsify ship` output — multi-hundred-MB local verification artifacts, rebuilt on demand.
+app/ship/
+
 # gjsify
 .gjsify/
 

@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Also callable, so a tag's release runs this exact job instead of a second copy of the
+  # toolchain kept in step with this one by hand.
+  workflow_call:
+
+permissions:
+  contents: read
 
 # The gjsify toolchain, as in postbote/troedler/beifahrer: `gjsify install --immutable`, the bundled
 # `gjsify tsc` type-check, `gjsify build` for the app, and the unit tests under BOTH gjs and node.
@@ -30,17 +36,17 @@ jobs:
           dnf install -y --setopt=install_weak_deps=False
           git tar xz findutils gjs
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Node 24: gjsify's native install-backend prebuilds target node 24; Fedora's default node
       # 22 loads a mismatched ABI and segfaults `gjsify install`.
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
       - name: Cache gjsify tarball store
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/gjsify/tarballs
           key: gjsify-tarballs-${{ hashFiles('gjsify-lock.json') }}
