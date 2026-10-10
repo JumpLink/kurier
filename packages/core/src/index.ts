@@ -325,3 +325,80 @@ export {
   type NoticeView,
 } from './empty-state.ts';
 export { noticeDue, NOTICE_IDS, type NoticeId } from './notices.ts';
+
+// ── `lotse serve`: scheduled tasks, questions to a person, the channel seam (ADR 0003) ──────────
+export {
+  MIN_INTERVAL_MS,
+  isDue,
+  nextRun,
+  parseDuration,
+  parseSchedule,
+  type Schedule,
+  type Weekday,
+} from './serve/schedule.ts';
+export {
+  DEFAULT_QUESTION_LIMITS,
+  ServeConfigError,
+  configHash,
+  isFreeModel,
+  parseServeConfig,
+  profileOf,
+  type QuestionLimits,
+  type ReleasedArea,
+  type RightsLevel,
+  type ServeConfig,
+  type ServeProfile,
+  type ServeTask,
+  type ServeUser,
+} from './serve/config.ts';
+export {
+  createdSince,
+  findQuestions,
+  formatQuestionId,
+  isOpen,
+  isQuestionText,
+  nextQuestionId,
+  normalizeQuestionId,
+  openQuestions,
+  parseAnswer,
+  parseQuestions,
+  pruneQuestions,
+  type AnswerKind,
+  type ParsedAnswer,
+  type Question,
+  type QuestionAction,
+  type QuestionKind,
+  type QuestionStatus,
+} from './serve/questions.ts';
+export {
+  actionOf,
+  callDigest,
+  describeCall,
+  isReleased,
+  serveGate,
+  stripAlways,
+  toolOf,
+  type AskOutcome,
+  type GateDecision,
+  type ServeGateOptions,
+  type ServeToken,
+} from './serve/gate.ts';
+export type { ServeChannel, ServeMessage } from './serve/channel.ts';
+export {
+  ModelUnavailableError,
+  answerQuestion,
+  cancelOrphanedPermissions,
+  ceilingReached,
+  dueTasks,
+  followUpPrompt,
+  nextWakeMs,
+  runTask,
+  userOf,
+  type AnswerMode,
+  type AnswerResult,
+  type QuestionBook,
+  type RunOutcome,
+  type RunResult,
+  type ServeDeps,
+  type ServeLogEntry,
+} from './serve/runner.ts';
