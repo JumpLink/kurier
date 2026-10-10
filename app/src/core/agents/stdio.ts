@@ -308,9 +308,10 @@ export function stdioTransport(options: StdioChannelOptions): Transport {
  * text for `cmd.exe` to interpret, not a PE binary — so `spawn` fails with `ENOENT` even though
  * `where`/`whichOnPath` found it (documented at
  * https://nodejs.org/api/child_process.html#spawning-bat-and-cmd-files-on-windows). A global
- * `shell: true` would fix that one case and weaken every other: `args` stays an ARRAY either way,
- * so Node still does the quoting — the thing that must never happen is building `args` into a
- * command-line STRING by interpolation, which is how `shell: true` turns into argument injection.
+ * `shell: true` would fix that one case and weaken every other. Under `shell: true` Node does NOT
+ * quote: it joins `args` with spaces and hands the line to `cmd.exe` (deprecated as DEP0190). That
+ * is safe here only because every agent's `args` are fixed literals (`acp`, `auth login`, …) —
+ * never let a person- or agent-supplied value reach `args` of a `.cmd`/`.bat` carrier.
  *
  * A separate export so the decision is a unit test, not a win32 box: the predicate is pure and
  * takes `platform` as an argument precisely so this runs on the CI the repo actually has.
