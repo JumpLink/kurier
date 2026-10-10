@@ -140,10 +140,23 @@ template $KurierMainWindow: Adw.ApplicationWindow {
               // kurier rather than about the agent — no agent is running yet, and copy that implies
               // otherwise is a small lie in the first screen anybody sees. "Start a new chat" names the
               // button in the sidebar's header bar, which exists now.
-              description: _("Pick a session from the list, or start a new chat.");
+              description: _("Pick a session from the list, or start a new chat. The agent starts when you send your first message.");
               // `vexpand` so it centres in the pane: an empty area with content jammed under the
               // header reads as a layout bug rather than as a deliberate empty state.
               vexpand: true;
+
+              // The one action of the page. `win.new-chat` is the same action as the sidebar's `+` and
+              // `<Ctrl>n`, so the button adds no path of its own.
+              child: Gtk.Button {
+                label: _("New chat");
+                action-name: "win.new-chat";
+                halign: center;
+
+                styles [
+                  "suggested-action",
+                  "pill",
+                ]
+              };
             };
           }
           StackPage {
@@ -183,22 +196,51 @@ template $KurierMainWindow: Adw.ApplicationWindow {
                   max-width-chars: 56;
                 }
 
+                // The install command as a card: a command is something to copy, so the copy button
+                // sits on it rather than somewhere the eye has to travel to. The label is selectable
+                // too, for a partial copy. Filled from `emptyStateView`, never written here.
                 Gtk.Box noAgentCommands {
-                  orientation: vertical;
+                  orientation: horizontal;
                   spacing: 6;
                   halign: center;
-                }
-
-                Gtk.Label noAgentDocs {
-                  use-markup: false;
-                  selectable: true;
-                  wrap: true;
-                  justify: center;
 
                   styles [
-                    "dim-label",
-                    "caption",
+                    "card",
                   ]
+
+                  Gtk.Label noAgentCommand {
+                    use-markup: false;
+                    selectable: true;
+                    wrap: true;
+                    xalign: 0;
+                    hexpand: true;
+                    margin-start: 12;
+                    margin-top: 8;
+                    margin-bottom: 8;
+
+                    styles [
+                      "monospace",
+                    ]
+                  }
+
+                  Gtk.Button noAgentCopy {
+                    icon-name: "edit-copy-symbolic";
+                    tooltip-text: _("Copy");
+                    valign: center;
+                    margin-end: 6;
+
+                    styles [
+                      "flat",
+                    ]
+
+                    accessibility {
+                      label: _("Copy");
+                    }
+                  }
+                }
+
+                Gtk.LinkButton noAgentDocs {
+                  halign: center;
                 }
 
                 Gtk.Button noAgentPreferences {
@@ -208,6 +250,7 @@ template $KurierMainWindow: Adw.ApplicationWindow {
                   visible: false;
 
                   styles [
+                    "suggested-action",
                     "pill",
                   ]
                 }

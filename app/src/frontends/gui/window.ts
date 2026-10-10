@@ -64,6 +64,7 @@
  */
 
 import Adw from '@girs/adw-1';
+import Gdk from '@girs/gdk-4.0';
 import Gio from '@girs/gio-2.0';
 import GLib from '@girs/glib-2.0';
 import GObject from '@girs/gobject-2.0';
@@ -241,7 +242,9 @@ export class MainWindow extends Adw.ApplicationWindow {
   declare readonly _noAgentPage: Adw.StatusPage;
   declare readonly _noAgentBody: Gtk.Label;
   declare readonly _noAgentCommands: Gtk.Box;
-  declare readonly _noAgentDocs: Gtk.Label;
+  declare readonly _noAgentCommand: Gtk.Label;
+  declare readonly _noAgentCopy: Gtk.Button;
+  declare readonly _noAgentDocs: Gtk.LinkButton;
   declare readonly _noAgentPreferences: Gtk.Button;
 
   readonly #sessions: SessionList;
@@ -486,18 +489,14 @@ export class MainWindow extends Adw.ApplicationWindow {
   #showNoAgent(view: Extract<EmptyStateView, { kind: 'no-agent' }>, hasPreferences: boolean): void {
     this._noAgentPage.title = view.title;
     this._noAgentBody.label = view.body;
-    for (const command of view.commands) {
-      const label = new Gtk.Label({
-        label: command,
-        selectable: true,
-        useMarkup: false,
-        wrap: true,
-        xalign: 0,
-      });
-      label.add_css_class('monospace');
-      this._noAgentCommands.append(label);
-    }
-    this._noAgentDocs.label = `or see ${view.docsUrl}`;
+    // The page has room for one command and `emptyStateView` offers one; a second would need a second card.
+    const command = view.commands[0] ?? '';
+    this._noAgentCommand.label = command;
+    this._noAgentCopy.connect('clicked', () => {
+      Gdk.Display.get_default()?.get_clipboard().set(command);
+    });
+    this._noAgentDocs.label = view.docsUrl;
+    this._noAgentDocs.uri = view.docsUrl;
     this._noAgentPreferences.visible = hasPreferences;
     this._contentStack.visibleChildName = 'no-agent';
   }
@@ -583,7 +582,7 @@ export class MainWindow extends Adw.ApplicationWindow {
     this._contentStack.visibleChildName = this.#unavailable ? 'no-agent' : 'new';
     this._contentPage.title = APP_NAME;
     this._contentHeader.showTitle = false;
-    this._cwdCaption.label = `in ${displayCwd(chat.cwd, chat.home)}`;
+    this._cwdCaption.label = `Working in ${displayCwd(chat.cwd, chat.home)}`;
     this._cwdCaption.visible = !this.#unavailable;
     this._split.showContent = true;
   }
@@ -1348,6 +1347,8 @@ GObject.registerClass(
       'noAgentPage',
       'noAgentBody',
       'noAgentCommands',
+      'noAgentCommand',
+      'noAgentCopy',
       'noAgentDocs',
       'noAgentPreferences',
     ],
